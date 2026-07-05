@@ -1,5 +1,5 @@
 """Agent Runner V2.15.2 — 可插拔后端自动执行器"""
-import os, sys, json, subprocess, traceback, shutil
+import os, sys, json, subprocess, traceback, shutil, threading, queue, time
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from factor_lab.leader.workloop import (
@@ -12,6 +12,103 @@ REPO_ROOT = Path("/home/ly/.hermes/research-assistant")
 COMMANDS_DIR = REPO_ROOT / "commands"
 BACKEND_PRIORITY = ["claude", "command", "dry-run", "codex"]
 DEFAULT_BACKEND = "claude"
+
+
+def _run_streaming_process(cmd, log_file: Path, input_text: str | None = None,
+                           timeout: int = 600, shell: bool = False) -> dict:
+    """运行子进程，并把 stdout/stderr 合并实时写入 log_file。
+
+    Dashboard 的 /api/stream 会 tail agent_logs/*.log；这里必须边运行边 flush，
+    否则前端只能在 Claude/command 完成后看到整段输出，仍然是黑盒。
+    """
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    started = time.time()
+    output_parts: list[str] = []
+    q: queue.Queue[str | None] = queue.Queue()
+
+    def _reader(stream) -> None:
+        try:
+            for line in iter(stream.readline, ""):
+                q.put(line)
+        finally:
+            try:
+                stream.close()
+            except Exception:
+                pass
+            q.put(None)
+
+    printable_cmd = cmd if isinstance(cmd, str) else " ".join(str(x) for x in cmd)
+    with log_file.open("w", encoding="utf-8", errors="replace") as lf:
+        lf.write(f"$ {printable_cmd}\n")
+        lf.write(f"# started_at={datetime.now(CST).isoformat()}\n\n")
+        lf.flush()
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                cwd=str(COMMANDS_DIR),
+                stdin=subprocess.PIPE if input_text is not None else None,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                shell=shell,
+                env=os.environ.copy(),
+            )
+        except FileNotFoundError:
+            lf.write("ERROR: command not found\n")
+            lf.flush()
+            return {"success": False, "error": "command_not_found", "output": ""}
+
+        if input_text is not None and proc.stdin is not None:
+            try:
+                proc.stdin.write(input_text)
+                if not input_text.endswith("\n"):
+                    proc.stdin.write("\n")
+                proc.stdin.close()
+            except BrokenPipeError:
+                pass
+
+        reader = threading.Thread(target=_reader, args=(proc.stdout,), daemon=True)
+        reader.start()
+        stream_closed = False
+        timed_out = False
+        while True:
+            try:
+                item = q.get(timeout=0.2)
+                if item is None:
+                    stream_closed = True
+                else:
+                    output_parts.append(item)
+                    lf.write(item)
+                    lf.flush()
+            except queue.Empty:
+                pass
+
+            if not timed_out and time.time() - started > timeout:
+                timed_out = True
+                lf.write(f"\nTIMEOUT: process exceeded {timeout}s, killed.\n")
+                lf.flush()
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+
+            if stream_closed and proc.poll() is not None:
+                break
+
+        try:
+            returncode = proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            returncode = -9
+
+        finished_at = datetime.now(CST).isoformat()
+        lf.write(f"\n# finished_at={finished_at} returncode={returncode}\n")
+        lf.flush()
+
+    output = "".join(output_parts)
+    if timed_out:
+        return {"success": False, "error": "超时", "returncode": returncode, "output": output[:200]}
+    return {"success": returncode == 0, "returncode": returncode, "output": output[:200]}
 
 
 class AgentRunner:
@@ -122,19 +219,13 @@ class AgentRunner:
         return {"success": True, "backend": "dry-run", "output": "dry-run 完成"}
 
     def _backend_claude(self, prompt, task_id, log_file):
-        """claude: 调用本地 Claude Code CLI"""
+        """claude: 调用本地 Claude Code CLI，并把输出实时写入日志供 Dashboard SSE tail。"""
         cmd = ["claude", "--print", "--add-dir", str(COMMANDS_DIR), "--model", "deepseek-v4"]
-        try:
-            result = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=600)
-            output = result.stdout + result.stderr
-            log_file.write_text(output)
-            return {"success": result.returncode == 0, "backend": "claude", "output": output[:200]}
-        except subprocess.TimeoutExpired:
-            log_file.write_text("TIMEOUT: claude 执行超时")
-            return {"success": False, "error": "超时"}
-        except FileNotFoundError:
-            log_file.write_text("ERROR: claude 命令未找到")
-            return {"success": False, "error": "claude 命令未找到"}
+        result = _run_streaming_process(cmd, log_file, input_text=prompt, timeout=600)
+        result["backend"] = "claude"
+        if result.get("error") == "command_not_found":
+            result["error"] = "claude 命令未找到"
+        return result
 
     def _backend_command(self, prompt, task_id, log_file):
         """command: 使用环境变量 HERMES_AGENT_COMMAND 模板"""
@@ -147,14 +238,9 @@ class AgentRunner:
         prompt_file.write_text(prompt)
 
         cmd = cmd_template.format(prompt_file=str(prompt_file), repo_root=str(REPO_ROOT))
-        try:
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=600)
-            output = result.stdout + result.stderr
-            log_file.write_text(output)
-            return {"success": result.returncode == 0, "backend": "command", "output": output[:200]}
-        except subprocess.TimeoutExpired:
-            log_file.write_text("TIMEOUT: command 执行超时")
-            return {"success": False, "error": "超时"}
+        result = _run_streaming_process(cmd, log_file, timeout=600, shell=True)
+        result["backend"] = "command"
+        return result
 
     def _backend_codex(self, prompt, task_id, log_file):
         """codex: 备用后端，不默认启用"""

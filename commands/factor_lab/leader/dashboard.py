@@ -638,6 +638,41 @@ class _DashboardHandler(BaseHTTPRequestHandler):
             return
         self._send(404, b"not found", "text/plain; charset=utf-8")
 
+    def do_POST(self) -> None:  # noqa: N802 - stdlib hook
+        """Handle Agent Console mutations used by the browser UI.
+
+        The Console frontend creates and cancels sessions with POST. Keeping this
+        separate from do_GET prevents the browser from receiving the stdlib 501
+        response for an otherwise valid Agent Console action.
+        """
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/agent-console/sessions":
+            qs = parse_qs(parsed.query)
+            agent = qs.get("agent", ["hermes"])[0]
+            prompt = qs.get("prompt", [""])[0]
+            if not prompt.strip():
+                self._send(400, b'{"error":"prompt required"}', "application/json")
+                return
+            from factor_lab.agent_console.sessions import create_session
+            from factor_lab.agent_console.adapters import start_session
+            import threading as _t
+            sid = create_session(agent, prompt)
+            _t.Thread(target=start_session, args=(sid, agent, prompt), daemon=True).start()
+            body = json.dumps({"session_id": sid, "status": "running"}).encode()
+            self._send(201, body, "application/json; charset=utf-8")
+            return
+
+        if parsed.path.startswith("/api/agent-console/sessions/"):
+            parts = parsed.path.split("/")
+            if len(parts) >= 6 and parts[5] == "cancel":
+                sid = parts[4]
+                from factor_lab.agent_console.adapters import cancel_session
+                cancel_session(sid)
+                self._send(200, b'{"status":"cancelled"}', "application/json")
+                return
+
+        self._send(404, b"not found", "text/plain; charset=utf-8")
+
     def log_message(self, fmt: str, *args: Any) -> None:  # silence noisy access logs
         return
 

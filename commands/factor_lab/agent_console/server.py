@@ -40,10 +40,12 @@ CONSOLE_HTML = r"""<!doctype html>
   <div class="container">
     <div class="toolbar">
       <select id="agentSelect">
-        <option value="hermes">Hermes Agent</option>
-        <option value="claude">Claude Code</option>
-      </select>
-      <button id="startBtn" onclick="startSession()">开始</button>
+        <option value="hermes_demo">Hermes Agent (演示)</option>
+        <option value="hermes_research">Hermes Agent (研究)</option>
+        <option value="claude_code">Claude Code</option>
+        </select>
+        <span id="streamHint" style="font-size:12px;color:#9aa7c7;"></span>
+        <button id="startBtn" onclick="startSession()">开始</button>
       <button id="cancelBtn" onclick="cancelSession()" disabled>取消</button>
       <span id="sessionStatus" class="status-badge status-pending">就绪</span>
     </div>
@@ -56,14 +58,26 @@ CONSOLE_HTML = r"""<!doctype html>
     <div id="diagnosticArea" class="diagnostic-area"></div>
   </div>
 <script>
+const ADAPTER_INFO = {
+  'hermes_demo':  {label:'Hermes Agent (演示)', streaming:'buffered', hint:'缓冲模式 — 非逐 token'},
+  'hermes_research': {label:'Hermes Agent (研究)', streaming:'buffered', hint:'运行投研命令'},
+  'claude_code':  {label:'Claude Code', streaming:'buffered', hint:'缓冲模式 — 命令完成后输出'}
+};
+
+document.getElementById('agentSelect').addEventListener('change', function(){
+  const info = ADAPTER_INFO[this.value] || {hint:''};
+  document.getElementById('streamHint').textContent = info.hint;
+});
+
 let currentSession = null;
 let eventSource = null;
 
 function startSession(){
   const agent = document.getElementById('agentSelect').value;
+  const info = ADAPTER_INFO[agent] || {};
   const prompt = document.getElementById('promptInput').value.trim();
   if (!prompt) { alert('请输入任务描述'); return; }
-  document.getElementById('answerArea').textContent = '正在启动 ' + agent + ' session...';
+  document.getElementById('answerArea').textContent = '正在启动 ' + (info.label || agent) + '...';
   document.getElementById('diagnosticArea').textContent = '';
   document.getElementById('diagnosticArea').classList.remove('show');
   document.getElementById('startBtn').disabled = true;
