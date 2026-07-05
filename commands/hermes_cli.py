@@ -129,6 +129,9 @@ leader:task-submit --text "..." --title "任务标题"
                               提交新任务到 inbox
 leader:auto-run-once          自动执行器: 读取路线图 cursor，执行当前版本
 leader:auto-status            自动执行器状态
+leader:dashboard [--host 127.0.0.1] [--port 8765]
+                              本地只读 Web 监控台: 自动版本推进实时状态
+leader:dashboard-json         输出 dashboard 使用的状态 JSON
 Leader 自动派发:
   leader:inspect                 Leader 只读检查本地报告/代码/Registry，判断 V3 阶段
   leader:dispatch [--dry-run]    按 Alpha Factory 路线图生成 agent_tasks 任务包
@@ -791,6 +794,20 @@ run_daily_premarket(no_notify=True)
         s = policy_status()
         for k, v in s.items():
             print(f"  {k}: {v}")
+
+    elif command == "leader:dashboard":
+        import argparse
+        p = argparse.ArgumentParser()
+        p.add_argument("--host", default="127.0.0.1")
+        p.add_argument("--port", type=int, default=8765)
+        a = p.parse_args(args)
+        from factor_lab.leader.dashboard import serve
+        serve(host=a.host, port=a.port)
+
+    elif command == "leader:dashboard-json":
+        import json
+        from factor_lab.leader.dashboard import collect_status
+        print(json.dumps(collect_status(), ensure_ascii=False, indent=2))
 
     elif command == "leader:accept":
         from factor_lab.leader.leader_cli import main as leader_main
