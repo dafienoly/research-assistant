@@ -141,4 +141,5 @@ def test_claude_stream_transform_suppresses_noisy_events():
 
     assert _extract_claude_stream_text('{"type":"stream_event"}') == ""
     assert _extract_claude_stream_text('{"type":"system","subtype":"status"}') == ""
+    assert _extract_claude_stream_text('{"type":"assistant"}') == ""
     assert _extract_claude_stream_text('{"type":"assistant","message":{"content":[{"text":"hello"}]}}') == "hello"

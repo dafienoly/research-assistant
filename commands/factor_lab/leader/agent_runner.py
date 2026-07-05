@@ -45,9 +45,9 @@ def _extract_claude_stream_text(line: str) -> str:
 
     event_type = event.get("type") or event.get("event") or "event"
     subtype = event.get("subtype") or event.get("name") or ""
-    if event_type in {"stream_event"} or (event_type == "system" and subtype in {"init", "status"}):
-        return ""
     label = f"[claude:{event_type}{':' + subtype if subtype else ''}]"
+    if event_type not in {"error"}:
+        return ""
     return label + "\n"
 
 
