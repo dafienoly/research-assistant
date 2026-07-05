@@ -10,7 +10,7 @@ if (-not (Test-Path $BatchDir)) { New-Item -ItemType Directory -Force -Path $Bat
 
 @"
 @echo off
-wsl -d Ubuntu -- bash -lc "~/research-assistant/commands/scripts/run_hermes_agent_runner.sh"
+wsl -d Ubuntu -- bash -lc "/home/ly/.hermes/research-assistant/commands/scripts/run_hermes_agent_runner.sh"
 "@ | Out-File -FilePath $ScriptPath -Encoding ASCII
 
 # Register schtasks
