@@ -31,15 +31,27 @@ def _write_latest(run_id, run_dir, version, task_count):
     }, indent=2))
 
 
+def _make_roadmap_task(version: str) -> str:
+    """生成完整的 roadmap 任务描述"""
+    from factor_lab.leader.roadmap import get_version
+    v = get_version(version)
+    if v:
+        return (f"# T001 — {v.name}\n- Version: {v.version}\n- Priority: P1\n"
+                f"- Owner: hermes_auto_developer\n- Status: pending\n\n"
+                f"## 描述\nImplement {v.version}: {v.name}\nObjective: {v.objective}\n\n"
+                f"## 验收标准\n- Implement roadmap item\n- Run tests\n- Produce completion signal\n\n"
+                f"## 安全边界\nauto_apply=False, no_live_trade=True")
+    return f"# T001 — {version}\n- Version: {version}\n- Priority: P1\n- Owner: hermes_auto_developer\n"
+
+
 def _ensure_latest_clean(version):
-    """确保 latest.json 与 cursor 一致，不清除则重建"""
     latest = _read_latest()
     if not latest or latest.get("current") != version:
-        tid = f"align_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}"
+        tid = f"roadmap_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}"
         run_dir = TASKS_DIR / tid
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "tasks").mkdir(exist_ok=True)
-        (run_dir / "tasks" / "T001.md").write_text(f"Align {version}")
+        (run_dir / "tasks" / "T001.md").write_text(_make_roadmap_task(version))
         (run_dir / "tasks.json").write_text('["T001"]')
         _write_latest(tid, run_dir, version, 1)
 
@@ -107,11 +119,13 @@ def auto_run_once():
         return {"status": "blocked", "reason": "coding_backend_not_configured"}
 
     # 5. Execute agent-runner
+    agent_log_dir = TASKS_DIR / "agent_logs"
+    agent_log_dir.mkdir(parents=True, exist_ok=True)
     try:
         result = subprocess.run(
             [VENV, CLI, "leader:agent-runner", "--once", "--backend", backend],
             capture_output=True, text=True, timeout=60)
-        agent_ok = result.returncode == 0
+        agent_ok = result.returncode == 0 and "Status: completed" in result.stdout
     except subprocess.TimeoutExpired:
         agent_ok = False
     except Exception:
@@ -130,10 +144,10 @@ def auto_run_once():
     except Exception:
         test_ok = False
 
-    # 7. Acceptance / Git commit / Advance
-    # 规则: 只有 test_ok=True 才 advance cursor, 且 return status 必须匹配
+    # 7. Acceptance: 必须 agent_ok AND test_ok 才能 advance
     commit = ""
-    if test_ok:
+    report_path = str(agent_log_dir)
+    if agent_ok and test_ok:
         try:
             r = subprocess.run(["git", "rev-parse", "HEAD"],
                                 capture_output=True, text=True,
@@ -145,16 +159,17 @@ def auto_run_once():
         nv = next_version(current)
         next_q = f"continue with {nv.version}" if nv else "roadmap complete"
         write_completion("completed", current, cv.name,
+                          report_dir=report_path,
                           summary={"passed": 1, "failed": 0,
-                                   "note": f"Version {current} tests passed"},
+                                   "note": f"Version {current} completed"},
                           completed_tasks=[current], remaining_tasks=[],
                           next_question=next_q)
         _status = "completed"
     else:
-        advance(current, "failed")
         write_completion("partial", current, cv.name,
+                          report_dir=report_path,
                           summary={"passed": 0, "failed": 1,
-                                   "note": f"Version {current} tests failed"},
+                                   "note": f"agent_ok={agent_ok} test_ok={test_ok}"},
                           remaining_tasks=[current],
                           next_question="fix before continuing")
         _status = "partial"

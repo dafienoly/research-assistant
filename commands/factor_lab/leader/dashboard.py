@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import time
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -137,45 +138,148 @@ def _latest_task_snapshot(latest: dict[str, Any]) -> dict[str, Any]:
     return {"task_files": names, "bad_markers": bad}
 
 
-def _agent_output_snapshot(latest: dict[str, Any], completion: dict[str, Any], lines: int = 120) -> dict[str, Any]:
-    """读取当前/最近 agent backend 输出，给前端模拟“会话输出”。
+def _related_run_ids(run_id: str | None) -> list[str]:
+    # 不把 align_* 猜成 auto_*；同秒生成的二者可能不是同一轮任务。
+    return [run_id] if run_id else []
 
-    Cron 是无头进程，不会像手动聊天一样主动把回答推到当前终端；
-    AgentRunner 会把每个任务的模型输出写入 agent_tasks/agent_logs/<run_id>/*.log。
-    """
+
+def _log_has_bad_markers(path: Path) -> bool:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")[:6000]
+    except Exception:
+        return False
+    bad = ("V2.15", "some_task", "dry_run_completion", "[DRY-RUN] 未调用模型")
+    return any(marker in text for marker in bad)
+
+
+def _agent_log_files(latest: dict[str, Any], completion: dict[str, Any]) -> list[Path]:
     candidates: list[Path] = []
     report_dir = completion.get("report_dir")
     if report_dir:
         candidates.append(Path(report_dir))
-    run_id = latest.get("run_id")
-    if run_id:
-        candidates.append(AGENT_LOG_ROOT / run_id)
 
-    # 兜底：取最近一个 agent_logs 目录，避免 latest 已推进到下一版本时看不到上一轮输出。
+    for rid in _related_run_ids(latest.get("run_id")):
+        candidates.append(AGENT_LOG_ROOT / rid)
+
     if AGENT_LOG_ROOT.exists():
-        recent_dirs = sorted([p for p in AGENT_LOG_ROOT.iterdir() if p.is_dir()], key=lambda p: p.stat().st_mtime, reverse=True)
-        candidates.extend(recent_dirs[:3])
+        recent_dirs = sorted(
+            [p for p in AGENT_LOG_ROOT.iterdir() if p.is_dir()],
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        candidates.extend(recent_dirs[:8])
 
     seen: set[str] = set()
-    log_files: list[Path] = []
+    files: list[Path] = []
     for d in candidates:
         if not d.exists() or not d.is_dir():
             continue
         for f in sorted(d.glob("*.log"), key=lambda p: p.stat().st_mtime, reverse=True):
+            if _log_has_bad_markers(f):
+                continue
             key = str(f)
             if key not in seen:
                 seen.add(key)
-                log_files.append(f)
+                files.append(f)
+    return files
 
+
+def _agent_output_snapshot(latest: dict[str, Any], completion: dict[str, Any], lines: int = 160) -> dict[str, Any]:
+    """读取当前/最近 agent backend 输出，过滤旧 V2.15/dry-run 污染。"""
+    log_files = _agent_log_files(latest, completion)
     snippets = []
-    for f in log_files[:6]:
+    POLLUTION = ("V2.15", "some_task", "dry_run_completion", "rebalance_diff real dry-run",
+                 "[DRY-RUN]", "Align V", "live_execution")
+    for f in log_files[:8]:
+        raw = _tail(f, lines)
+        # 如果文件内容全部是污染日志，跳过
+        clean_lines = [l for l in raw if not any(p in l for p in POLLUTION)]
+        if not clean_lines:
+            continue
         snippets.append({
             "file": str(f),
             "mtime": datetime.fromtimestamp(f.stat().st_mtime, tz=CST).isoformat(),
-            "lines": _tail(f, lines),
+            "lines": clean_lines[-80:],
         })
     return {"log_files": [s["file"] for s in snippets], "snippets": snippets}
 
+
+def _roadmap_details() -> list[dict[str, Any]]:
+    rows = []
+    for item in get_roadmap():
+        d = _as_dict(item)
+        version = d.get("version", "")
+        if version.startswith("V3"):
+            series = "V3 Alpha Factory"
+        elif version.startswith("V4"):
+            series = "V4 Controlled Execution"
+        elif version.startswith("V5"):
+            series = "V5 Data Platform"
+        elif version.startswith("V6"):
+            series = "V6 Research Automation"
+        elif version.startswith("V7"):
+            series = "V7 Product UI/Ops"
+        elif version.startswith("V8"):
+            series = "V8 Multi-Agent Engineering"
+        elif version.startswith("V9"):
+            series = "V9 Future Backlog"
+        else:
+            series = "Other"
+        d["series"] = series
+        d["backlog"] = is_backlog(version)
+        rows.append(d)
+    return rows
+
+
+def _stream_event(handler: BaseHTTPRequestHandler, event: str, payload: dict[str, Any]) -> bool:
+    try:
+        data = json.dumps(payload, ensure_ascii=False)
+        handler.wfile.write(f"event: {event}\n".encode("utf-8"))
+        for line in data.splitlines() or [""]:
+            handler.wfile.write(f"data: {line}\n".encode("utf-8"))
+        handler.wfile.write(b"\n")
+        handler.wfile.flush()
+        return True
+    except (BrokenPipeError, ConnectionResetError):
+        return False
+
+
+def _stream_logs(handler: BaseHTTPRequestHandler, max_seconds: int = 3600) -> None:
+    watched: dict[Path, int] = {}
+
+    def update_watch_files() -> None:
+        for path in [LOG_PATH, *_agent_log_files(_read_json(LATEST), _read_json(COMPLETION))[:8]]:
+            if path.exists() and path not in watched:
+                # SSE 只推新增内容；历史快照由 /api/status 提供。
+                watched[path] = path.stat().st_size
+
+    update_watch_files()
+    started = time.time()
+    last_status = 0.0
+    while time.time() - started < max_seconds:
+        now = time.time()
+        if now - last_status >= 5:
+            if not _stream_event(handler, "status", collect_status()):
+                return
+            last_status = now
+            update_watch_files()
+
+        for path in list(watched):
+            if not path.exists():
+                continue
+            size = path.stat().st_size
+            offset = watched.get(path, 0)
+            if size < offset:
+                offset = 0
+            if size > offset:
+                with path.open("r", encoding="utf-8", errors="replace") as f:
+                    f.seek(offset)
+                    chunk = f.read()
+                watched[path] = size
+                event = "runner_log" if path == LOG_PATH else "agent_log"
+                if not _stream_event(handler, event, {"file": str(path), "chunk": chunk, "at": _now()}):
+                    return
+        time.sleep(1)
 
 def _derive_state(health_info: dict[str, Any], latest: dict[str, Any], completion: dict[str, Any], cursor: dict[str, Any], log_lines: list[str], git: dict[str, Any]) -> dict[str, Any]:
     reasons: list[str] = []
@@ -250,6 +354,7 @@ def collect_status() -> dict[str, Any]:
         "state": state,
         "health": health_info,
         "roadmap_progress": progress,
+        "roadmap_details": _roadmap_details(),
         "cursor": cursor,
         "latest": latest,
         "latest_completion": completion,
@@ -292,12 +397,17 @@ DASHBOARD_HTML = r"""
     li { margin: 5px 0; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .ok { color: #7df0bd; } .bad { color: #ff8ba0; } .warn { color: #ffdc7a; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { border-bottom: 1px solid #25304c; padding: 8px 6px; text-align: left; vertical-align: top; }
+    th { color: #9aa7c7; position: sticky; top: 0; background: #121a35; }
+    .wide { grid-column: 1 / -1; }
+    #streamOutput { max-height: 520px; white-space: pre-wrap; }
   </style>
 </head>
 <body>
   <header>
     <h1>Hermes 自动版本推进监控台</h1>
-    <div class="sub">只读本地页面 · 每 5 秒刷新 · <span id="updated">加载中...</span></div>
+    <div class="sub">只读本地页面 · 状态每 5 秒刷新 · SSE 日志流式更新 · <span id="updated">加载中...</span></div>
   </header>
   <main>
     <section class="card">
@@ -314,10 +424,16 @@ DASHBOARD_HTML = r"""
       <div class="card"><h2>Git</h2><div id="git"></div></div>
     </section>
 
+    <section class="card wide">
+      <h2>固定版本规划详情</h2>
+      <div id="roadmapDetails"></div>
+    </section>
+
     <section class="grid">
       <div class="card"><h2>当前任务文件</h2><pre id="tasks"></pre></div>
-      <div class="card"><h2>Hermes 实时运行输出</h2><pre id="agentOutput"></pre></div>
-      <div class="card"><h2>Runner 最近日志</h2><pre id="logs"></pre></div>
+      <div class="card wide"><h2>SSE 实时日志流</h2><pre id="streamOutput">等待日志流连接...</pre></div>
+      <div class="card"><h2>Hermes Backend 输出快照</h2><pre id="agentOutput"></pre></div>
+      <div class="card"><h2>Runner 最近日志快照</h2><pre id="logs"></pre></div>
     </section>
   </main>
 <script>
@@ -326,39 +442,39 @@ function metric(k,v){ return `<div class="metric"><span>${esc(k)}</span><span cl
 function renderMetrics(el, obj, keys){
   document.getElementById(el).innerHTML = keys.map(([k,label]) => metric(label, obj?.[k])).join('');
 }
-async function refresh(){
+function renderRoadmapDetails(rows, cursor){
+  const completed = new Set(cursor?.completed_versions || []);
+  const current = cursor?.current_version || '';
+  const html = `<table><thead><tr>
+    <th>系列</th><th>版本</th><th>名称</th><th>目标</th><th>自动</th><th>人工门禁</th><th>交易模式</th><th>状态</th>
+  </tr></thead><tbody>` + (rows || []).map(r => {
+    const st = r.version === current ? '当前' : completed.has(r.version) ? '已完成' : r.backlog ? 'Backlog' : '待执行';
+    return `<tr><td>${esc(r.series)}</td><td class="mono">${esc(r.version)}</td><td>${esc(r.name)}</td><td>${esc(r.objective)}</td><td>${esc(r.auto_allowed)}</td><td>${esc(r.manual_required)}</td><td>${esc(r.trading_mode)}</td><td>${esc(st)}</td></tr>`;
+  }).join('') + '</tbody></table>';
+  document.getElementById('roadmapDetails').innerHTML = html;
+}
+function appendStream(kind, text){
+  const el = document.getElementById('streamOutput');
+  const prefix = kind ? `\n### ${kind}\n` : '';
+  el.textContent += prefix + text;
+  const maxLen = 60000;
+  if (el.textContent.length > maxLen) el.textContent = el.textContent.slice(-maxLen);
+  el.scrollTop = el.scrollHeight;
+}
+function startStream(){
+  if (!window.EventSource) { appendStream('SSE', '浏览器不支持 EventSource，使用快照刷新。\n'); return; }
+  const es = new EventSource('/api/stream');
+  es.addEventListener('open', () => appendStream('SSE', '已连接日志流。\n'));
+  es.addEventListener('status', ev => { try { renderStatus(JSON.parse(ev.data)); } catch(e){} });
+  es.addEventListener('runner_log', ev => { const x = JSON.parse(ev.data); appendStream('runner ' + x.file, x.chunk); });
+  es.addEventListener('agent_log', ev => { const x = JSON.parse(ev.data); appendStream('agent ' + x.file, x.chunk); });
+  es.onerror = () => appendStream('SSE', '连接中断，浏览器会自动重连。\n');
+}
+function renderStatus(s){
   try {
     const r = await fetch('/api/status', {cache: 'no-store'});
     const s = await r.json();
-    document.getElementById('updated').textContent = s.generated_at;
-    const badge = document.getElementById('stateBadge');
-    badge.className = 'status ' + s.state.level;
-    badge.textContent = s.state.label;
-    document.getElementById('reasons').innerHTML = s.state.reasons.map(x => `<li>${esc(x)}</li>`).join('');
-
-    const p = s.roadmap_progress;
-    document.getElementById('roadmap').innerHTML =
-      metric('当前版本', s.cursor.current_version) +
-      metric('当前名称', p.current_item?.name || '') +
-      metric('已完成版本', `${p.completed_auto_versions}/${p.total_auto_versions}`) +
-      `<div class="bar"><div style="width:${p.percent}%"></div></div>` +
-      metric('进度', `${p.percent}%`) +
-      metric('后续版本', (p.next_versions || []).join(' → '));
-
-    renderMetrics('health', s.health, [
-      ['cron_service_running','cron running'], ['latest_tick_at','latest tick'], ['tick_age_seconds','tick age 秒'],
-      ['tick_count','tick count'], ['lock_status','lock'], ['latest_completion_status','completion status']
-    ]);
-    renderMetrics('latest', s.latest, [['current','current'], ['status','status'], ['task_count','task_count'], ['run_id','run_id'], ['updated_at','updated_at']]);
-    renderMetrics('completion', s.latest_completion, [['version','version'], ['stage','stage'], ['status','status'], ['next_question','next_question'], ['generated_at','generated_at']]);
-    renderMetrics('backend', s.backend, [['coding_backend_configured','coding backend'], ['default_for_code_change','code backend'], ['claude_bin_path','claude path'], ['cron_safe','cron_safe']]);
-    document.getElementById('git').innerHTML = metric('HEAD', s.git.head) + metric('dirty', s.git.dirty) + '<pre>' + esc((s.git.recent_commits || []).join('\n')) + '</pre>';
-    document.getElementById('tasks').textContent = JSON.stringify(s.latest_task_snapshot, null, 2);
-    const snippets = s.agent_output?.snippets || [];
-    document.getElementById('agentOutput').textContent = snippets.length
-      ? snippets.map(x => `### ${x.file} @ ${x.mtime}\n${(x.lines || []).join('\n')}`).join('\n\n')
-      : '暂无 agent backend 输出。等待下一轮任务执行，或检查 agent_tasks/agent_logs/。';
-    document.getElementById('logs').textContent = (s.log_tail || []).join('\n');
+    renderStatus(s);
   } catch(e) {
     document.getElementById('stateBadge').className = 'status red';
     document.getElementById('stateBadge').textContent = '页面刷新失败';
@@ -366,6 +482,7 @@ async function refresh(){
   }
 }
 refresh();
+startStream();
 setInterval(refresh, 5000);
 </script>
 </body>
@@ -395,6 +512,18 @@ class _DashboardHandler(BaseHTTPRequestHandler):
             lines = int(qs.get("lines", ["120"])[0])
             body = json.dumps({"lines": _tail(LOG_PATH, lines)}, ensure_ascii=False, indent=2).encode("utf-8")
             self._send(200, body, "application/json; charset=utf-8")
+            return
+        if parsed.path == "/api/roadmap":
+            body = json.dumps({"items": _roadmap_details()}, ensure_ascii=False, indent=2).encode("utf-8")
+            self._send(200, body, "application/json; charset=utf-8")
+            return
+        if parsed.path == "/api/stream":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.end_headers()
+            _stream_logs(self)
             return
         if parsed.path == "/api/agent-output":
             body = json.dumps(
