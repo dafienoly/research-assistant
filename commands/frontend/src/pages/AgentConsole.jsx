@@ -1,231 +1,87 @@
 import { useState, useRef, useEffect } from 'react'
-import { Card, Button, Tag, Space, Typography, Empty, Spin, Badge } from 'antd'
-import {
-  PlayCircleOutlined,
-  PauseCircleOutlined,
-  StopOutlined,
-  ReloadOutlined,
-  RobotOutlined,
-} from '@ant-design/icons'
-import useSSE from '../hooks/useSSE'
+import { Card, Button, Select, Tag, Typography, Input } from 'antd'
+import { API } from '../App'
 
-const { Text, Paragraph } = Typography
-
-const SEVERITY_COLORS = {
-  info: 'default',
-  success: 'success',
-  warning: 'warning',
-  error: 'error',
-  debug: 'geekblue',
-}
+const { TextArea } = Input
+const cardStyle = { background: '#121a35', border: '1px solid #26304f', borderRadius: 12, marginBottom: 16 }
 
 export default function AgentConsole() {
-  const [logs, setLogs] = useState([])
-  const [paused, setPaused] = useState(false)
-  const logEndRef = useRef(null)
-  const logContainerRef = useRef(null)
-  const autoScrollRef = useRef(true)
+  const [agent, setAgent] = useState('hermes_research')
+  const [prompt, setPrompt] = useState('')
+  const [sid, setSid] = useState(null)
+  const [answer, setAnswer] = useState('')
+  const [diag, setDiag] = useState('')
+  const [status, setStatus] = useState('idle')
+  const [hint, setHint] = useState('')
+  const answerRef = useRef(null)
+  const esRef = useRef(null)
 
-  const SSE_URL = '/api/agents/events'
+  const adapters = {
+    hermes_demo: { label: 'Hermes Agent (演示)', hint: '缓冲模式 — dry-run' },
+    hermes_research: { label: 'Hermes Agent (研究)', hint: '运行投研命令' },
+    claude_code: { label: 'Claude Code', hint: '缓冲模式 — 命令完成后输出' },
+  }
 
-  const { data: sseData, isConnected, connect, disconnect } = useSSE(SSE_URL, {
-    events: ['agent_log', 'agent_status', 'message'],
-    autoConnect: false,
-    reconnectDelay: 2000,
-  })
+  const start = async () => {
+    if (!prompt.trim()) return
+    setAnswer(''); setDiag(''); setStatus('running')
+    const a = adapters[agent] || {}
+    setHint(a.hint || '')
+    try {
+      const r = await fetch(`${API}/api/agent-console/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent, prompt })
+      })
+      const d = await r.json()
+      setSid(d.session_id)
+      connectSSE(d.session_id)
+    } catch (e) { setStatus('error'); setAnswer('启动失败: ' + e.message) }
+  }
 
-  // Incoming SSE data
-  useEffect(() => {
-    if (!sseData) return
-    const { event, data } = sseData
-
-    if (event === 'agent_log') {
-      const entry = {
-        id: Date.now() + Math.random(),
-        timestamp: new Date().toLocaleTimeString(),
-        agent: data.agent || 'system',
-        level: data.level || 'info',
-        message: data.message || '',
-      }
-      setLogs((prev) => (paused ? prev : [...prev.slice(-500), entry]))
-    } else if (event === 'agent_status') {
-      const entry = {
-        id: Date.now() + Math.random(),
-        timestamp: new Date().toLocaleTimeString(),
-        agent: data.agent || 'system',
-        level: 'info',
-        message: `[状态变更] ${data.agent} → ${data.status}`,
-      }
-      setLogs((prev) => (paused ? prev : [...prev.slice(-500), entry]))
+  const connectSSE = (sid) => {
+    if (esRef.current) esRef.current.close()
+    const es = new EventSource(`${API}/api/agent-console/sessions/${sid}/stream`)
+    esRef.current = es
+    es.onmessage = (ev) => {
+      try {
+        const d = JSON.parse(ev.data)
+        if (d.type === 'answer_delta') { setAnswer(p => p + d.data) }
+        else if (d.type === 'diagnostic') { setDiag(p => p + d.data + '\n') }
+        else if (d.type === 'error') { setAnswer(p => p + '\n[错误] ' + d.data) }
+        else if (d.type === 'done') { setStatus(d.status || 'completed'); es.close() }
+      } catch (e) {}
     }
-  }, [sseData, paused])
-
-  // Auto-scroll
-  useEffect(() => {
-    if (autoScrollRef.current && logEndRef.current) {
-      logEndRef.current.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [logs])
-
-  const handleScroll = () => {
-    const el = logContainerRef.current
-    if (!el) return
-    const threshold = 40
-    autoScrollRef.current =
-      el.scrollHeight - el.scrollTop - el.clientHeight < threshold
+    es.onerror = () => { setStatus('completed'); es.close() }
   }
 
-  const handleConnect = () => {
-    setLogs((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        timestamp: new Date().toLocaleTimeString(),
-        agent: 'system',
-        level: 'info',
-        message: '正在连接 SSE 事件流...',
-      },
-    ])
-    connect()
+  const cancel = async () => {
+    if (sid) await fetch(`${API}/api/agent-console/sessions/${sid}/cancel`, { method: 'POST' })
+    setStatus('cancelled')
   }
 
-  const handleDisconnect = () => {
-    disconnect()
-    setLogs((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        timestamp: new Date().toLocaleTimeString(),
-        agent: 'system',
-        level: 'warning',
-        message: '已断开 SSE 连接',
-      },
-    ])
-  }
+  useEffect(() => { if (answerRef.current) answerRef.current.scrollTop = answerRef.current.scrollHeight }, [answer])
 
-  const handleClear = () => {
-    setLogs([])
-  }
+  const tagColor = { idle: 'default', running: 'processing', completed: 'success', error: 'error', cancelled: 'warning' }
 
-  // Simulate a log when not connected (development fallback)
-  const handleSimulate = () => {
-    const agents = ['Research Agent', 'Strategy Agent', 'Data Agent', 'Monitor Agent']
-    const levels = ['info', 'success', 'warning', 'error']
-    const messages = [
-      '正在执行任务分析...',
-      '数据提取完成',
-      'API 响应延迟较高',
-      '任务调度异常，正在重试',
-      '策略回测已完成',
-      '知识库索引更新中',
-      '新事件已捕获',
-      '模型推理完成',
-    ]
-    setLogs((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        timestamp: new Date().toLocaleTimeString(),
-        agent: agents[Math.floor(Math.random() * agents.length)],
-        level: levels[Math.floor(Math.random() * levels.length)],
-        message: messages[Math.floor(Math.random() * messages.length)],
-      },
-    ])
-  }
-
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2 style={{ margin: 0 }}>
-          <RobotOutlined style={{ marginRight: 8 }} />
-          智能体控制台
-        </h2>
-        <Space>
-          <Badge status={isConnected ? 'success' : 'default'} text={isConnected ? '已连接' : '未连接'} />
-          {!isConnected ? (
-            <Button type="primary" icon={<PlayCircleOutlined />} onClick={handleConnect}>
-              连接
-            </Button>
-          ) : (
-            <Button danger icon={<StopOutlined />} onClick={handleDisconnect}>
-              断开
-            </Button>
-          )}
-          <Button
-            icon={paused ? <PlayCircleOutlined /> : <PauseCircleOutlined />}
-            onClick={() => setPaused((p) => !p)}
-          >
-            {paused ? '继续' : '暂停'}
-          </Button>
-          <Button icon={<ReloadOutlined />} onClick={handleClear}>
-            清空
-          </Button>
-          <Button onClick={handleSimulate}>模拟日志</Button>
-        </Space>
+  return <div>
+    <Card style={cardStyle}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <Select value={agent} onChange={setAgent} style={{ width: 220 }}
+          options={Object.entries(adapters).map(([k, v]) => ({ value: k, label: v.label }))} />
+        <span style={{ color: '#9aa7c7', fontSize: 12 }}>{hint}</span>
+        <Button type="primary" onClick={start} disabled={status === 'running'}>开始</Button>
+        <Button onClick={cancel} disabled={status !== 'running'}>取消</Button>
+        <Tag color={tagColor[status]}>{status}</Tag>
       </div>
-
-      <Card
-        style={{
-          background: '#1a1a2e',
-          borderRadius: 8,
-          fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace",
-          fontSize: 13,
-        }}
-        bodyStyle={{ padding: 0 }}
-      >
-        <div
-          ref={logContainerRef}
-          onScroll={handleScroll}
-          style={{
-            height: 'calc(100vh - 220px)',
-            overflow: 'auto',
-            padding: '12px 16px',
-          }}
-        >
-          {logs.length === 0 ? (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={
-                <Text style={{ color: '#888' }}>
-                  暂无日志，点击「连接」或「模拟日志」开始
-                </Text>
-              }
-            />
-          ) : (
-            logs.map((entry) => (
-              <div
-                key={entry.id}
-                style={{
-                  display: 'flex',
-                  gap: 12,
-                  padding: '2px 0',
-                  lineHeight: '22px',
-                  color:
-                    entry.level === 'error'
-                      ? '#ff4d4f'
-                      : entry.level === 'warning'
-                      ? '#faad14'
-                      : entry.level === 'success'
-                      ? '#52c41a'
-                      : '#e0e0e0',
-                }}
-              >
-                <span style={{ color: '#666', flexShrink: 0, width: 80 }}>
-                  {entry.timestamp}
-                </span>
-                <Tag
-                  color={SEVERITY_COLORS[entry.level] || 'default'}
-                  style={{ fontSize: 11, lineHeight: '18px', flexShrink: 0 }}
-                >
-                  {entry.agent}
-                </Tag>
-                <span style={{ wordBreak: 'break-all' }}>{entry.message}</span>
-              </div>
-            ))
-          )}
-          <div ref={logEndRef} />
-        </div>
-      </Card>
-    </div>
-  )
+      <TextArea rows={3} value={prompt} onChange={e => setPrompt(e.target.value)}
+        placeholder="输入投研或开发任务..." style={{ background: '#080d1c', color: '#e8ecf8', border: '1px solid #26304f' }} />
+    </Card>
+    <Card style={cardStyle} title={<span style={{ color: '#cdd6f8' }}>💬 回答</span>}>
+      <pre ref={answerRef} style={{ background: '#121a35', color: '#e8ecf8', padding: 16, borderRadius: 8, minHeight: 200, maxHeight: 400, overflow: 'auto', whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.6, border: '1px solid #26304f' }}>{answer || '等待输入...'}</pre>
+    </Card>
+    {diag && <details style={{ marginTop: 8 }}><summary style={{ color: '#9aa7c7', cursor: 'pointer', fontSize: 12 }}>📋 诊断信息</summary>
+      <pre style={{ background: '#080d1c', color: '#9aa7c7', padding: 10, borderRadius: 8, fontSize: 12, maxHeight: 200, overflow: 'auto', marginTop: 8 }}>{diag}</pre>
+    </details>}
+  </div>
 }

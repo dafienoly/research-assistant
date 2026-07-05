@@ -1,94 +1,51 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom'
-import { Layout, Menu, Typography } from 'antd'
+import { Layout, Menu, Typography, Spin } from 'antd'
 import {
-  DashboardOutlined,
-  RobotOutlined,
-  SearchOutlined,
-  BookOutlined,
-  SettingOutlined,
+  DashboardOutlined, RobotOutlined, ForkOutlined, FileTextOutlined, HistoryOutlined
 } from '@ant-design/icons'
-
 import Dashboard from './pages/Dashboard'
 import AgentConsole from './pages/AgentConsole'
-import Research from './pages/Research'
-import KnowledgeBase from './pages/KnowledgeBase'
-import Settings from './pages/Settings'
+import Roadmap from './pages/Roadmap'
+import Reports from './pages/Reports'
+import SessionHistory from './pages/SessionHistory'
 
-const { Sider, Content, Header } = Layout
+const API = 'http://127.0.0.1:8766'
+export { API }
 
-const MENU_ITEMS = [
-  {
-    key: '/',
-    icon: <DashboardOutlined />,
-    label: <NavLink to="/" end>总览</NavLink>,
-  },
-  {
-    key: '/console',
-    icon: <RobotOutlined />,
-    label: <NavLink to="/console">智能体控制台</NavLink>,
-  },
-  {
-    key: '/research',
-    icon: <SearchOutlined />,
-    label: <NavLink to="/research">研究</NavLink>,
-  },
-  {
-    key: '/knowledge',
-    icon: <BookOutlined />,
-    label: <NavLink to="/knowledge">知识库</NavLink>,
-  },
-  {
-    key: '/settings',
-    icon: <SettingOutlined />,
-    label: <NavLink to="/settings">设置</NavLink>,
-  },
+const { Sider, Content } = Layout
+
+const MENU = [
+  { key: '/', icon: <DashboardOutlined />, label: <NavLink to="/" end>总览</NavLink> },
+  { key: '/console', icon: <RobotOutlined />, label: <NavLink to="/console">Agent Console</NavLink> },
+  { key: '/roadmap', icon: <ForkOutlined />, label: <NavLink to="/roadmap">路线图</NavLink> },
+  { key: '/reports', icon: <FileTextOutlined />, label: <NavLink to="/reports">版本报告</NavLink> },
+  { key: '/history', icon: <HistoryOutlined />, label: <NavLink to="/history">Session 历史</NavLink> },
 ]
 
 export default function App() {
   const [collapsed, setCollapsed] = useState(false)
-
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider
-        collapsible
-        collapsed={collapsed}
-        onCollapse={setCollapsed}
-        theme="light"
-        style={{
-          borderRight: '1px solid #f0f0f0',
-          boxShadow: '2px 0 8px rgba(0,0,0,0.04)',
-        }}
-      >
-        <div
-          style={{
-            height: 56,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderBottom: '1px solid #f0f0f0',
-          }}
-        >
-          <Typography.Title level={4} style={{ margin: 0, whiteSpace: 'nowrap' }}>
-            {collapsed ? '🧠' : '🧠 Research Assistant'}
+    <Layout style={{ minHeight: '100vh', background: '#0b1020' }}>
+      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed}
+        theme="dark" width={200}
+        style={{ background: '#111832', borderRight: '1px solid #26304f' }}>
+        <div style={{ height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #26304f' }}>
+          <Typography.Title level={5} style={{ margin: 0, color: '#cdd6f8', fontSize: 14 }}>
+            {collapsed ? '⚡' : '⚡ Hermes Auto Dashboard'}
           </Typography.Title>
         </div>
-        <Menu
-          mode="inline"
-          defaultSelectedKeys={['/']}
-          items={MENU_ITEMS}
-          style={{ borderInlineEnd: 'none' }}
-        />
+        <Menu mode="inline" theme="dark" defaultSelectedKeys={['/']}
+          items={MENU} style={{ background: 'transparent', borderInlineEnd: 'none' }} />
       </Sider>
-
-      <Layout>
+      <Layout style={{ background: '#0b1020' }}>
         <Content style={{ padding: 24, overflow: 'auto' }}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/console" element={<AgentConsole />} />
-            <Route path="/research" element={<Research />} />
-            <Route path="/knowledge" element={<KnowledgeBase />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/roadmap" element={<Roadmap />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/history" element={<SessionHistory />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Content>
