@@ -152,5 +152,20 @@ def auto_run_once():
                           remaining_tasks=[current],
                           next_question="fix before continuing")
 
+    _post_cleanup()
     return {"status": "completed" if test_ok and agent_ok else "partial",
             "version": current, "backend": backend, "commit": commit}
+
+
+def _post_cleanup():
+    """确保 auto_run_once 后 latest.json 不受污染"""
+    import json as _json
+    from factor_lab.leader.roadmap_cursor import get_cursor as _gc
+    _c = _gc()
+    _cv = _c["current_version"]
+    _l = _read_latest()
+    if _l and _l.get("current") != _cv:
+        _archive = TASKS_DIR / "archive"
+        _archive.mkdir(exist_ok=True)
+        (_archive / f"post_stale_{_l['run_id']}.json").write_text(_json.dumps(_l, indent=2))
+        _ensure_latest_clean(_cv)
