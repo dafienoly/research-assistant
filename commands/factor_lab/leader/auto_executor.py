@@ -31,6 +31,19 @@ def _write_latest(run_id, run_dir, version, task_count):
     }, indent=2))
 
 
+def _ensure_latest_clean(version):
+    """确保 latest.json 与 cursor 一致，不清除则重建"""
+    latest = _read_latest()
+    if not latest or latest.get("current") != version:
+        tid = f"align_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}"
+        run_dir = TASKS_DIR / tid
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "tasks").mkdir(exist_ok=True)
+        (run_dir / "tasks" / "T001.md").write_text(f"Align {version}")
+        (run_dir / "tasks.json").write_text('["T001"]')
+        _write_latest(tid, run_dir, version, 1)
+
+
 def auto_run_once():
     """自动执行器主循环 (RoadmapItem 安全版)"""
     release_lock("completed")
@@ -39,15 +52,17 @@ def auto_run_once():
     current = cursor["current_version"]
     cv = get_version(current)
 
-    # 1. Check backlog
+    # 1. Check backlog (before backend, before stale handling)
     if cv is None:
         write_completion("blocked", current, "unknown", remaining_tasks=[current],
                           next_question=f"{current} not in roadmap")
+        _ensure_latest_clean(current)
         return {"status": "blocked", "reason": "not_in_roadmap"}
 
     if cv.trading_mode == "backlog":
         write_completion("blocked", current, current, next_question=f"{current} is backlog",
                           remaining_tasks=[current])
+        _ensure_latest_clean(current)
         return {"status": "blocked", "reason": "backlog"}
 
     if cv.manual_required:
@@ -55,22 +70,14 @@ def auto_run_once():
                           next_question=f"{current} requires manual gate: {cv.objective}",
                           remaining_tasks=[current])
         set_blocked(current, cv.objective)
+        _ensure_latest_clean(current)
         return {"status": "blocked", "reason": "manual_required"}
 
-    # 2. Check backend
-    backend = select_backend("code_change")
-    if backend is None:
-        write_completion("blocked", current, current,
-                          next_question="coding_backend_not_configured",
-                          remaining_tasks=[current])
-        return {"status": "blocked", "reason": "coding_backend_not_configured"}
-
-    # 3. Handle stale latest.json
+    # 2. Check/align latest.json with cursor.current_version (BEFORE backend check)
     latest = _read_latest()
     pending_tasks = None
     if latest:
         if latest.get("current") != current:
-            # Archive stale latest
             archive_dir = TASKS_DIR / "archive"
             archive_dir.mkdir(exist_ok=True)
             (archive_dir / f"stale_{latest['run_id']}.json").write_text(json.dumps(latest, indent=2))
@@ -78,7 +85,6 @@ def auto_run_once():
         elif latest.get("status") == "pending" and latest.get("task_count", 0) > 0:
             pending_tasks = latest
 
-    # 4. Generate task if none pending
     if not pending_tasks:
         tid = f"auto_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}"
         run_dir = TASKS_DIR / tid
@@ -89,6 +95,16 @@ def auto_run_once():
         (run_dir / "tasks.json").write_text('["T001"]')
         _write_latest(tid, run_dir, current, 1)
         pending_tasks = {"run_id": tid, "status": "pending"}
+
+    # 3. Check backend (after latest is aligned)
+    backend = select_backend("code_change")
+    if backend is None:
+        # latest is already aligned, safe to block
+        write_completion("blocked", current, cv.name,
+                          next_question="coding_backend_not_configured",
+                          remaining_tasks=[current])
+        _ensure_latest_clean(current)
+        return {"status": "blocked", "reason": "coding_backend_not_configured"}
 
     # 5. Execute agent-runner
     try:
