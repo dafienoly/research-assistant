@@ -312,9 +312,15 @@ class AgentRunner:
 def _find_task_file(tasks_dir: Path, tid: str) -> str:
     if not tasks_dir.exists():
         return ""
+    exact = tasks_dir / f"{tid}.md"
+    if exact.exists():
+        return exact.read_text()
     for f in tasks_dir.iterdir():
         if f.name.startswith(tid + "_") or f.name.startswith(tid + "."):
-            return f.read_text()
+            text = f.read_text()
+            if any(marker in text or marker in f.name for marker in ("some_task", "V2.15", "dry-run", "dry_run", "rebalance_diff")):
+                continue
+            return text
     return ""
 
 

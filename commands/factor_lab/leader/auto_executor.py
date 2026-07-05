@@ -31,6 +31,22 @@ def _write_latest(run_id, run_dir, version, task_count):
     }, indent=2))
 
 
+def _latest_has_polluted_tasks(latest: dict) -> bool:
+    path = Path(latest.get("path", ""))
+    tasks_dir = path / "tasks"
+    if not tasks_dir.exists():
+        return True
+    markers = ("some_task", "V2.15", "dry-run", "dry_run", "rebalance_diff", "live_execution")
+    for task_file in tasks_dir.glob("*"):
+        try:
+            text = task_file.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            return True
+        if any(marker in task_file.name or marker in text for marker in markers):
+            return True
+    return False
+
+
 def _make_roadmap_task(version: str) -> str:
     """生成完整的 roadmap 任务描述"""
     from factor_lab.leader.roadmap import get_version
@@ -46,7 +62,9 @@ def _make_roadmap_task(version: str) -> str:
 
 def _ensure_latest_clean(version):
     latest = _read_latest()
-    if not latest or latest.get("current") != version or not str(latest.get("run_id", "")).startswith("auto_"):
+    if (not latest or latest.get("current") != version
+            or not str(latest.get("run_id", "")).startswith("auto_")
+            or _latest_has_polluted_tasks(latest)):
         tid = f"auto_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}"
         run_dir = TASKS_DIR / tid
         run_dir.mkdir(parents=True, exist_ok=True)
