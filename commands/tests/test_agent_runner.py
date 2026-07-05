@@ -116,6 +116,7 @@ def test_claude_backend_uses_stream_json_and_bypass(monkeypatch, tmp_path):
     assert "--output-format" in cmd
     assert "stream-json" in cmd
     assert "--include-partial-messages" in cmd
+    assert "--verbose" in cmd
     assert "--permission-mode" in cmd
     assert "bypassPermissions" in cmd
     assert "--dangerously-skip-permissions" in cmd
