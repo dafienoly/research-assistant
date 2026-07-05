@@ -1,11 +1,11 @@
-"""Auto Executor — 连续自动开发执行器"""
+"""Auto Executor — 连续自动开发执行器 (RoadmapItem 兼容版)"""
 import sys, json, subprocess
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from factor_lab.leader.roadmap import get_roadmap, get_version, next_version
 from factor_lab.leader.roadmap_cursor import get_cursor, advance, set_blocked
-from factor_lab.leader.backend_policy import select_backend, need_code_change, policy_status
-from factor_lab.leader.task_intake import intake, route_to_version, build_task_package
+from factor_lab.leader.backend_policy import select_backend, need_code_change
+from factor_lab.leader.task_intake import build_task_package
 from factor_lab.leader.workloop import write_completion, release_lock, TASKS_DIR
 
 CST = timezone(timedelta(hours=8))
@@ -13,79 +13,128 @@ VENV = "/home/ly/.hermes/research-assistant/.venv_quant/bin/python3"
 CLI = "/home/ly/.hermes/research-assistant/commands/hermes_cli.py"
 
 
+def _read_latest():
+    p = TASKS_DIR / "latest.json"
+    if p.exists():
+        try:
+            return json.loads(p.read_text())
+        except Exception:
+            return None
+    return None
+
+
+def _write_latest(run_id, run_dir, version, task_count):
+    (TASKS_DIR / "latest.json").write_text(json.dumps({
+        "run_id": run_id, "path": str(run_dir), "status": "pending",
+        "current": version, "next": version, "task_count": task_count,
+        "updated_at": datetime.now(CST).isoformat(),
+    }, indent=2))
+
+
 def auto_run_once():
-    """自动执行器主循环"""
+    """自动执行器主循环 (RoadmapItem 安全版)"""
     release_lock("completed")
 
-    # 1. 读取 cursor
     cursor = get_cursor()
     current = cursor["current_version"]
     cv = get_version(current)
 
-    # 2. 检查是否 backlog
-    if cv and cv.get("trading_mode") == "backlog":
-        write_completion("blocked", current, current, next_question=f"{current} is backlog, not auto-executed",
+    # 1. Check backlog
+    if cv is None:
+        write_completion("blocked", current, "unknown", remaining_tasks=[current],
+                          next_question=f"{current} not in roadmap")
+        return {"status": "blocked", "reason": "not_in_roadmap"}
+
+    if cv.trading_mode == "backlog":
+        write_completion("blocked", current, current, next_question=f"{current} is backlog",
                           remaining_tasks=[current])
         return {"status": "blocked", "reason": "backlog"}
 
-    # 3. 检查 manual_required
-    if cv and cv.get("manual_required", False):
-        write_completion("blocked", current, current, next_question=f"{current} requires manual gate: {cv.get('objective','')}",
+    if cv.manual_required:
+        write_completion("blocked", current, current,
+                          next_question=f"{current} requires manual gate: {cv.objective}",
                           remaining_tasks=[current])
-        set_blocked(current, cv.get("objective", ""))
+        set_blocked(current, cv.objective)
         return {"status": "blocked", "reason": "manual_required"}
 
-    # 4. 检查 backend
-    task_type = "code_change"  # default for auto development
-    backend = select_backend(task_type)
+    # 2. Check backend
+    backend = select_backend("code_change")
     if backend is None:
         write_completion("blocked", current, current,
                           next_question="coding_backend_not_configured",
                           remaining_tasks=[current])
         return {"status": "blocked", "reason": "coding_backend_not_configured"}
 
-    # 5. Scan inbox
-    inbox = intake()
+    # 3. Handle stale latest.json
+    latest = _read_latest()
+    pending_tasks = None
+    if latest:
+        if latest.get("current") != current:
+            # Archive stale latest
+            archive_dir = TASKS_DIR / "archive"
+            archive_dir.mkdir(exist_ok=True)
+            (archive_dir / f"stale_{latest['run_id']}.json").write_text(json.dumps(latest, indent=2))
+            pending_tasks = None
+        elif latest.get("status") == "pending" and latest.get("task_count", 0) > 0:
+            pending_tasks = latest
 
-    # 6. Check latest.json
-    latest = TASKS_DIR / "latest.json"
-    pending_tasks = []
-    if latest.exists():
-        lj = json.loads(latest.read_text())
-        if lj.get("status") == "pending" and lj.get("task_count", 0) > 0:
-            pending_tasks = lj
-
-    # 7. If no pending tasks, auto-generate from roadmap
+    # 4. Generate task if none pending
     if not pending_tasks:
-        task_desc = f"Implement {cv['version']}: {cv['name']} - {cv['objective']}"
-        rid = build_task_package(current, [{"title": cv["name"], "text": task_desc}])
-        pending_tasks = {"run_id": rid, "status": "pending"}
+        tid = f"auto_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}"
+        run_dir = TASKS_DIR / tid
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "tasks").mkdir(exist_ok=True)
+        task_text = f"Implement {cv.version}: {cv.name} - {cv.objective}"
+        (run_dir / "tasks" / "T001.md").write_text(task_text)
+        (run_dir / "tasks.json").write_text('["T001"]')
+        _write_latest(tid, run_dir, current, 1)
+        pending_tasks = {"run_id": tid, "status": "pending"}
 
-    # 8. Execute agent-runner
-    result = subprocess.run([VENV, CLI, "leader:agent-runner", "--once", "--backend", backend],
-                             capture_output=True, text=True, timeout=60)
-
-    # 9. Run tests
-    test_ok = True
+    # 5. Execute agent-runner
     try:
-        subprocess.run([VENV, "-m", "pytest", "-q", "--tb=short"], capture_output=True, text=True, timeout=30)
+        result = subprocess.run(
+            [VENV, CLI, "leader:agent-runner", "--once", "--backend", backend],
+            capture_output=True, text=True, timeout=60)
+        agent_ok = result.returncode == 0
+    except subprocess.TimeoutExpired:
+        agent_ok = False
+    except Exception:
+        agent_ok = False
+
+    # 6. Run tests
+    test_ok = False
+    try:
+        r = subprocess.run(
+            [VENV, "-m", "pytest", "tests/test_fixed_roadmap.py",
+             "tests/test_workloop.py", "tests/test_agent_runner.py",
+             "-q", "--tb=short"],
+            capture_output=True, text=True, timeout=30,
+            cwd="/home/ly/.hermes/research-assistant/commands")
+        test_ok = r.returncode == 0
     except Exception:
         test_ok = False
 
-    # 10. Git commit
+    # 7. Git commit
     commit = ""
     if test_ok:
         try:
-            r = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=str(TASKS_DIR.parent))
+            r = subprocess.run(["git", "rev-parse", "HEAD"],
+                                capture_output=True, text=True,
+                                cwd="/home/ly/.hermes/research-assistant")
             commit = r.stdout.strip()
         except Exception:
             pass
-        advance(current, "completed", commit=commit, run_id=latest.read_text() if latest.exists() else "")
-        write_completion("completed", current, cv["name"],
+        advance(current, "completed", commit=commit)
+        nv = next_version(current)
+        next_q = f"continue with {nv.version}" if nv else "roadmap complete"
+        write_completion("completed", current, cv.name,
                           completed_tasks=[current], remaining_tasks=[],
-                          next_question=f"continue with {next_version(current)['version'] if next_version(current) else 'done'}")
+                          next_question=next_q)
     else:
         advance(current, "failed")
-        write_completion("partial", current, cv["name"], remaining_tasks=[current])
+        write_completion("partial", current, cv.name,
+                          remaining_tasks=[current],
+                          next_question="fix before continuing")
 
-    return {"status": "completed" if test_ok else "partial", "version": current, "backend": backend, "commit": commit}
+    return {"status": "completed" if test_ok and agent_ok else "partial",
+            "version": current, "backend": backend, "commit": commit}
