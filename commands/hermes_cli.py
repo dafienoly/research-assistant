@@ -714,9 +714,10 @@ run_daily_premarket(no_notify=True)
         consume_latest_task()
 
     elif command == "leader:lock-status":
+        import json as _json
         from factor_lab.leader.workloop import is_locked, LOCK_FILE
         if is_locked():
-            data = json.loads(open(LOCK_FILE).read())
+            data = _json.loads(open(LOCK_FILE).read())
             print(f"  🔒 运行中: {data.get('run_id')}")
         else:
             print(f"  🔓 无运行中任务")
