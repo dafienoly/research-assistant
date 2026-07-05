@@ -125,6 +125,9 @@ def show_help():
 leader:automation-status       后台自动工作流健康状态检查
 leader:roadmap-status          固定路线图进度显示
 leader:task-list               列出待办任务
+leader:version-report          版本开发报告
+leader:backup-list             列出备份
+leader:recover --backup-id <id>  从备份恢复版本状态
 leader:task-submit --text "..." --title "任务标题"
                               提交新任务到 inbox
 leader:auto-run-once          自动执行器: 读取路线图 cursor，执行当前版本
@@ -774,6 +777,29 @@ run_daily_premarket(no_notify=True)
         print(f"  Inbox: {inbox['inbox_count']} tasks")
         for t in inbox.get("tasks", [])[:5]:
             print(f"    - {t['id']}: {t['title'][:50] if t.get('title') else '(no title)'}")
+
+    elif command == "leader:version-report":
+        from factor_lab.leader.version_report import generate_report
+        import json
+        r = generate_report()
+        print(f"  当前版本: {r['current_version']}")
+        print(f"  已完成的版本: {r['total_completed']}")
+        print(f"  失败的版本: {r['total_failed']}")
+        print(f"  📁 /mnt/d/HermesReports/version_reports/")
+
+    elif command == "leader:backup-list":
+        from factor_lab.leader.roadmap_backup import list_backups
+        for b in list_backups()[-10:]:
+            print(f"  {b['id']}: V{b['current_version']} ({b['completed']} completed)")
+
+    elif command == "leader:recover":
+        import argparse
+        p = argparse.ArgumentParser()
+        p.add_argument("--backup-id", required=True)
+        a = p.parse_args(args)
+        from factor_lab.leader.roadmap_backup import recover
+        r = recover(a.backup_id)
+        print(f"  Status: {r.get('status', '?')}")
 
     elif command == "leader:task-submit":
         import argparse

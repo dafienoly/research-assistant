@@ -80,24 +80,35 @@ def _ensure_latest_clean(version):
 
 def auto_run_once():
     """自动执行器主循环 (RoadmapItem 安全版)"""
+    from factor_lab.leader.version_timing import record_start, record_end
+    from factor_lab.leader.roadmap_backup import auto_backup
+    from factor_lab.leader.version_notify import version_completed, version_blocked, version_failed
+
     if is_locked():
         return {"status": "running", "reason": "another_agent_run_in_progress"}
+
+    release_lock("completed")
 
     cursor = get_cursor()
     current = cursor["current_version"]
     cv = get_version(current)
+
+    record_start(current)
+    auto_backup()
 
     # 1. Check backlog (before backend, before stale handling)
     if cv is None:
         write_completion("blocked", current, "unknown", remaining_tasks=[current],
                           next_question=f"{current} not in roadmap")
         _ensure_latest_clean(current)
+        version_blocked(current, "unknown", "不在路线图中")
         return {"status": "blocked", "reason": "not_in_roadmap"}
 
     if cv.trading_mode == "backlog":
         write_completion("blocked", current, current, next_question=f"{current} is backlog",
                           remaining_tasks=[current])
         _ensure_latest_clean(current)
+        version_blocked(current, cv.name or current, "backlog 版本不自动执行")
         return {"status": "blocked", "reason": "backlog"}
 
     if cv.manual_required:
@@ -106,6 +117,7 @@ def auto_run_once():
                           remaining_tasks=[current])
         set_blocked(current, cv.objective)
         _ensure_latest_clean(current)
+        version_blocked(current, cv.name, cv.objective)
         return {"status": "blocked", "reason": "manual_required"}
 
     # 2. Check/align latest.json with cursor.current_version (BEFORE backend check)
@@ -188,6 +200,8 @@ def auto_run_once():
                           completed_tasks=[current], remaining_tasks=[],
                           next_question=next_q)
         _status = "completed"
+        version_completed(current, cv.name, f"{cv.objective} — 测试通过")
+        record_end(current, "completed")
     else:
         write_completion("partial", current, cv.name,
                           report_dir=report_path,
