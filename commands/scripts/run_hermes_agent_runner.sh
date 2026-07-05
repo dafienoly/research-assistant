@@ -1,6 +1,11 @@
 #!/bin/bash
-# Hermes Auto Runner — 定时自动开发执行器
+# Hermes Auto Runner — 定时自动开发执行器 (cron 安全版)
 set -e
+
+# 注入 PATH 确保 cron 能找到 claude
+export PATH="/usr/local/bin:/usr/bin:/bin:/home/ly/.local/bin:/home/ly/.npm-global/bin:$PATH"
+export HERMES_CLAUDE_BIN="${HERMES_CLAUDE_BIN:-$(command -v claude)}"
+
 VENV=/home/ly/.hermes/research-assistant/.venv_quant/bin/python3
 CLI=/home/ly/.hermes/research-assistant/commands/hermes_cli.py
 cd /home/ly/.hermes/research-assistant/commands || exit 1

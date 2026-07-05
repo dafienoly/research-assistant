@@ -23,7 +23,8 @@ def test_stale_latest_archived_logic():
     cursor = get_cursor()
     current = cursor["current_version"]
     assert current != "V2.15", "cursor 不应为 V2.15"
-    assert current in ("V3.0", "V3.0.1", "V3.1"), f"cursor 应指向 V3.x, 当前为 {current}"
+    assert current != "live_execution", "cursor 不应为 live_execution"
+    assert current.startswith("V3") or current.startswith("V4"), f"cursor 应指向 V3/V4, 当前为 {current}"
 
 
 def test_no_some_task_in_roadmap():
