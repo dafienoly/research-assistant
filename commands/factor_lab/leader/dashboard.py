@@ -24,6 +24,7 @@ LATEST = TASKS_DIR / "latest.json"
 COMPLETION = TASKS_DIR / "latest_completion.json"
 CURSOR = TASKS_DIR / "roadmap_cursor.json"
 LOG_PATH = Path("/tmp/hermes_agent_runner.log")
+AGENT_LOG_ROOT = TASKS_DIR / "agent_logs"
 
 ERROR_PATTERNS = (
     "Traceback",
@@ -136,6 +137,46 @@ def _latest_task_snapshot(latest: dict[str, Any]) -> dict[str, Any]:
     return {"task_files": names, "bad_markers": bad}
 
 
+def _agent_output_snapshot(latest: dict[str, Any], completion: dict[str, Any], lines: int = 120) -> dict[str, Any]:
+    """读取当前/最近 agent backend 输出，给前端模拟“会话输出”。
+
+    Cron 是无头进程，不会像手动聊天一样主动把回答推到当前终端；
+    AgentRunner 会把每个任务的模型输出写入 agent_tasks/agent_logs/<run_id>/*.log。
+    """
+    candidates: list[Path] = []
+    report_dir = completion.get("report_dir")
+    if report_dir:
+        candidates.append(Path(report_dir))
+    run_id = latest.get("run_id")
+    if run_id:
+        candidates.append(AGENT_LOG_ROOT / run_id)
+
+    # 兜底：取最近一个 agent_logs 目录，避免 latest 已推进到下一版本时看不到上一轮输出。
+    if AGENT_LOG_ROOT.exists():
+        recent_dirs = sorted([p for p in AGENT_LOG_ROOT.iterdir() if p.is_dir()], key=lambda p: p.stat().st_mtime, reverse=True)
+        candidates.extend(recent_dirs[:3])
+
+    seen: set[str] = set()
+    log_files: list[Path] = []
+    for d in candidates:
+        if not d.exists() or not d.is_dir():
+            continue
+        for f in sorted(d.glob("*.log"), key=lambda p: p.stat().st_mtime, reverse=True):
+            key = str(f)
+            if key not in seen:
+                seen.add(key)
+                log_files.append(f)
+
+    snippets = []
+    for f in log_files[:6]:
+        snippets.append({
+            "file": str(f),
+            "mtime": datetime.fromtimestamp(f.stat().st_mtime, tz=CST).isoformat(),
+            "lines": _tail(f, lines),
+        })
+    return {"log_files": [s["file"] for s in snippets], "snippets": snippets}
+
+
 def _derive_state(health_info: dict[str, Any], latest: dict[str, Any], completion: dict[str, Any], cursor: dict[str, Any], log_lines: list[str], git: dict[str, Any]) -> dict[str, Any]:
     reasons: list[str] = []
     level = "green"
@@ -202,6 +243,7 @@ def collect_status() -> dict[str, Any]:
     log_lines = _tail(LOG_PATH, 120)
     progress = _roadmap_progress(cursor)
     task_snapshot = _latest_task_snapshot(latest)
+    agent_output = _agent_output_snapshot(latest, completion)
     state = _derive_state(health_info, latest, completion, cursor, log_lines, git)
     return {
         "generated_at": _now(),
@@ -214,6 +256,7 @@ def collect_status() -> dict[str, Any]:
         "backend": backend,
         "git": git,
         "latest_task_snapshot": task_snapshot,
+        "agent_output": agent_output,
         "log_tail": log_lines[-60:],
     }
 
@@ -273,7 +316,8 @@ DASHBOARD_HTML = r"""
 
     <section class="grid">
       <div class="card"><h2>当前任务文件</h2><pre id="tasks"></pre></div>
-      <div class="card"><h2>最近日志</h2><pre id="logs"></pre></div>
+      <div class="card"><h2>Hermes 实时运行输出</h2><pre id="agentOutput"></pre></div>
+      <div class="card"><h2>Runner 最近日志</h2><pre id="logs"></pre></div>
     </section>
   </main>
 <script>
@@ -310,6 +354,10 @@ async function refresh(){
     renderMetrics('backend', s.backend, [['coding_backend_configured','coding backend'], ['default_for_code_change','code backend'], ['claude_bin_path','claude path'], ['cron_safe','cron_safe']]);
     document.getElementById('git').innerHTML = metric('HEAD', s.git.head) + metric('dirty', s.git.dirty) + '<pre>' + esc((s.git.recent_commits || []).join('\n')) + '</pre>';
     document.getElementById('tasks').textContent = JSON.stringify(s.latest_task_snapshot, null, 2);
+    const snippets = s.agent_output?.snippets || [];
+    document.getElementById('agentOutput').textContent = snippets.length
+      ? snippets.map(x => `### ${x.file} @ ${x.mtime}\n${(x.lines || []).join('\n')}`).join('\n\n')
+      : '暂无 agent backend 输出。等待下一轮任务执行，或检查 agent_tasks/agent_logs/。';
     document.getElementById('logs').textContent = (s.log_tail || []).join('\n');
   } catch(e) {
     document.getElementById('stateBadge').className = 'status red';
@@ -346,6 +394,14 @@ class _DashboardHandler(BaseHTTPRequestHandler):
             qs = parse_qs(parsed.query)
             lines = int(qs.get("lines", ["120"])[0])
             body = json.dumps({"lines": _tail(LOG_PATH, lines)}, ensure_ascii=False, indent=2).encode("utf-8")
+            self._send(200, body, "application/json; charset=utf-8")
+            return
+        if parsed.path == "/api/agent-output":
+            body = json.dumps(
+                _agent_output_snapshot(_read_json(LATEST), _read_json(COMPLETION)),
+                ensure_ascii=False,
+                indent=2,
+            ).encode("utf-8")
             self._send(200, body, "application/json; charset=utf-8")
             return
         self._send(404, b"not found", "text/plain; charset=utf-8")
