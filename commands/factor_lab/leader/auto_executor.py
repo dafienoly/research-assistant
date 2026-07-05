@@ -46,8 +46,8 @@ def _make_roadmap_task(version: str) -> str:
 
 def _ensure_latest_clean(version):
     latest = _read_latest()
-    if not latest or latest.get("current") != version:
-        tid = f"roadmap_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}"
+    if not latest or latest.get("current") != version or not str(latest.get("run_id", "")).startswith("auto_"):
+        tid = f"auto_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}"
         run_dir = TASKS_DIR / tid
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "tasks").mkdir(exist_ok=True)
