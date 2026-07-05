@@ -31,10 +31,10 @@ def route_to_version(task_text: str) -> str:
     """简单路由：根据关键词判断版本"""
     roadmap = get_roadmap()
     for r in roadmap[:60]:
-        if r.get("name","").lower() in task_text.lower():
-            return r["version"]
-        if any(kw in task_text for kw in [r["version"], r["name"]]):
-            return r["version"]
+        if r.name.lower() in task_text.lower():
+            return r.version
+        if any(kw in task_text for kw in [r.version, r.name]):
+            return r.version
     return None
 
 def build_task_package(version: str, tasks: list) -> str:

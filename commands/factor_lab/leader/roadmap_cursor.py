@@ -41,8 +41,8 @@ def advance(version, status="completed", commit="", run_id=""):
             c["completed_versions"].append(version)
             c["completed_versions"] = list(dict.fromkeys(c["completed_versions"]))
         nv = next_version(version)
-        if nv and not is_backlog(nv["version"]):
-            c["current_version"] = nv["version"]
+        if nv and not is_backlog(nv.version):
+            c["current_version"] = nv.version
         c["status"] = "running"
     elif status == "failed":
         if version not in c["failed_versions"]:
