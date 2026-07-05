@@ -1,5 +1,5 @@
 """Agent Console Adapters — Hermes / Claude 引擎"""
-import subprocess, json, os, threading, time
+import subprocess, json, os, threading, time, pty, select
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from factor_lab.agent_console.schemas import AgentEvent
@@ -11,43 +11,64 @@ CLI = "/home/ly/.hermes/research-assistant/commands/hermes_cli.py"
 COMMANDS = "/home/ly/.hermes/research-assistant/commands"
 
 
+# ─── Capabilities ───────────────────────────────────────────────
+
+ADAPTER_INFO = {
+    "hermes_demo": {
+        "label": "Hermes Agent (演示模式)", "streaming": "buffered",
+        "description": "运行 leader:dispatch --dry-run，用于验证链路",
+    },
+    "hermes_research": {
+        "label": "Hermes Agent (研究模式)", "streaming": "buffered",
+        "description": "运行投研分析: leader:automation-status + 盘前信号分析",
+    },
+    "claude_code": {
+        "label": "Claude Code (--print)", "streaming": "buffered",
+        "description": "Claude Code --print 模式，回答缓冲后一次性输出。"
+        "实验性 PTY 路径在 adapters.py 中预留。",
+    },
+}
+
+
+def get_adapters() -> list:
+    """返回可用 adapter 列表"""
+    return [
+        {"id": "hermes_demo", **ADAPTER_INFO["hermes_demo"]},
+        {"id": "hermes_research", **ADAPTER_INFO["hermes_research"]},
+        {"id": "claude_code", **ADAPTER_INFO["claude_code"]},
+    ]
+
+
 def start_session(sid: str, agent: str, prompt: str):
-    """后台启动引擎"""
     update_status(sid, "running")
-    if agent == "hermes":
-        _run_hermes(sid, prompt)
-    elif agent == "claude":
+    if agent == "hermes_demo":
+        _run_hermes_demo(sid, prompt)
+    elif agent == "hermes_research":
+        _run_hermes_research(sid, prompt)
+    elif agent == "claude_code":
         _run_claude(sid, prompt)
     else:
         append_event(sid, AgentEvent("error", sid, data=f"Unknown agent: {agent}", status="failed"))
         update_status(sid, "failed")
 
 
-def _run_hermes(sid: str, prompt: str):
-    """Hermes Agent 适配器"""
+# ─── Hermes Demo Mode ───────────────────────────────────────────
+
+
+def _run_hermes_demo(sid: str, prompt: str):
+    """演示模式: 包装 leader:dispatch --dry-run"""
+    append_event(sid, AgentEvent("answer_delta", sid,
+                 data=f"## Hermes Agent (演示模式)\n\n任务: {prompt}\n\n运行 dry-run...\n\n",
+                 status="running"))
     try:
-        # 先发送回答框架
-        append_event(sid, AgentEvent("answer_delta", sid, data=f"## 任务\n\n{prompt}\n\n## 分析\n\n", status="running"))
         proc = subprocess.run([VENV, CLI, "leader:dispatch", "--dry-run"],
-                               capture_output=True, text=True, timeout=120,
-                               cwd=COMMANDS)
+                               capture_output=True, text=True, timeout=120, cwd=COMMANDS)
         output = proc.stdout + proc.stderr
-        # 尝试分离回答与诊断
-        answer_lines = []
-        diagnostic_lines = []
-        for line in output.split("\n"):
-            if any(kw in line for kw in ["✅", "📁", "Version", "Status", "pending"]):
-                diagnostic_lines.append(line)
-            else:
-                answer_lines.append(line)
-        # 发送 answer delta
-        if answer_lines:
-            for chunk in _chunkify("\n".join(answer_lines)):
-                append_event(sid, AgentEvent("answer_delta", sid, data=chunk, status="running"))
-        # 发送 diagnostic
-        for line in diagnostic_lines:
-            append_event(sid, AgentEvent("diagnostic", sid, data=line, status="running"))
-        # 最终状态
+        answer, diagnostic = _split_output(output)
+        for chunk in _chunkify(answer):
+            append_event(sid, AgentEvent("answer_delta", sid, data=chunk, status="running"))
+        for line in diagnostic:
+            append_event(sid, AgentEvent("diagnostic", sid, data=line))
         status = "completed" if proc.returncode == 0 else "failed"
         append_event(sid, AgentEvent("done", sid, data="", status=status))
         update_status(sid, status)
@@ -56,22 +77,106 @@ def _run_hermes(sid: str, prompt: str):
         update_status(sid, "failed")
 
 
-def _run_claude(sid: str, prompt: str):
-    """Claude Code 适配器 (--print 模式)"""
+# ─── Hermes Research Mode ───────────────────────────────────────
+
+
+def _run_hermes_research(sid: str, prompt: str):
+    """研究模式: 运行真实投研命令，输出分析正文"""
     append_event(sid, AgentEvent("answer_delta", sid,
-                 data=f"## Claude Code 分析\n\n处理中...\n\n", status="running"))
+                 data=f"## Hermes Agent (研究模式)\n\n## 任务\n\n{prompt}\n\n## 分析\n\n",
+                 status="running"))
+    try:
+        # 运行多个 Hermes 命令获取分析数据
+        cmds = [
+            ([VENV, CLI, "leader:automation-status"], "系统状态"),
+            ([VENV, CLI, "leader:roadmap-status"], "路线图"),
+        ]
+        full_answer = ""
+        for cmd, label in cmds:
+            append_event(sid, AgentEvent("diagnostic", sid, data=f"运行: {' '.join(cmd[-2:])}"))
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30, cwd=COMMANDS)
+            output = proc.stdout + proc.stderr
+            full_answer += f"\n### {label}\n\n"
+            # 提取可读内容作为 answer
+            for line in output.split("\n"):
+                if line.strip() and not line.startswith("<frozen"):
+                    full_answer += line.strip() + "\n"
+            # stderr 作为 diagnostic
+            if proc.stderr:
+                for line in proc.stderr.split("\n"):
+                    if line.strip():
+                        append_event(sid, AgentEvent("diagnostic", sid, data=line))
+
+        # 发送 answer_delta
+        for chunk in _chunkify(full_answer):
+            append_event(sid, AgentEvent("answer_delta", sid, data=chunk, status="running"))
+
+        status = "completed"
+        append_event(sid, AgentEvent("answer_delta", sid,
+                     data="\n---\n*分析完成。诊断信息见折叠面板。*", status=status))
+        append_event(sid, AgentEvent("done", sid, data="", status=status))
+        update_status(sid, status)
+    except Exception as e:
+        append_event(sid, AgentEvent("error", sid, data=str(e), status="failed"))
+        update_status(sid, "failed")
+
+
+# ─── Claude Code Mode ───────────────────────────────────────────
+
+
+def _run_claude(sid: str, prompt: str):
+    """Claude Code --print 模式 (buffered, 非逐 token)"""
+    append_event(sid, AgentEvent("answer_delta", sid,
+                 data=f"## Claude Code (缓冲模式)\n\n> ⚠️ Claude Code --print 模式在命令完成后才输出完整回答，"
+                 f"非逐 token 实时流。\n\n任务: {prompt}\n\n",
+                 status="running"))
     claude_bin = os.environ.get("HERMES_CLAUDE_BIN",
                                 "/home/ly/.nvm/versions/node/v22.16.0/bin/claude")
     try:
-        proc = subprocess.run([claude_bin, "--print", "--add-dir", COMMANDS],
-                               input=prompt, capture_output=True, text=True, timeout=300)
-        output = proc.stdout
-        if not output.strip():
-            output = proc.stderr
-        # Claude --print 输出整体作为回答
-        for chunk in _chunkify(output):
-            append_event(sid, AgentEvent("answer_delta", sid, data=chunk, status="running"))
-        status = "completed" if proc.returncode == 0 else "failed"
+        # 尝试 PTY 模式 (实验性)
+        pty_used = False
+        try:
+            master_fd, slave_fd = pty.openpty()
+            proc = subprocess.Popen([claude_bin, "--print", "--add-dir", COMMANDS],
+                                     stdin=subprocess.PIPE, stdout=slave_fd, stderr=slave_fd,
+                                     text=True, close_fds=True)
+            os.close(slave_fd)
+            proc.stdin.write(prompt)
+            proc.stdin.close()
+            output = ""
+            while True:
+                try:
+                    r, _, _ = select.select([master_fd], [], [], 0.5)
+                    if r:
+                        chunk = os.read(master_fd, 4096).decode("utf-8", errors="replace")
+                        if chunk:
+                            output += chunk
+                            append_event(sid, AgentEvent("answer_delta", sid, data=chunk, status="running"))
+                            append_event(sid, AgentEvent("diagnostic", sid, data="[PTY chunk]"))
+                    else:
+                        if proc.poll() is not None:
+                            break
+                except (OSError, ValueError):
+                    break
+            os.close(master_fd)
+            proc.wait(timeout=5)
+            pty_used = True
+        except Exception:
+            # PTY 失败，回退到 buffered --print
+            pty_used = False
+
+        if not pty_used:
+            append_event(sid, AgentEvent("diagnostic", sid, data="[PTY fallback → buffered --print]"))
+            proc = subprocess.run([claude_bin, "--print", "--add-dir", COMMANDS],
+                                   input=prompt, capture_output=True, text=True, timeout=300)
+            output = proc.stdout if proc.stdout.strip() else proc.stderr
+            for chunk in _chunkify(output):
+                append_event(sid, AgentEvent("answer_delta", sid, data=chunk, status="running"))
+
+        streaming_mode = "pty" if pty_used else "buffered"
+        append_event(sid, AgentEvent("diagnostic", sid,
+                     data=f"[Claude streaming mode: {streaming_mode}]"))
+        status = "completed"
         append_event(sid, AgentEvent("done", sid, data="", status=status))
         update_status(sid, status)
     except subprocess.TimeoutExpired:
@@ -79,7 +184,7 @@ def _run_claude(sid: str, prompt: str):
         update_status(sid, "failed")
     except FileNotFoundError:
         append_event(sid, AgentEvent("error", sid,
-                     data="Claude Code CLI 未安装或未找到。请安装 claude 或设置 HERMES_CLAUDE_BIN。",
+                     data="Claude Code CLI 未安装。请设置 HERMES_CLAUDE_BIN。",
                      status="failed"))
         update_status(sid, "failed")
     except Exception as e:
@@ -87,13 +192,25 @@ def _run_claude(sid: str, prompt: str):
         update_status(sid, "failed")
 
 
+# ─── Helpers ────────────────────────────────────────────────────
+
+
+def _split_output(output: str):
+    """分离回答正文与诊断信息"""
+    answer_lines, diagnostic_lines = [], []
+    for line in output.split("\n"):
+        if any(kw in line for kw in ["✅", "📁", "Version", "Status", "pending", "===", "⚠️"]):
+            diagnostic_lines.append(line)
+        else:
+            answer_lines.append(line)
+    return "\n".join(answer_lines), diagnostic_lines
+
+
 def _chunkify(text: str, size: int = 500):
-    """将长文本分块发送"""
     for i in range(0, len(text), size):
         yield text[i:i + size]
 
 
 def cancel_session(sid: str):
-    """取消 session (标记 cancelled)"""
     update_status(sid, "cancelled")
     append_event(sid, AgentEvent("done", sid, data="", status="cancelled"))
