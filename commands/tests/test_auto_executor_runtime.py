@@ -42,6 +42,22 @@ def test_auto_executor_does_not_clear_running_lock(monkeypatch):
     assert result == {"status": "running", "reason": "another_agent_run_in_progress"}
 
 
+def test_ensure_latest_clean_replaces_non_auto_run(monkeypatch, tmp_path):
+    from factor_lab.leader import auto_executor
+
+    monkeypatch.setattr(auto_executor, "TASKS_DIR", tmp_path)
+    (tmp_path / "latest.json").write_text(json.dumps({
+        "run_id": "roadmap_old",
+        "current": "V3.0.1",
+        "status": "pending",
+        "task_count": 1,
+    }))
+    auto_executor._ensure_latest_clean("V3.0.1")
+    latest = json.loads((tmp_path / "latest.json").read_text())
+    assert latest["run_id"].startswith("auto_")
+    assert latest["current"] == "V3.0.1"
+
+
 def test_get_version_returns_roadmap_item():
     v = get_version("V3.0.1")
     assert v is not None
