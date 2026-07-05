@@ -6,7 +6,7 @@ from factor_lab.leader.roadmap import get_roadmap, get_version, next_version
 from factor_lab.leader.roadmap_cursor import get_cursor, advance, set_blocked
 from factor_lab.leader.backend_policy import select_backend, need_code_change
 from factor_lab.leader.task_intake import build_task_package
-from factor_lab.leader.workloop import write_completion, release_lock, TASKS_DIR
+from factor_lab.leader.workloop import write_completion, release_lock, is_locked, TASKS_DIR
 
 CST = timezone(timedelta(hours=8))
 VENV = "/home/ly/.hermes/research-assistant/.venv_quant/bin/python3"
@@ -58,7 +58,8 @@ def _ensure_latest_clean(version):
 
 def auto_run_once():
     """自动执行器主循环 (RoadmapItem 安全版)"""
-    release_lock("completed")
+    if is_locked():
+        return {"status": "running", "reason": "another_agent_run_in_progress"}
 
     cursor = get_cursor()
     current = cursor["current_version"]
@@ -124,7 +125,7 @@ def auto_run_once():
     try:
         result = subprocess.run(
             [VENV, CLI, "leader:agent-runner", "--once", "--backend", backend],
-            capture_output=True, text=True, timeout=60)
+            capture_output=True, text=True, timeout=3600)
         agent_ok = result.returncode == 0 and "Status: completed" in result.stdout
     except subprocess.TimeoutExpired:
         agent_ok = False
