@@ -9,7 +9,7 @@ from factor_lab.agent_console.adapters import get_adapters
 from factor_lab.agent_console.schemas import AgentEvent
 from factor_lab.agent_console.server import CONSOLE_HTML
 from factor_lab.agent_console.sessions import append_event
-from factor_lab.leader.dashboard import DASHBOARD_HTML, _DashboardHandler, _derive_state, collect_status
+from factor_lab.leader.dashboard import DASHBOARD_HTML, _DashboardHandler, _current_answer_snapshot, _derive_state, collect_status
 
 
 def _serve_dashboard():
@@ -34,6 +34,7 @@ def test_dashboard_collect_status_has_core_sections():
         "backend",
         "git",
         "latest_task_snapshot",
+        "current_answer",
         "agent_output",
         "log_tail",
     ]:
@@ -56,7 +57,30 @@ def test_dashboard_html_uses_status_api_sse_and_auto_refresh():
     assert "SSE 实时日志流" in DASHBOARD_HTML
     assert "固定版本规划详情" in DASHBOARD_HTML
     assert "roadmapDetails" in DASHBOARD_HTML
+    assert "当前自动开发回答" in DASHBOARD_HTML
+    assert "currentAnswer" in DASHBOARD_HTML
+    assert "current_answer" in DASHBOARD_HTML
     assert "agentOutput" in DASHBOARD_HTML
+
+
+def test_current_answer_snapshot_reads_latest_log(tmp_path, monkeypatch):
+    from factor_lab.leader import dashboard
+
+    run_id = "auto_test_current"
+    log_dir = tmp_path / run_id
+    log_dir.mkdir()
+    log_file = log_dir / "T001.log"
+    log_file.write_text(
+        "$ claude --print --output-format stream-json --permission-mode bypassPermissions\n"
+        "# started_at=2026-07-05T00:00:00+08:00\n\n"
+        "hello stream\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dashboard, "AGENT_LOG_ROOT", tmp_path)
+    answer = _current_answer_snapshot({"run_id": run_id, "current": "V3.1"})
+    assert answer["streaming_mode"] == "stream-json"
+    assert answer["permission_mode"] == "bypassPermissions"
+    assert answer["text"] == "hello stream"
 
 
 def test_agent_console_post_endpoints_are_implemented():

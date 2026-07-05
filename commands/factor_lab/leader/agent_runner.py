@@ -14,8 +14,44 @@ BACKEND_PRIORITY = ["claude", "command", "dry-run", "codex"]
 DEFAULT_BACKEND = "claude"
 
 
+def _extract_claude_stream_text(line: str) -> str:
+    """把 Claude Code stream-json 事件压成可读文本。"""
+    try:
+        event = json.loads(line)
+    except Exception:
+        return line
+
+    def _texts(value):
+        found: list[str] = []
+        if isinstance(value, str):
+            return found
+        if isinstance(value, list):
+            for item in value:
+                found.extend(_texts(item))
+            return found
+        if not isinstance(value, dict):
+            return found
+        text = value.get("text")
+        if isinstance(text, str):
+            found.append(text)
+        for key in ("delta", "message", "content", "result"):
+            if key in value:
+                found.extend(_texts(value[key]))
+        return found
+
+    text = "".join(_texts(event))
+    if text:
+        return text
+
+    event_type = event.get("type") or event.get("event") or "event"
+    subtype = event.get("subtype") or event.get("name") or ""
+    label = f"[claude:{event_type}{':' + subtype if subtype else ''}]"
+    return label + "\n"
+
+
 def _run_streaming_process(cmd, log_file: Path, input_text: str | None = None,
-                           timeout: int = 600, shell: bool = False) -> dict:
+                           timeout: int = 600, shell: bool = False,
+                           line_transform=None) -> dict:
     """运行子进程，并把 stdout/stderr 合并实时写入 log_file。
 
     Dashboard 的 /api/stream 会 tail agent_logs/*.log；这里必须边运行边 flush，
@@ -78,8 +114,9 @@ def _run_streaming_process(cmd, log_file: Path, input_text: str | None = None,
                 if item is None:
                     stream_closed = True
                 else:
-                    output_parts.append(item)
-                    lf.write(item)
+                    rendered = line_transform(item) if line_transform else item
+                    output_parts.append(rendered)
+                    lf.write(rendered)
                     lf.flush()
             except queue.Empty:
                 pass
@@ -219,10 +256,25 @@ class AgentRunner:
         return {"success": True, "backend": "dry-run", "output": "dry-run 完成"}
 
     def _backend_claude(self, prompt, task_id, log_file):
-        """claude: 调用本地 Claude Code CLI，并把输出实时写入日志供 Dashboard SSE tail。"""
-        cmd = ["claude", "--print", "--add-dir", str(COMMANDS_DIR), "--model", "deepseek-v4"]
-        result = _run_streaming_process(cmd, log_file, input_text=prompt, timeout=600)
+        """claude: stream-json 模式，实时写入可读回答供 Dashboard SSE tail。"""
+        claude_bin = os.environ.get("HERMES_CLAUDE_BIN") or shutil.which("claude") or "claude"
+        cmd = [
+            claude_bin, "--print",
+            "--output-format", "stream-json",
+            "--include-partial-messages",
+            "--input-format", "text",
+            "--permission-mode", "bypassPermissions",
+            "--dangerously-skip-permissions",
+            "--add-dir", str(COMMANDS_DIR),
+            "--model", "deepseek-v4",
+        ]
+        result = _run_streaming_process(
+            cmd, log_file, input_text=prompt, timeout=3600,
+            line_transform=_extract_claude_stream_text,
+        )
         result["backend"] = "claude"
+        result["streaming_mode"] = "stream-json"
+        result["permission_mode"] = "bypassPermissions"
         if result.get("error") == "command_not_found":
             result["error"] = "claude 命令未找到"
         return result

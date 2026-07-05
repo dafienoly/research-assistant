@@ -91,3 +91,34 @@ def test_runner_does_not_require_codex():
     # 验证默认 backend 不是 codex
     runner = AgentRunner()  # default
     assert runner.backend != "codex"
+
+
+def test_claude_backend_uses_stream_json_and_bypass(monkeypatch, tmp_path):
+    from factor_lab.leader import agent_runner
+
+    captured = {}
+    monkeypatch.setenv("HERMES_CLAUDE_BIN", "/opt/claude")
+
+    def fake_stream(cmd, log_file, input_text=None, timeout=0, shell=False, line_transform=None):
+        captured["cmd"] = cmd
+        captured["timeout"] = timeout
+        captured["line_transform"] = line_transform
+        log_file.write_text("streamed")
+        return {"success": True, "returncode": 0, "output": "ok"}
+
+    monkeypatch.setattr(agent_runner, "_run_streaming_process", fake_stream)
+    runner = AgentRunner(backend="claude")
+    runner.log_dir = tmp_path
+    result = runner._backend_claude("prompt", "T001", tmp_path / "T001.log")
+
+    cmd = captured["cmd"]
+    assert cmd[0] == "/opt/claude"
+    assert "--output-format" in cmd
+    assert "stream-json" in cmd
+    assert "--include-partial-messages" in cmd
+    assert "--permission-mode" in cmd
+    assert "bypassPermissions" in cmd
+    assert "--dangerously-skip-permissions" in cmd
+    assert captured["timeout"] == 3600
+    assert callable(captured["line_transform"])
+    assert result["streaming_mode"] == "stream-json"
