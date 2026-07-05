@@ -1,170 +1,79 @@
 import { useState, useEffect } from 'react'
-import { Row, Col, Card, Statistic, Table, Tag, Spin } from 'antd'
-import {
-  RobotOutlined,
-  FileSearchOutlined,
-  BookOutlined,
-  ThunderboltOutlined,
-} from '@ant-design/icons'
-import ReactECharts from 'echarts-for-react'
+import { Card, Row, Col, Statistic, Table, Tag, Spin, Alert, Descriptions } from 'antd'
+import { API } from '../App'
+
+const darkCard = { background: '#121a35', border: '1px solid #26304f', borderRadius: 12, marginBottom: 16 }
+const labelStyle = { color: '#9aa7c7', fontSize: 12 }
+const valStyle = { color: '#e8ecf8', fontSize: 13, fontFamily: 'monospace' }
+
+function Metric({ label, value, color }) {
+  return <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #25304c' }}>
+    <span style={labelStyle}>{label}</span>
+    <span style={{ ...valStyle, color: color || '#e8ecf8' }}>{String(value ?? '-')}</span>
+  </div>
+}
 
 export default function Dashboard() {
-  const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({
-    activeAgents: 0,
-    totalResearch: 0,
-    knowledgeEntries: 0,
-    tasksCompleted: 0,
-  })
-  const [recentTasks, setRecentTasks] = useState([])
-  const [chartData, setChartData] = useState({ dates: [], values: [] })
-
+  const [data, setData] = useState(null)
+  const [err, setErr] = useState(null)
   useEffect(() => {
-    setStats({
-      activeAgents: 3,
-      totalResearch: 128,
-      knowledgeEntries: 456,
-      tasksCompleted: 892,
-    })
-    setRecentTasks([
-      { key: '1', name: 'A股市场情绪分析', agent: 'Research Agent', status: 'completed', time: '2分钟前' },
-      { key: '2', name: '行业轮动策略回测', agent: 'Strategy Agent', status: 'running', time: '5分钟前' },
-      { key: '3', name: '财报数据提取 — 茅台', agent: 'Data Agent', status: 'completed', time: '10分钟前' },
-      { key: '4', name: '政策新闻监控', agent: 'Monitor Agent', status: 'pending', time: '15分钟前' },
-      { key: '5', name: '知识库向量化更新', agent: 'Knowledge Agent', status: 'running', time: '20分钟前' },
-    ])
-    setChartData({
-      dates: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-      values: [12, 18, 15, 22, 20, 8, 5],
-    })
-    setLoading(false)
+    fetch(`${API}/api/status`).then(r => r.json()).then(setData).catch(e => setErr(e.message))
+    const t = setInterval(() => fetch(`${API}/api/status`).then(r => r.json()).then(setData).catch(() => {}), 5000)
+    return () => clearInterval(t)
   }, [])
+  if (err) return <Alert type="error" message={`无法连接 FastAPI (${API})`} description={err} />
+  if (!data) return <Spin style={{ display: 'block', marginTop: 80 }} />
 
-  const statusColor = {
-    completed: 'success',
-    running: 'processing',
-    pending: 'default',
-  }
-  const statusLabel = {
-    completed: '已完成',
-    running: '运行中',
-    pending: '等待中',
-  }
+  const s = data.state || {}
+  const h = data.health || {}
+  const c = data.cursor || {}
+  const l = data.latest || {}
+  const r = data.report || {}
+  const be = data.backend || {}
+  const bg = s.level === 'green' ? '#0f3d2e' : s.level === 'red' ? '#4a1620' : '#44380c'
+  const fg = s.level === 'green' ? '#7df0bd' : s.level === 'red' ? '#ff8ba0' : '#ffdc7a'
 
-  const lineOption = {
-    tooltip: { trigger: 'axis' },
-    grid: { left: 40, right: 20, bottom: 30, top: 10 },
-    xAxis: {
-      type: 'category',
-      data: chartData.dates,
-      axisLabel: { fontSize: 11 },
-    },
-    yAxis: { type: 'value', minInterval: 1 },
-    series: [
-      {
-        type: 'line',
-        data: chartData.values,
-        smooth: true,
-        lineStyle: { color: '#1677ff', width: 2 },
-        areaStyle: {
-          color: {
-            type: 'linear',
-            x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [
-              { offset: 0, color: 'rgba(22,119,255,0.25)' },
-              { offset: 1, color: 'rgba(22,119,255,0.02)' },
-            ],
-          },
-        },
-        symbol: 'circle',
-        symbolSize: 6,
-      },
-    ],
-  }
-
-  const columns = [
-    { title: '任务', dataIndex: 'name', key: 'name' },
-    { title: '智能体', dataIndex: 'agent', key: 'agent' },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (s) => <Tag color={statusColor[s]}>{statusLabel[s]}</Tag>,
-    },
-    { title: '时间', dataIndex: 'time', key: 'time' },
+  const cols = [
+    { title: '版本', dataIndex: 'version', key: 'v' },
+    { title: '名称', dataIndex: 'name', key: 'n' },
+    { title: '状态', dataIndex: 'status', key: 's',
+      render: v => <Tag color={v === 'completed' ? 'green' : v === 'current' ? 'blue' : v === 'failed' ? 'red' : 'default'}>{v}</Tag> },
+    { title: '自动', dataIndex: 'auto_allowed', key: 'a', render: v => v ? '✅' : '❌' },
+    { title: '人工', dataIndex: 'manual_required', key: 'm', render: v => v ? '⚠️' : '—' },
   ]
 
-  if (loading) return <Spin size="large" style={{ display: 'block', margin: '80px auto' }} />
-
-  return (
-    <div>
-      <h2 style={{ marginBottom: 24 }}>总览</h2>
-
-      <Row gutter={[16, 16]}>
-        <Col xs={12} sm={12} lg={6}>
-          <Card hoverable>
-            <Statistic
-              title="活跃智能体"
-              value={stats.activeAgents}
-              prefix={<RobotOutlined style={{ color: '#1677ff' }} />}
-              suffix="个"
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={12} lg={6}>
-          <Card hoverable>
-            <Statistic
-              title="研究任务"
-              value={stats.totalResearch}
-              prefix={<FileSearchOutlined style={{ color: '#52c41a' }} />}
-              suffix="项"
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={12} lg={6}>
-          <Card hoverable>
-            <Statistic
-              title="知识条目"
-              value={stats.knowledgeEntries}
-              prefix={<BookOutlined style={{ color: '#faad14' }} />}
-              suffix="条"
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={12} lg={6}>
-          <Card hoverable>
-            <Statistic
-              title="完成任务"
-              value={stats.tasksCompleted}
-              prefix={<ThunderboltOutlined style={{ color: '#ff4d4f' }} />}
-              suffix="次"
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
-        <Col xs={24} lg={14}>
-          <Card title="本周研究活动趋势">
-            <ReactECharts
-              option={lineOption}
-              style={{ height: 280 }}
-              notMerge
-            />
-          </Card>
-        </Col>
-        <Col xs={24} lg={10}>
-          <Card title="最近任务">
-            <Table
-              dataSource={recentTasks}
-              columns={columns}
-              pagination={false}
-              size="small"
-              showHeader={false}
-            />
-          </Card>
-        </Col>
-      </Row>
+  return <div>
+    <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
+      <span style={{ background: bg, color: fg, padding: '6px 14px', borderRadius: 999, fontWeight: 700, fontSize: 13 }}>
+        {s.level === 'green' ? '✅ 正常' : s.level === 'red' ? '❌ 异常' : '⚠️ 警告'}
+      </span>
+      <span style={{ color: '#9aa7c7', fontSize: 12 }}>{h.checked_at || ''}</span>
     </div>
-  )
+
+    <Row gutter={16}>
+      <Col span={8}><Card style={darkCard}><h3 style={{ color: '#cdd6f8', fontSize: 14, margin: '0 0 12px' }}>🚀 版本推进</h3>
+        <Metric label="当前版本" value={c.current_version} />
+        <Metric label="已完成" value={r.total_completed} />
+        <Metric label="失败的版本" value={r.total_failed} color={r.total_failed > 0 ? '#ff8ba0' : undefined} />
+        <Metric label="自动允许至" value={c.auto_allowed_until} />
+      </Card></Col>
+      <Col span={8}><Card style={darkCard}><h3 style={{ color: '#cdd6f8', fontSize: 14, margin: '0 0 12px' }}>🔒 系统状态</h3>
+        <Metric label="Lock" value={h.lock_status} color={h.lock_status === 'free' ? '#7df0bd' : '#ff8ba0'} />
+        <Metric label="Cron" value={h.cron_service_running ? '✅ running' : '❌ stopped'} />
+        <Metric label="Tick 计数" value={h.tick_count} />
+        <Metric label="Latest.json" value={l.current || '-'} />
+      </Card></Col>
+      <Col span={8}><Card style={darkCard}><h3 style={{ color: '#cdd6f8', fontSize: 14, margin: '0 0 12px' }}>⚡ Backend</h3>
+        <Metric label="后端" value={be.claude_bin_path || 'dry-run'} />
+        <Metric label="Coding Backend" value={be.coding_backend_configured ? '✅ 已配置' : '❌ 未配置'} />
+        <Metric label="Cron Safe" value={be.cron_safe ? '✅' : '❌'} />
+      </Card></Col>
+    </Row>
+
+    <Card style={darkCard} title={<span style={{ color: '#cdd6f8' }}>📋 版本列表</span>}>
+      <Table dataSource={r.versions || []} columns={cols} rowKey="version" pagination={false}
+        size="small" style={{ background: 'transparent' }}
+        locale={{ emptyText: <span style={{ color: '#9aa7c7' }}>无数据</span> }} />
+    </Card>
+  </div>
 }
