@@ -252,7 +252,7 @@ def _build_tasks_for_remaining(remaining, version, stage):
 
 def _build_next_stage_tasks(version, stage, next_q):
     # 安全限制: 不自动派发 live/paper config 修改
-    safe_prefixes = ("V2.15", "research", "dry-run", "acceptance")
+    safe_prefixes = ("V2", "V3", "research", "dry-run", "dry_run", "acceptance", "test", "auto")
     if any(version.startswith(p) for p in safe_prefixes):
         return [{"title": "dry_run_completion", "version": "V2.15.1", "priority": "P1",
                  "owner": "governance_engineer",

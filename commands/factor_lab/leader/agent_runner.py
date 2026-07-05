@@ -219,4 +219,4 @@ def loop_once():
 
 
 def safe_stages() -> list:
-    return ["research", "dry-run", "dry_run", "acceptance", "test", "V2.15", "V3"]
+    return ["research", "dry-run", "dry_run", "acceptance", "test", "V2", "V3", "auto"]
