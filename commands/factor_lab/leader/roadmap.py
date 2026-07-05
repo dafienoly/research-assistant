@@ -1,180 +1,121 @@
-"""V3+ Alpha Factory roadmap.
+"""Roadmap — 固定产品路线图 V3-V9"""
+ROADMAP = []
 
-路线原则：V3 不再按“新增某类因子”排版本，而是按 Alpha Factory
-生命周期排版本。原 P0/P1/P2/P3 因子方向统一挂到 V3 Alpha Factory
-之下，避免继续堆 V2.x 功能。
-"""
+def _load():
+    global ROADMAP
+    if ROADMAP:
+        return ROADMAP
+    # V3.x
+    for i, (v, n, o) in enumerate([
+        ("V3.0", "Alpha Factory Foundation", "建立 AlphaSpec、AlphaRegistry、Lifecycle、CLI"),
+        ("V3.0.1", "Existing Factor Catalog Migration", "迁移现有因子到 Alpha Registry"),
+        ("V3.1", "Industry Relative Alpha Pack", "行业相对、行业中性 Alpha"),
+        ("V3.2", "Factor Evaluation & Orthogonality", "IC/ICIR/OOS/Walk Forward"),
+        ("V3.3", "Data Enrichment Alpha Pack", "北向、两融、资金流增强 Alpha"),
+        ("V3.4", "Technical Pattern Control Pack", "MACD/KDJ/Boll as control"),
+        ("V3.5", "Event-driven Alpha Pack", "解禁、回购、分红事件 Alpha"),
+        ("V3.6", "Alpha Portfolio Intelligence", "多 Alpha 组合、降权、淘汰"),
+        ("V3.7", "LLM Alpha Discovery", "LLM 生成 AlphaSpec 候选"),
+        ("V3.8", "Alpha Review Queue & Governance", "候选审核、证据、风险"),
+        ("V3.9", "Alpha Promotion/Retirement Engine", "Alpha 晋级、退役治理"),
+    ]):
+        ROADMAP.append({"version": v, "name": n, "objective": o, "auto_allowed": True, "manual_required": False, "trading_mode": "none"})
+    # V4.x
+    for i, (v, n, o, m) in enumerate([
+        ("V4.0", "Controlled Live Pipeline Design", "受控实盘管线设计", False),
+        ("V4.1", "Shadow Live Pipeline", "影子实盘/模拟实盘", False),
+        ("V4.2", "Broker Adapter Contract & Sandbox", "broker 合约", False),
+        ("V4.3", "Order Preview/Rebalance/Approval", "订单预览、审批", False),
+        ("V4.4", "Kill Switch / Risk Sentinel", "熔断、风险哨兵", False),
+        ("V4.5", "Human Approval Workflow", "审批工作流", False),
+        ("V4.6", "Live Audit/Rollback/Incident", "审计回滚", False),
+        ("V4.7", "MiniQMT Adapter Hardening", "MiniQMT 加固", False),
+        ("V4.8", "Capital Safety Boundary", "资金安全边界", False),
+        ("V4.9", "Controlled Live Readiness Report", "实盘就绪报告", True),
+    ]):
+        ROADMAP.append({"version": v, "name": n, "objective": o, "auto_allowed": True, "manual_required": m, "trading_mode": "sandbox_only"})
+    # V5.x
+    for i, (v, n, o) in enumerate([
+        ("V5.0", "Data Source Registry", "数据源注册表"),
+        ("V5.1", "AkShare/BaoStock Provider", "免费数据源 Provider"),
+        ("V5.2", "Realtime Quote Ingest", "实时行情"),
+        ("V5.3", "Minute/Daily Bar Storage", "分钟线日线存储"),
+        ("V5.4", "Data Quality Gate", "数据质量门禁"),
+        ("V5.5", "No-Fallback Data Contract", "禁止 fallback"),
+        ("V5.6", "Data Lineage/Manifest/Audit", "数据血缘"),
+        ("V5.7", "Market Calendar Engine", "交易日历"),
+        ("V5.8", "Data Health Dashboard", "数据健康"),
+        ("V5.9", "Paid Provider Readiness", "付费数据源预留"),
+    ]):
+        ROADMAP.append({"version": v, "name": n, "objective": o, "auto_allowed": True, "manual_required": False, "trading_mode": "none"})
+    # V6.x
+    for i, (v, n, o) in enumerate([
+        ("V6.0", "Research Skill Runtime", "投研 skill 运行时"),
+        ("V6.1", "Strategy Template Registry", "策略模板注册表"),
+        ("V6.2", "Backtest Engine Integration", "回测引擎"),
+        ("V6.3", "Walk Forward/OOS/Anti-overfit", "反过拟合门禁"),
+        ("V6.4", "Portfolio Backtest/Benchmark", "组合回测"),
+        ("V6.5", "Strategy Report Generator", "策略报告"),
+        ("V6.6", "Factor Mining Agent", "因子挖掘 Agent"),
+        ("V6.7", "News/Policy/Event Research", "事件研究"),
+        ("V6.8", "A-share Sector Rotation", "行业轮动"),
+        ("V6.9", "Strategy Promotion Board", "策略晋级"),
+    ]):
+        ROADMAP.append({"version": v, "name": n, "objective": o, "auto_allowed": True, "manual_required": False, "trading_mode": "none"})
+    # V7.x
+    for i, (v, n, o) in enumerate([
+        ("V7.0", "Modern Frontend Dashboard", "前端总览"),
+        ("V7.1", "Data Status/Provider Failure UI", "数据状态 UI"),
+        ("V7.2", "AgentOps Control Tower", "控制塔"),
+        ("V7.3", "Task Queue/Run History/Logs", "任务队列"),
+        ("V7.4", "Roadmap Progress UI", "路线图进度"),
+        ("V7.5", "Report Center", "报告中心"),
+        ("V7.6", "Risk Dashboard", "风险仪表盘"),
+        ("V7.7", "Paper Trading Dashboard", "纸面交易"),
+        ("V7.8", "User Feedback/Task Intake UI", "用户反馈 UI"),
+        ("V7.9", "One-click Local Ops", "一键运维"),
+    ]):
+        ROADMAP.append({"version": v, "name": n, "objective": o, "auto_allowed": True, "manual_required": False, "trading_mode": "none"})
+    # V8.x
+    for i, (v, n, o) in enumerate([
+        ("V8.0", "Agent Role Registry", "角色注册"),
+        ("V8.1", "Agent Router", "Agent 路由"),
+        ("V8.2", "Auto Bugfix Loop", "自动 bugfix"),
+        ("V8.3", "Regression Test Planner", "回归测试"),
+        ("V8.4", "GitHub Issue/PR Pipeline", "Issue/PR 流水线"),
+        ("V8.5", "Documentation Generator", "文档生成"),
+        ("V8.6", "Release Manager", "发布管理"),
+        ("V8.7", "Self-Diagnostics", "自诊断"),
+        ("V8.8", "Cost/Token/Backend Policy", "成本策略"),
+        ("V8.9", "Continuous Improvement Engine", "持续改进"),
+    ]):
+        ROADMAP.append({"version": v, "name": n, "objective": o, "auto_allowed": True, "manual_required": False, "trading_mode": "none"})
+    # V9.x (backlog)
+    for v, n in [("V9.0","Cloud/Local Hybrid Runner"),("V9.1","Distributed Backtest"),("V9.2","Multi-account Governance"),("V9.3","External Notification Center"),("V9.4","Enterprise-grade Audit")]:
+        ROADMAP.append({"version": v, "name": n, "objective": "backlog", "auto_allowed": False, "manual_required": True, "trading_mode": "backlog"})
+    return ROADMAP
 
-from __future__ import annotations
+def get_roadmap():
+    return _load()
 
-from dataclasses import dataclass, asdict
-from typing import Literal
+def get_version(ver):
+    for r in _load():
+        if r["version"] == ver:
+            return r
+    return None
 
-TradingMode = Literal["none", "paper", "human_controlled_live"]
+def next_version(current):
+    items = _load()
+    for i, item in enumerate(items):
+        if item["version"] == current and i+1 < len(items):
+            return items[i+1]
+    return None
 
+def is_backlog(ver):
+    r = get_version(ver)
+    return r and r.get("trading_mode") == "backlog"
 
-@dataclass(frozen=True)
-class RoadmapItem:
-    version: str
-    name: str
-    objective: str
-    trading_mode: TradingMode
-    stage_gate: str
-    owner_role: str
-    required_outputs: tuple[str, ...]
-    acceptance: tuple[str, ...]
-
-    def to_dict(self) -> dict:
-        return asdict(self)
-
-
-ALPHA_FACTORY_ROADMAP: tuple[RoadmapItem, ...] = (
-    RoadmapItem(
-        version="V3.0",
-        name="Alpha Factory Foundation",
-        objective="建立 AlphaSpec、AlphaRegistry、生命周期、样例 Alpha，形成 Alpha 工厂底座。",
-        trading_mode="none",
-        stage_gate="foundation_ready",
-        owner_role="foundation_engineer",
-        required_outputs=("AlphaSpec", "AlphaRegistry", "Lifecycle", "SampleAlphas", "Alpha CLI"),
-        acceptance=(
-            "所有 Alpha 默认 enabled=false / paper_enabled=false / live_enabled=false",
-            "注册、列表、查看、退役、评估计划可运行",
-            "输出 manifest 与 audit，不调用 broker/miniqmt",
-        ),
-    ),
-    RoadmapItem(
-        version="V3.0.1",
-        name="Existing Factor Catalog Migration",
-        objective="把现有因子目录纳入 Alpha Registry，形成可治理、可审计的 Alpha Catalog。",
-        trading_mode="none",
-        stage_gate="catalog_migrated",
-        owner_role="migration_engineer",
-        required_outputs=("factor_catalog_registry.csv", "factor_migration_report.html", "factor_migration_summary.md"),
-        acceptance=(
-            "现有 factor_base 注册表中的因子全部生成 AlphaSpec 或明确 skipped/duplicate 原因",
-            "迁移过程不触发回测、不修改 paper/live 配置、不调用交易接口",
-            "重复迁移幂等：重复运行只记录 duplicates，不重复污染 registry",
-        ),
-    ),
-    RoadmapItem(
-        version="V3.1",
-        name="Industry Relative Alpha Pack",
-        objective="实现行业相对、行业中性、行业内排序 Alpha Pack。",
-        trading_mode="none",
-        stage_gate="industry_relative_alpha_ready",
-        owner_role="alpha_engineer",
-        required_outputs=("industry_relative_alpha_specs", "industry_neutralization_report", "industry_rank_report"),
-        acceptance=(
-            "AlphaSpec 只描述信号，不直接写入策略配置",
-            "行业暴露、行业内排序、行业中性处理均有报告和测试",
-            "每个 Alpha 都进入 Alpha Registry，默认 disabled",
-        ),
-    ),
-    RoadmapItem(
-        version="V3.2",
-        name="Factor Evaluation & Orthogonality",
-        objective="统一 IC、ICIR、相关性、行业暴露、OOS、Walk Forward 与评估门禁。",
-        trading_mode="none",
-        stage_gate="evaluation_gate_ready",
-        owner_role="evaluation_engineer",
-        required_outputs=("evaluation_pipeline", "orthogonality_matrix", "walk_forward_report", "gate_report"),
-        acceptance=(
-            "所有评估结果绑定 alpha_id/run_id/manifest/audit",
-            "相关性、行业暴露、OOS、Walk Forward 可作为 GateEngine 输入",
-            "报告区分 passed/warning/blocker，禁止 silent fallback",
-        ),
-    ),
-    RoadmapItem(
-        version="V3.3",
-        name="Data Enrichment Alpha Pack",
-        objective="接入北向、两融、资金流等增强数据，生成可审计 AlphaSpec。",
-        trading_mode="none",
-        stage_gate="data_enrichment_ready",
-        owner_role="data_alpha_engineer",
-        required_outputs=("northbound_alpha_specs", "margin_alpha_specs", "fund_flow_alpha_specs", "data_coverage_report"),
-        acceptance=(
-            "所有增强数据有 freshness/coverage/as-of 校验",
-            "历史不足的数据标记 pending，不伪造回测结论",
-            "Alpha 默认 disabled，不进入实盘链路",
-        ),
-    ),
-    RoadmapItem(
-        version="V3.4",
-        name="Technical Pattern Control Pack",
-        objective="把 MACD/KDJ/Bollinger 作为对照和冗余检测工具，而非核心预测因子。",
-        trading_mode="none",
-        stage_gate="technical_control_ready",
-        owner_role="control_alpha_engineer",
-        required_outputs=("technical_control_specs", "redundancy_report", "benchmark_comparison_report"),
-        acceptance=(
-            "技术指标只作为 control/baseline/redundancy 检测",
-            "不得把常见技术形态直接包装为高置信 Alpha",
-            "输出与现有 Alpha 的相关性和增量价值判断",
-        ),
-    ),
-    RoadmapItem(
-        version="V3.5",
-        name="Event-driven Alpha Pack",
-        objective="围绕解禁、回购、分红、业绩预告等事件构建事件驱动 Alpha。",
-        trading_mode="none",
-        stage_gate="event_alpha_ready",
-        owner_role="event_alpha_engineer",
-        required_outputs=("event_alpha_specs", "event_calendar", "event_study_report"),
-        acceptance=(
-            "事件日期、公告日期、可交易日期必须分离，避免未来函数",
-            "事件窗口收益、覆盖率、缺失率均入报告",
-            "所有信号只注册/评估，不自动交易",
-        ),
-    ),
-    RoadmapItem(
-        version="V3.6",
-        name="Alpha Portfolio Intelligence",
-        objective="实现多 Alpha 组合、淘汰、降权、晋级与 Paper 组合治理。",
-        trading_mode="paper",
-        stage_gate="paper_portfolio_ready",
-        owner_role="portfolio_engineer",
-        required_outputs=("alpha_portfolio_engine", "promotion_policy", "deweight_retire_report"),
-        acceptance=(
-            "只允许进入 Paper，不直接进入 live",
-            "组合权重、淘汰、降权、晋级均需人审 Gate",
-            "所有变更有 rollback 与 audit trail",
-        ),
-    ),
-    RoadmapItem(
-        version="V3.7",
-        name="LLM Alpha Discovery",
-        objective="让 LLM 生成 AlphaSpec 候选，不直接写策略代码或实盘策略。",
-        trading_mode="none",
-        stage_gate="llm_alpha_spec_ready",
-        owner_role="llm_alpha_researcher",
-        required_outputs=("llm_alpha_spec_generator", "candidate_review_queue", "prompt_audit"),
-        acceptance=(
-            "LLM 只能输出 AlphaSpec 草案，不直接改策略配置",
-            "每个候选必须附 hypothesis/evidence/risk_notes",
-            "候选进入人工 review queue 后才可注册",
-        ),
-    ),
-    RoadmapItem(
-        version="V4.0",
-        name="Controlled Live Alpha Pipeline",
-        objective="通过 V2 治理链路后进入小权限、可回滚、人工确认的实盘 Alpha Pipeline。",
-        trading_mode="human_controlled_live",
-        stage_gate="controlled_live_gate_ready",
-        owner_role="live_governance_engineer",
-        required_outputs=("controlled_live_gate", "kill_switch", "human_confirm_workflow", "live_audit_report"),
-        acceptance=(
-            "必须经过 V2 风控/审批/审计链路",
-            "实盘只能小权限、人工确认、可回滚",
-            "任何自动下单默认禁止，除非显式通过 Controlled Live Gate",
-        ),
-    ),
-)
-
-
-def roadmap_as_dicts() -> list[dict]:
-    return [item.to_dict() for item in ALPHA_FACTORY_ROADMAP]
-
-
-def find_roadmap_item(version: str) -> RoadmapItem | None:
-    return next((item for item in ALPHA_FACTORY_ROADMAP if item.version == version), None)
+# Backward compatibility for planner.py
+ALPHA_FACTORY_ROADMAP = [r["version"] for r in _load()]
+def roadmap_as_dicts():
+    return _load()

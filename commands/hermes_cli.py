@@ -123,6 +123,12 @@ def show_help():
   leader:lock-status             查看当前任务锁状态
 
 leader:automation-status       后台自动工作流健康状态检查
+leader:roadmap-status          固定路线图进度显示
+leader:task-list               列出待办任务
+leader:task-submit --text "..." --title "任务标题"
+                              提交新任务到 inbox
+leader:auto-run-once          自动执行器: 读取路线图 cursor，执行当前版本
+leader:auto-status            自动执行器状态
 Leader 自动派发:
   leader:inspect                 Leader 只读检查本地报告/代码/Registry，判断 V3 阶段
   leader:dispatch [--dry-run]    按 Alpha Factory 路线图生成 agent_tasks 任务包
@@ -749,9 +755,41 @@ run_daily_premarket(no_notify=True)
 
     elif command == "leader:automation-status":
         from factor_lab.leader.auto_health import health
-        import json
         h = health()
         for k, v in h.items():
+            print(f"  {k}: {v}")
+
+    elif command == "leader:roadmap-status":
+        from factor_lab.leader.roadmap_cursor import status_text
+        print(status_text())
+
+    elif command == "leader:task-list":
+        from factor_lab.leader.task_intake import intake
+        inbox = intake()
+        print(f"  Inbox: {inbox['inbox_count']} tasks")
+        for t in inbox.get("tasks", [])[:5]:
+            print(f"    - {t['id']}: {t['title'][:50] if t.get('title') else '(no title)'}")
+
+    elif command == "leader:task-submit":
+        import argparse
+        p = argparse.ArgumentParser()
+        p.add_argument("--text", required=True)
+        p.add_argument("--title", default="")
+        a = p.parse_args(args)
+        from factor_lab.leader.task_intake import submit
+        e = submit(a.text, a.title)
+        print(f"  ✅ Submitted: {e['id']}")
+
+    elif command == "leader:auto-run-once":
+        from factor_lab.leader.auto_executor import auto_run_once
+        result = auto_run_once()
+        for k, v in result.items():
+            print(f"  {k}: {v}")
+
+    elif command == "leader:auto-status":
+        from factor_lab.leader.backend_policy import policy_status
+        s = policy_status()
+        for k, v in s.items():
             print(f"  {k}: {v}")
 
     elif command == "leader:accept":
