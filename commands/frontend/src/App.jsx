@@ -1,122 +1,98 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { Routes, Route, NavLink, Navigate } from 'react-router-dom'
+import { Layout, Menu, Typography } from 'antd'
+import {
+  DashboardOutlined,
+  RobotOutlined,
+  SearchOutlined,
+  BookOutlined,
+  SettingOutlined,
+} from '@ant-design/icons'
 
-function App() {
-  const [count, setCount] = useState(0)
+import Dashboard from './pages/Dashboard'
+import AgentConsole from './pages/AgentConsole'
+import Research from './pages/Research'
+import KnowledgeBase from './pages/KnowledgeBase'
+import Settings from './pages/Settings'
+
+const { Sider, Content, Header } = Layout
+
+const MENU_ITEMS = [
+  {
+    key: '/',
+    icon: <DashboardOutlined />,
+    label: <NavLink to="/" end>总览</NavLink>,
+  },
+  {
+    key: '/console',
+    icon: <RobotOutlined />,
+    label: <NavLink to="/console">智能体控制台</NavLink>,
+  },
+  {
+    key: '/research',
+    icon: <SearchOutlined />,
+    label: <NavLink to="/research">研究</NavLink>,
+  },
+  {
+    key: '/knowledge',
+    icon: <BookOutlined />,
+    label: <NavLink to="/knowledge">知识库</NavLink>,
+  },
+  {
+    key: '/settings',
+    icon: <SettingOutlined />,
+    label: <NavLink to="/settings">设置</NavLink>,
+  },
+]
+
+export default function App() {
+  const [collapsed, setCollapsed] = useState(false)
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+    <Layout style={{ minHeight: '100vh' }}>
+      <Sider
+        collapsible
+        collapsed={collapsed}
+        onCollapse={setCollapsed}
+        theme="light"
+        style={{
+          borderRight: '1px solid #f0f0f0',
+          boxShadow: '2px 0 8px rgba(0,0,0,0.04)',
+        }}
+      >
+        <div
+          style={{
+            height: 56,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderBottom: '1px solid #f0f0f0',
+          }}
         >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+          <Typography.Title level={4} style={{ margin: 0, whiteSpace: 'nowrap' }}>
+            {collapsed ? '🧠' : '🧠 Research Assistant'}
+          </Typography.Title>
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+        <Menu
+          mode="inline"
+          defaultSelectedKeys={['/']}
+          items={MENU_ITEMS}
+          style={{ borderInlineEnd: 'none' }}
+        />
+      </Sider>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      <Layout>
+        <Content style={{ padding: 24, overflow: 'auto' }}>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/console" element={<AgentConsole />} />
+            <Route path="/research" element={<Research />} />
+            <Route path="/knowledge" element={<KnowledgeBase />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Content>
+      </Layout>
+    </Layout>
   )
 }
-
-export default App
