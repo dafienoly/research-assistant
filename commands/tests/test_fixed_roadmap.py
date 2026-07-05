@@ -1,7 +1,7 @@
 """测试: V2.16.3 Fixed Roadmap Continuous Auto-Development"""
 import sys, os, json, tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from factor_lab.leader.roadmap import get_roadmap, get_version, next_version, is_backlog
+from factor_lab.leader.roadmap import get_roadmap, get_version, next_version, is_backlog, ALPHA_FACTORY_ROADMAP
 from factor_lab.leader.roadmap_cursor import get_cursor, advance, set_blocked, CURSOR_FILE
 from factor_lab.leader.backend_policy import need_code_change, select_backend, policy_status
 from factor_lab.leader.task_intake import submit, intake, route_to_version
@@ -9,7 +9,7 @@ from factor_lab.leader.task_intake import submit, intake, route_to_version
 
 def test_roadmap_covers_v3_to_v9():
     r = get_roadmap()
-    versions = {i["version"] for i in r}
+    versions = {item.version for item in r}
     assert "V3.0" in versions
     assert "V4.0" in versions
     assert "V5.0" in versions
@@ -41,21 +41,24 @@ def test_cursor_advance_no_duplicate():
 
 
 def test_v2_not_reverted_to_dry_run():
-    """V3+ 不应被派回 V2.15.1 dry_run_completion"""
     v = get_version("V3.0")
     assert v is not None, "V3.0 must exist in roadmap"
-    assert v["auto_allowed"] == True
+    assert v.auto_allowed == True
 
 
 def test_v4_manual_gate():
     v = get_version("V4.9")
     assert v is not None
-    assert v["manual_required"] == True
+    assert v.manual_required == True
+
+
+def test_v3_6_is_paper():
+    v = get_version("V3.6")
+    assert v is not None
+    assert v.trading_mode == "paper", f"V3.6 trading_mode should be paper, got {v.trading_mode}"
 
 
 def test_backend_policy():
-    dry = select_backend("code_change")
-    # dry-run may be returned if no claude, but code_change needs coding
     assert need_code_change("code_change") == True
     assert need_code_change("documentation") == False
 
@@ -71,3 +74,13 @@ def test_intake_submit():
 def test_intake_route():
     v = route_to_version("Alpha Factory Foundation")
     assert v == "V3.0" or v is not None
+
+
+def test_alpha_factory_roadmap_is_object_list():
+    assert isinstance(ALPHA_FACTORY_ROADMAP, list)
+    assert all(hasattr(item, 'version') for item in ALPHA_FACTORY_ROADMAP)
+    versions = [item.version for item in ALPHA_FACTORY_ROADMAP]
+    assert "V3.0" in versions
+    assert "V3.6" in versions
+    assert "V4.0" in versions
+    assert "V8.9" in versions
