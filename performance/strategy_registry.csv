@@ -1,0 +1,4 @@
+strategy_name,version,universe,total_return,annual_return,max_drawdown,sharpe,calmar,win_rate,turnover,production_readiness,updated_at
+breakout_semiconductor,0.1.0,,0.1078,0.1078,0.1458,,0.74,,,research_only,2026-07-03T18:02:19+08:00
+quality_growth_semiconductor,0.1.0,,0.0851,0.0851,0.0423,,2.01,,,research_only,2026-07-03T18:02:19+08:00
+semiconductor_trend_following,0.1.0,,0.0595,0.0595,0.0398,,1.49,,,research_only,2026-07-03T18:02:19+08:00

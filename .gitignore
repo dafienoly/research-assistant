@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+.venv_*/
+venv/
+env/
+
+# Local runtime state
+logs/
+*.log
+*.jsonl.lock
+current_run.lock
+
+# Data and generated outputs
+/data/cache/
+/data/raw/
+/data/staging/
+/data/intraday/
+/research_outputs/
+/performance/backtests/
+/performance/paper_trading/
+/performance/signals/
+/analysis_report/
+
+# Hermes runtime task/output state
+/agent_tasks/auto_*/
+/agent_tasks/latest.json
+/agent_tasks/latest_completion.json
+/agent_tasks/current_run.lock
+
+# Secrets and local config
+.env
+.env.*
+*.token
+*.secret
+secrets.json
+config.local.json
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/

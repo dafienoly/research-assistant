@@ -1,0 +1,46 @@
+# 半导体突破买入策略 — 通用 strategy schema 示例
+name: breakout_semiconductor
+version: 0.1.0
+description: 半导体主题突破买入策略 — 放量突破20日高点后买入
+
+universe:
+  name: semiconductor_theme
+  max_universe_size: 500
+
+data_rules:
+  no_future_data: true
+
+factors:
+  - name: ret20
+    category: price_momentum
+    weight: 0.20
+  - name: vol_ratio20
+    category: volume
+    weight: 0.25
+    params: {min_ratio: 1.5}
+  - name: ma20_gt_ma60
+    category: trend
+    weight: 0.15
+
+signal_rules:
+  buy_watch:
+    final_score_gt: 65
+    rank_top_n: 5
+  exit_watch:
+    final_score_lt: 30
+
+portfolio:
+  top_n: 5
+  rebalance: daily
+  initial_cash: 1000000
+  max_single_weight: 0.20
+  lot_size: 100
+
+cost:
+  commission_rate: 0.0003
+  min_commission: 5
+  stamp_tax_rate_sell: 0.0005
+  slippage_bps: 10
+
+benchmark:
+  primary: hs300

@@ -1,0 +1,31 @@
+name: Hermes Research CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  hermes-research-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest pandas numpy
+      - name: Run Hermes tests
+        working-directory: commands
+        run: pytest -q
+      - name: Run Leader acceptance when local Hermes paths exist
+        working-directory: commands
+        run: |
+          if [ -x /home/ly/.hermes/research-assistant/.venv_quant/bin/python3 ]; then
+            /home/ly/.hermes/research-assistant/.venv_quant/bin/python3 hermes_cli.py leader:accept --full-tests
+          else
+            echo "Skip local Leader acceptance: Hermes local venv not available on this runner."
+          fi

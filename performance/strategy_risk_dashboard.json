@@ -1,0 +1,62 @@
+{
+  "last_updated": "2026-07-03T18:02:19+08:00",
+  "total_strategies": 3,
+  "strategies": [
+    {
+      "strategy_name": "breakout_semiconductor",
+      "version": "0.1.0",
+      "universe": "",
+      "total_return": 0.1078,
+      "annual_return": 0.1078,
+      "max_drawdown": 0.1458,
+      "sharpe": null,
+      "calmar": 0.74,
+      "win_rate": null,
+      "turnover": null,
+      "benchmark_excess_return": null,
+      "stability_score": null,
+      "overfit_risk": "unknown",
+      "production_readiness": "research_only",
+      "updated_at": "2026-07-03T18:02:19+08:00"
+    },
+    {
+      "strategy_name": "quality_growth_semiconductor",
+      "version": "0.1.0",
+      "universe": "",
+      "total_return": 0.0851,
+      "annual_return": 0.0851,
+      "max_drawdown": 0.0423,
+      "sharpe": null,
+      "calmar": 2.01,
+      "win_rate": null,
+      "turnover": null,
+      "benchmark_excess_return": null,
+      "stability_score": null,
+      "overfit_risk": "unknown",
+      "production_readiness": "research_only",
+      "updated_at": "2026-07-03T18:02:19+08:00"
+    },
+    {
+      "strategy_name": "semiconductor_trend_following",
+      "version": "0.1.0",
+      "universe": "",
+      "total_return": 0.0595,
+      "annual_return": 0.0595,
+      "max_drawdown": 0.0398,
+      "sharpe": null,
+      "calmar": 1.49,
+      "win_rate": null,
+      "turnover": null,
+      "benchmark_excess_return": null,
+      "stability_score": null,
+      "overfit_risk": "unknown",
+      "production_readiness": "research_only",
+      "updated_at": "2026-07-03T18:02:19+08:00"
+    }
+  ],
+  "warnings": [],
+  "paper_trade_candidates": [
+    "quality_growth_semiconductor",
+    "semiconductor_trend_following"
+  ]
+}

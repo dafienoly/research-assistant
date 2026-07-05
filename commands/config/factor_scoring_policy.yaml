@@ -1,0 +1,105 @@
+# 因子评分政策配置 — V1.4 因子类型感知评分
+# 此文件是配置源，所有评分逻辑读取此配置，不写死阈值
+
+global:
+  min_total_days: 120
+  min_valid_symbols: 30
+  hard_fail_on_data_error: true
+  require_peer_outperformance_for_ab: true
+  require_placebo_pass_for_ab: true
+  require_walk_forward_pass_for_ab: true
+
+  # 评分权重（可被家族覆盖）
+  default_weights:
+    ic_stability: 0.25
+    monotonicity: 0.20
+    peer_excess: 0.20
+    risk_control: 0.15
+    walk_forward: 0.15
+    simplicity: 0.05
+
+families:
+
+  momentum:
+    label: 动量
+    keywords: [ret, mom, momentum, ts_regression_slope, max_high, min_low]
+    max_drawdown_warn: 0.45
+    max_drawdown_fail: 0.65
+    max_relative_drawdown_vs_peer: 1.35
+    min_excess_return_vs_peer_for_b: 0.05
+    min_calmar_for_b: 0.8
+    allow_high_beta: true
+    risk_control_weight: 0.10
+    peer_excess_weight: 0.25
+
+  reversal:
+    label: 反转
+    keywords: [reversal, contrarian]
+    max_drawdown_warn: 0.35
+    max_drawdown_fail: 0.55
+    max_relative_drawdown_vs_peer: 1.20
+    min_excess_return_vs_peer_for_b: 0.03
+    min_calmar_for_b: 0.8
+    allow_high_beta: false
+
+  trend:
+    label: 趋势
+    keywords: [ma_gt_, close_gt_ma, ma_gap, trend, ts_slope]
+    max_drawdown_warn: 0.50
+    max_drawdown_fail: 0.70
+    max_relative_drawdown_vs_peer: 1.40
+    min_excess_return_vs_peer_for_b: 0.05
+    min_calmar_for_b: 0.7
+    allow_high_beta: true
+    risk_control_weight: 0.10
+    peer_excess_weight: 0.25
+
+  volume_price:
+    label: 量价
+    keywords: [vol_ratio, vol_price, volume, turnover, amount, vwap, amihud]
+    max_drawdown_warn: 0.40
+    max_drawdown_fail: 0.60
+    max_relative_drawdown_vs_peer: 1.30
+    min_excess_return_vs_peer_for_b: 0.03
+    min_calmar_for_b: 0.7
+    allow_high_beta: true
+
+  volatility:
+    label: 波动
+    keywords: [volatility, atr, std, ret_std]
+    max_drawdown_warn: 0.30
+    max_drawdown_fail: 0.45
+    max_relative_drawdown_vs_peer: 1.10
+    min_excess_return_vs_peer_for_b: 0.02
+    min_calmar_for_b: 1.0
+    allow_high_beta: false
+
+  defensive:
+    label: 防御
+    keywords: [defensive, low_vol, low_beta, stability, quality]
+    max_drawdown_warn: 0.25
+    max_drawdown_fail: 0.40
+    max_relative_drawdown_vs_peer: 1.00
+    min_excess_return_vs_peer_for_b: 0.01
+    min_calmar_for_b: 1.0
+    allow_high_beta: false
+
+  value_quality:
+    label: 价值质量
+    keywords: [roe, gross_margin, debt_ratio, quality, pe, pb, val]
+    max_drawdown_warn: 0.35
+    max_drawdown_fail: 0.50
+    max_relative_drawdown_vs_peer: 1.20
+    min_excess_return_vs_peer_for_b: 0.03
+    min_calmar_for_b: 0.8
+    allow_high_beta: false
+
+  unknown:
+    label: 未知
+    keywords: []
+    max_drawdown_warn: 0.35
+    max_drawdown_fail: 0.50
+    max_relative_drawdown_vs_peer: 1.20
+    min_excess_return_vs_peer_for_b: 0.05
+    min_calmar_for_b: 0.8
+    max_grade: B
