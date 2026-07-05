@@ -471,10 +471,46 @@ function startStream(){
   es.onerror = () => appendStream('SSE', '连接中断，浏览器会自动重连。\n');
 }
 function renderStatus(s){
+  const state = s?.state || {};
+  const badge = document.getElementById('stateBadge');
+  badge.className = 'status ' + (state.level || 'yellow');
+  badge.textContent = state.label || '未知状态';
+  document.getElementById('updated').textContent = s?.generated_at || '';
+  document.getElementById('reasons').innerHTML = (state.reasons || []).map(x => `<li>${esc(x)}</li>`).join('');
+
+  const p = s?.roadmap_progress || {};
+  document.getElementById('roadmap').innerHTML =
+    `<div class="bar"><div style="width:${esc(p.percent || 0)}%"></div></div>` +
+    metric('进度', `${p.completed_auto_versions || 0}/${p.total_auto_versions || 0} (${p.percent || 0}%)`) +
+    metric('当前版本', s?.cursor?.current_version || '') +
+    metric('下一批', (p.next_versions || []).join(', '));
+
+  renderMetrics('health', s?.health || {}, [
+    ['cron_service_running','cron'], ['crontab_registered','crontab'],
+    ['tick_age_seconds','tick_age_seconds'], ['lock_status','lock_status']
+  ]);
+  renderMetrics('latest', s?.latest || {}, [
+    ['run_id','run_id'], ['current','current'], ['next','next'], ['status','status'], ['path','path']
+  ]);
+  renderMetrics('completion', s?.latest_completion || {}, [
+    ['status','status'], ['version','version'], ['stage','stage'], ['report_dir','report_dir'], ['next_question','next_question']
+  ]);
+  renderMetrics('backend', s?.backend || {}, [
+    ['recommended_backend','recommended'], ['coding_backend_configured','configured'], ['claude_bin_path','claude_bin']
+  ]);
+  renderMetrics('git', s?.git || {}, [
+    ['head','head'], ['dirty','dirty']
+  ]);
+
+  document.getElementById('tasks').textContent = JSON.stringify(s?.latest_task_snapshot || {}, null, 2);
+  document.getElementById('agentOutput').textContent = JSON.stringify(s?.agent_output || {}, null, 2);
+  document.getElementById('logs').textContent = (s?.log_tail || []).join('\n');
+  renderRoadmapDetails(s?.roadmap_details || [], s?.cursor || {});
+}
+async function refresh(){
   try {
     const r = await fetch('/api/status', {cache: 'no-store'});
-    const s = await r.json();
-    renderStatus(s);
+    renderStatus(await r.json());
   } catch(e) {
     document.getElementById('stateBadge').className = 'status red';
     document.getElementById('stateBadge').textContent = '页面刷新失败';
@@ -503,6 +539,10 @@ class _DashboardHandler(BaseHTTPRequestHandler):
         if parsed.path == "/":
             self._send(200, DASHBOARD_HTML.encode("utf-8"), "text/html; charset=utf-8")
             return
+        if parsed.path == "/console":
+            from factor_lab.agent_console.server import CONSOLE_HTML
+            self._send(200, CONSOLE_HTML.encode("utf-8"), "text/html; charset=utf-8")
+            return
         if parsed.path == "/api/status":
             body = json.dumps(collect_status(), ensure_ascii=False, indent=2).encode("utf-8")
             self._send(200, body, "application/json; charset=utf-8")
@@ -528,9 +568,72 @@ class _DashboardHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/agent-output":
             body = json.dumps(
                 _agent_output_snapshot(_read_json(LATEST), _read_json(COMPLETION)),
-                ensure_ascii=False,
-                indent=2,
+                ensure_ascii=False, indent=2,
             ).encode("utf-8")
+            self._send(200, body, "application/json; charset=utf-8")
+            return
+
+        # --- Agent Console API ---
+        if parsed.path == "/api/agent-console/sessions":
+            import uuid as _uuid
+            qs = parse_qs(parsed.query)
+            agent = qs.get("agent", ["hermes"])[0]
+            prompt = qs.get("prompt", [""])[0]
+            if not prompt.strip():
+                self._send(400, b'{"error":"prompt required"}', "application/json")
+                return
+            from factor_lab.agent_console.sessions import create_session
+            from factor_lab.agent_console.adapters import start_session
+            import threading as _t
+            sid = create_session(agent, prompt)
+            _t.Thread(target=start_session, args=(sid, agent, prompt), daemon=True).start()
+            body = json.dumps({"session_id": sid, "status": "running"}).encode()
+            self._send(201, body, "application/json; charset=utf-8")
+            return
+
+        if parsed.path.startswith("/api/agent-console/sessions/"):
+            parts = parsed.path.split("/")
+            if len(parts) >= 5 and parts[5] == "stream":
+                sid = parts[4]
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Connection", "keep-alive")
+                self.end_headers()
+                import time as _time
+                from factor_lab.agent_console.sessions import stream_events
+                last_count = 0
+                while True:
+                    try:
+                        el = __import__("pathlib").Path(
+                            f"/home/ly/.hermes/research-assistant/agent_tasks/agent_console_sessions/{sid}/events.jsonl")
+                        if el.exists():
+                            lines = el.read_text().splitlines()
+                            for line in lines[last_count:]:
+                                self.wfile.write(f"data: {line}\n\n".encode())
+                                self.wfile.flush()
+                                last_count += 1
+                            # 检查是否完成
+                            if lines and '"done"' in lines[-1]:
+                                break
+                        _time.sleep(0.5)
+                    except BrokenPipeError:
+                        break
+                    except Exception:
+                        break
+                return
+
+            if len(parts) >= 5 and parts[5] == "cancel":
+                sid = parts[4]
+                from factor_lab.agent_console.adapters import cancel_session
+                cancel_session(sid)
+                self._send(200, b'{"status":"cancelled"}', "application/json")
+                return
+
+            sid = parts[4] if len(parts) >= 5 else ""
+            from factor_lab.agent_console.sessions import get_session
+            session = get_session(sid)
+            body = json.dumps(session, ensure_ascii=False).encode("utf-8")
             self._send(200, body, "application/json; charset=utf-8")
             return
         self._send(404, b"not found", "text/plain; charset=utf-8")
