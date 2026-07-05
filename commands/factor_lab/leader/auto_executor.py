@@ -130,7 +130,8 @@ def auto_run_once():
     except Exception:
         test_ok = False
 
-    # 7. Git commit
+    # 7. Acceptance / Git commit / Advance
+    # 规则: 只有 test_ok=True 才 advance cursor, 且 return status 必须匹配
     commit = ""
     if test_ok:
         try:
@@ -144,17 +145,22 @@ def auto_run_once():
         nv = next_version(current)
         next_q = f"continue with {nv.version}" if nv else "roadmap complete"
         write_completion("completed", current, cv.name,
+                          summary={"passed": 1, "failed": 0,
+                                   "note": f"Version {current} tests passed"},
                           completed_tasks=[current], remaining_tasks=[],
                           next_question=next_q)
+        _status = "completed"
     else:
         advance(current, "failed")
         write_completion("partial", current, cv.name,
+                          summary={"passed": 0, "failed": 1,
+                                   "note": f"Version {current} tests failed"},
                           remaining_tasks=[current],
                           next_question="fix before continuing")
+        _status = "partial"
 
     _post_cleanup()
-    return {"status": "completed" if test_ok and agent_ok else "partial",
-            "version": current, "backend": backend, "commit": commit}
+    return {"status": _status, "version": current, "backend": backend, "commit": commit}
 
 
 def _post_cleanup():
