@@ -38,6 +38,16 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--consume", action="store_true")
     sp.add_argument("--no-github", action="store_true")
 
+    sp = sub.add_parser("agent-runner")
+    sp.add_argument("mode", choices=["once", "watch"])
+    sp.add_argument("--interval", type=int, default=180)
+    sp.add_argument("--max-ticks", type=int, default=0)
+    sp.add_argument("--codex-bin", default="codex")
+    sp.add_argument("--model", default=None)
+    sp.add_argument("--timeout", type=int, default=3600)
+    sp.add_argument("--dry-run", action="store_true")
+    sp.add_argument("--no-loop", action="store_true")
+
     args = parser.parse_args(argv)
 
     if args.command == "inspect":
@@ -65,6 +75,13 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "loop-watch":
         from factor_lab.leader.auto_loop import loop_watch
         loop_watch(interval_seconds=args.interval, max_ticks=args.max_ticks, auto_consume=args.consume, auto_github=not args.no_github)
+    elif args.command == "agent-runner":
+        from factor_lab.leader.agent_runner import run_once, watch
+        if args.mode == "once":
+            result = run_once(codex_bin=args.codex_bin, model=args.model, timeout_seconds=args.timeout, dry_run=args.dry_run, trigger_loop=not args.no_loop)
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+        else:
+            watch(interval_seconds=args.interval, max_ticks=args.max_ticks, codex_bin=args.codex_bin, model=args.model, timeout_seconds=args.timeout, dry_run=args.dry_run, trigger_loop=not args.no_loop)
     else:
         parser.print_help()
 

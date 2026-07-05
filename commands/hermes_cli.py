@@ -117,6 +117,9 @@ def show_help():
   leader:dispatch --from-latest-completion
                                 Leader 自动工作循环: 从完成信号派发下一轮
   leader:consume-latest-task     Hermes 消费 latest.json 中的任务
+  leader:agent-runner --once [--backend claude] [--interval 180] [--watch]
+                                Hermes 自动执行器: 可插拔后端 (V2.15.2)
+  leader:loop-once               Leader 循环: 读取 completion 并派发下一轮
   leader:lock-status             查看当前任务锁状态
 
 Leader 自动派发:
@@ -127,6 +130,8 @@ Leader 自动派发:
                                 版本完成后提交并推送到 GitHub
   leader:loop-once              自动工作循环单次 tick
   leader:loop-watch             自动工作循环轮询运行
+  leader:agent-runner --once    Codex 后台执行器单次运行
+  leader:agent-runner --watch   Codex 后台执行器轮询运行
   
 后台任务管理:
   bg:list                      列出所有持久化后台任务
@@ -716,6 +721,30 @@ run_daily_premarket(no_notify=True)
         else:
             print(f"  🔓 无运行中任务")
 
+    elif command == "leader:agent-runner":
+        import argparse
+        p = argparse.ArgumentParser()
+        p.add_argument("--once", action="store_true")
+        p.add_argument("--watch", action="store_true")
+        p.add_argument("--backend", default="claude")
+        p.add_argument("--interval", type=int, default=180)
+        a = p.parse_args(args)
+        from factor_lab.leader.agent_runner import AgentRunner
+        runner = AgentRunner(backend=a.backend, interval=a.interval)
+        if a.watch:
+            runner.watch()
+        else:
+            result = runner.run_once()
+            print(f"  Status: {result.get('status', '?')}")
+            if result.get("completed"):
+                print(f"  ✅ Completed: {', '.join(result['completed'])}")
+            if result.get("remaining"):
+                print(f"  ⏳ Remaining: {', '.join(result['remaining'])}")
+
+    elif command == "leader:loop-once":
+        from factor_lab.leader.agent_runner import loop_once
+        loop_once()
+
     elif command == "leader:accept":
         from factor_lab.leader.leader_cli import main as leader_main
         leader_main(["accept"] + args)
@@ -731,6 +760,14 @@ run_daily_premarket(no_notify=True)
     elif command == "leader:loop-watch":
         from factor_lab.leader.leader_cli import main as leader_main
         leader_main(["loop-watch"] + args)
+
+    elif command == "leader:agent-runner":
+        from factor_lab.leader.leader_cli import main as leader_main
+        if "--once" in args:
+            args = ["once"] + [a for a in args if a != "--once"]
+        elif "--watch" in args:
+            args = ["watch"] + [a for a in args if a != "--watch"]
+        leader_main(["agent-runner"] + args)
 
     elif command == "architecture:audit":
         from factor_lab.architecture.architecture_audit import run_architecture_audit
