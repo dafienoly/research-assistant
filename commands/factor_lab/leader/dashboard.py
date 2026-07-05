@@ -207,8 +207,21 @@ def _agent_output_snapshot(latest: dict[str, Any], completion: dict[str, Any], l
 def _current_answer_snapshot(latest: dict[str, Any], lines: int = 240) -> dict[str, Any]:
     run_id = latest.get("run_id", "")
     current = latest.get("current", "")
+    if run_id and not run_id.startswith("auto_"):
+        return {
+            "run_id": run_id,
+            "version": current,
+            "file": "",
+            "status": "waiting",
+            "streaming_mode": "unknown",
+            "permission_mode": "default",
+            "updated_at": "",
+            "text": "",
+        }
     log_file = AGENT_LOG_ROOT / run_id / "T001.log" if run_id else None
     raw_lines = _tail(log_file, lines) if log_file else []
+    if any("[DRY-RUN]" in line for line in raw_lines):
+        raw_lines = []
     command_line = raw_lines[0] if raw_lines and raw_lines[0].startswith("$ ") else ""
     is_stream_json = "stream-json" in command_line
     is_buffered = " --print" in command_line and not is_stream_json

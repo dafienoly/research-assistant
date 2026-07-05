@@ -2,10 +2,24 @@
 import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from pathlib import Path
+import pytest
 from factor_lab.leader.roadmap import get_version, ALPHA_FACTORY_ROADMAP
 from factor_lab.leader.roadmap_cursor import get_cursor, advance, CURSOR_FILE
-from factor_lab.leader.workloop import release_lock, TASKS_DIR
+from factor_lab.leader.workloop import release_lock, TASKS_DIR, LATEST_COMPLETION, LOCK_FILE
 from factor_lab.leader.backend_policy import need_code_change
+
+
+@pytest.fixture(autouse=True)
+def _preserve_runtime_state():
+    paths = [TASKS_DIR / "latest.json", LATEST_COMPLETION, LOCK_FILE, CURSOR_FILE]
+    snapshots = {path: path.read_bytes() if path.exists() else None for path in paths}
+    yield
+    for path, data in snapshots.items():
+        if data is None:
+            path.unlink(missing_ok=True)
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
 
 
 def test_auto_loop_once_and_watch_entrypoints(monkeypatch):

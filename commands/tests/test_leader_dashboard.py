@@ -83,6 +83,19 @@ def test_current_answer_snapshot_reads_latest_log(tmp_path, monkeypatch):
     assert answer["text"] == "hello stream"
 
 
+def test_current_answer_snapshot_skips_non_auto_and_dry_run(tmp_path, monkeypatch):
+    from factor_lab.leader import dashboard
+
+    monkeypatch.setattr(dashboard, "AGENT_LOG_ROOT", tmp_path)
+    assert _current_answer_snapshot({"run_id": "roadmap_1", "current": "V3.1"})["text"] == ""
+
+    run_id = "auto_dry"
+    log_dir = tmp_path / run_id
+    log_dir.mkdir()
+    (log_dir / "T001.log").write_text("[DRY-RUN] 未调用模型\n", encoding="utf-8")
+    assert _current_answer_snapshot({"run_id": run_id, "current": "V3.1"})["text"] == ""
+
+
 def test_agent_console_post_endpoints_are_implemented():
     assert hasattr(_DashboardHandler, "do_POST")
     assert "/api/agent-console/sessions" in CONSOLE_HTML
