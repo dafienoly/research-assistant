@@ -96,7 +96,8 @@ class AgentRunner:
         release_lock(status)
 
         # 完成后触发 loop-once
-        _trigger_loop_once()
+        # loop-once disabled — auto_executor manages its own advancement
+        # _trigger_loop_once()
 
         return {"status": status, "completed": completed, "remaining": remaining,
                 "log_dir": str(self.log_dir)}

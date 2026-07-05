@@ -1,12 +1,10 @@
-# Runtime state files (not committed)
-agent_tasks/roadmap_cursor.json
-agent_tasks/archive/
-agent_tasks/latest.json
-agent_tasks/latest_completion.json
-agent_tasks/current_run.lock
-agent_tasks/auto_loop_state.json
-agent_tasks/github_sync_latest.json
-agent_tasks/inbox/
-agent_tasks/agent_logs/
-agent_tasks/VERSION
+# Runtime state files
+agent_tasks/
+**/__pycache__/
+logs/
+research_outputs/
+analysis_report/
+data/intraday/
+performance/backtests/
+performance/signals/
 VERSION_TRACK
