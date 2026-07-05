@@ -122,3 +122,13 @@ def test_claude_backend_uses_stream_json_and_bypass(monkeypatch, tmp_path):
     assert captured["timeout"] == 3600
     assert callable(captured["line_transform"])
     assert result["streaming_mode"] == "stream-json"
+
+
+def test_find_task_file_prefers_exact_clean_task(tmp_path):
+    from factor_lab.leader.agent_runner import _find_task_file
+
+    tasks = tmp_path / "tasks"
+    tasks.mkdir()
+    (tasks / "T001_some_task.md").write_text("some_task V2.15")
+    (tasks / "T001.md").write_text("clean task")
+    assert _find_task_file(tasks, "T001") == "clean task"

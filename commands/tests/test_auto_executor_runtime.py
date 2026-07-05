@@ -58,6 +58,26 @@ def test_ensure_latest_clean_replaces_non_auto_run(monkeypatch, tmp_path):
     assert latest["current"] == "V3.0.1"
 
 
+def test_ensure_latest_clean_replaces_polluted_auto_run(monkeypatch, tmp_path):
+    from factor_lab.leader import auto_executor
+
+    monkeypatch.setattr(auto_executor, "TASKS_DIR", tmp_path)
+    polluted = tmp_path / "auto_old" / "tasks"
+    polluted.mkdir(parents=True)
+    (polluted / "T001_some_task.md").write_text("some_task V2.15")
+    (tmp_path / "latest.json").write_text(json.dumps({
+        "run_id": "auto_old",
+        "path": str(tmp_path / "auto_old"),
+        "current": "V3.0.1",
+        "status": "pending",
+        "task_count": 1,
+    }))
+    auto_executor._ensure_latest_clean("V3.0.1")
+    latest = json.loads((tmp_path / "latest.json").read_text())
+    assert latest["run_id"].startswith("auto_")
+    assert latest["run_id"] != "auto_old"
+
+
 def test_get_version_returns_roadmap_item():
     v = get_version("V3.0.1")
     assert v is not None
