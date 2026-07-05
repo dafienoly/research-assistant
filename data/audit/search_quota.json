@@ -1,0 +1,22 @@
+{
+  "providers": {
+    "tavily": {
+      "monthly": 45,
+      "daily": {
+        "2026-07-03": 45
+      },
+      "skipped": 6
+    },
+    "firecrawl": {
+      "monthly": 0,
+      "daily": {},
+      "skipped": 0
+    },
+    "anysearch": {
+      "monthly": 0,
+      "daily": {},
+      "skipped": 0
+    }
+  },
+  "last_reset_month": "2026-07"
+}

@@ -1,0 +1,50 @@
+# 通用趋势跟随策略 — 通用 strategy schema 示例
+# 这是示例模板，不代表生产推荐。universe 可按需替换。
+name: example_trend_following
+version: 0.1.0
+description: 通用趋势跟随策略示例 — universe 可替换为任意股票池
+
+universe:
+  name: custom_theme
+  source:
+    - tags/stock_theme_tags.csv
+    - tags/stock_industry.csv
+  max_universe_size: 500
+
+data_rules:
+  no_future_data: true
+
+factors:
+  - name: ret20
+    category: price_momentum
+    weight: 0.30
+  - name: ma20_gt_ma60
+    category: trend
+    weight: 0.30
+  - name: vol_ratio20
+    category: volume
+    weight: 0.20
+
+signal_rules:
+  buy_watch:
+    final_score_gt: 60
+    rank_top_n: 10
+  exit_watch:
+    close_lt_ma20: true
+    final_score_lt: 40
+
+portfolio:
+  top_n: 10
+  rebalance: daily
+  initial_cash: 1000000
+  max_single_weight: 0.15
+  lot_size: 100
+
+cost:
+  commission_rate: 0.0003
+  min_commission: 5
+  stamp_tax_rate_sell: 0.0005
+  slippage_bps: 10
+
+benchmark:
+  primary: hs300

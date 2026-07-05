@@ -1,0 +1,57 @@
+{
+  "run_id": "20260705_v2151_dry_run_completion",
+  "source_completion": {
+    "version": "V2.15",
+    "status": "partial_completed",
+    "report_dir": "/mnt/d/HermesReports/dry_run/20260705_113735/",
+    "passed_gates": ["signal", "etf_selector", "unified_report"],
+    "skeleton_gates": ["rebalance_diff", "order_preview", "approval"]
+  },
+  "leader_decision": {
+    "current": "V2.15 functional_complete_partial",
+    "next": "V2.15.1 dry_run_completion",
+    "reason": "dry-run 前三段真实运行，后三段仍为骨架，必须先补齐全链路干跑闭环。"
+  },
+  "tasks": [
+    {
+      "task_id": "T001",
+      "version": "V2.15.1",
+      "priority": "P0",
+      "owner": "dry_run_engineer",
+      "title": "补齐 rebalance_diff dry-run",
+      "status": "pending"
+    },
+    {
+      "task_id": "T002",
+      "version": "V2.15.1",
+      "priority": "P0",
+      "owner": "dry_run_engineer",
+      "title": "补齐 order_preview dry-run",
+      "status": "pending"
+    },
+    {
+      "task_id": "T003",
+      "version": "V2.15.1",
+      "priority": "P0",
+      "owner": "governance_engineer",
+      "title": "补齐 approval dry-run",
+      "status": "pending"
+    },
+    {
+      "task_id": "T004",
+      "version": "V2.15.1",
+      "priority": "P0",
+      "owner": "ci_engineer",
+      "title": "接入自动完成信号与下一轮 dispatch",
+      "status": "pending"
+    }
+  ],
+  "safety": {
+    "no_order_execution": true,
+    "no_broker_call": true,
+    "no_miniqmt_call": true,
+    "no_paper_config_change": true,
+    "no_live_config_change": true,
+    "dry_run_only": true
+  }
+}

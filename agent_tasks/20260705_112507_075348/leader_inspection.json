@@ -1,0 +1,1030 @@
+{
+  "generated_at": "2026-07-05T11:25:07.075257+08:00",
+  "roadmap_policy": "V3+ 按 Alpha Factory 生命周期排版本；P0/P1/P2/P3 因子方向挂到 V3 Alpha Factory 下，不再继续堆 V2.x。",
+  "stage": {
+    "current": "V3.0.1",
+    "next_version": "V3.1",
+    "reason": "现有因子目录已基本纳入 Alpha Registry，可进入行业相对 Alpha Pack。",
+    "blockers": []
+  },
+  "summary": {
+    "modules": 38,
+    "cli_handlers": 55,
+    "cli_help_commands": 71,
+    "alpha_registry_count": 174,
+    "factor_catalog_count": 88,
+    "test_files": 53,
+    "latest_report_dirs": 7
+  },
+  "modules": [
+    {
+      "module": "adaptive",
+      "path": "factor_lab/adaptive",
+      "py_files": 7,
+      "type": "package"
+    },
+    {
+      "module": "alpha",
+      "path": "factor_lab/alpha",
+      "py_files": 8,
+      "type": "package"
+    },
+    {
+      "module": "approval",
+      "path": "factor_lab/approval",
+      "py_files": 1,
+      "type": "package"
+    },
+    {
+      "module": "architecture",
+      "path": "factor_lab/architecture",
+      "py_files": 3,
+      "type": "package"
+    },
+    {
+      "module": "bg",
+      "path": "factor_lab/bg.py",
+      "py_files": 1,
+      "type": "module"
+    },
+    {
+      "module": "broker",
+      "path": "factor_lab/broker",
+      "py_files": 4,
+      "type": "package"
+    },
+    {
+      "module": "composite",
+      "path": "factor_lab/composite",
+      "py_files": 4,
+      "type": "package"
+    },
+    {
+      "module": "core",
+      "path": "factor_lab/core",
+      "py_files": 9,
+      "type": "package"
+    },
+    {
+      "module": "decision",
+      "path": "factor_lab/decision",
+      "py_files": 4,
+      "type": "package"
+    },
+    {
+      "module": "etf",
+      "path": "factor_lab/etf",
+      "py_files": 4,
+      "type": "package"
+    },
+    {
+      "module": "evolution",
+      "path": "factor_lab/evolution.py",
+      "py_files": 1,
+      "type": "module"
+    },
+    {
+      "module": "execution",
+      "path": "factor_lab/execution",
+      "py_files": 2,
+      "type": "package"
+    },
+    {
+      "module": "expression_parser",
+      "path": "factor_lab/expression_parser.py",
+      "py_files": 1,
+      "type": "module"
+    },
+    {
+      "module": "factor_base",
+      "path": "factor_lab/factor_base.py",
+      "py_files": 1,
+      "type": "module"
+    },
+    {
+      "module": "factor_engine",
+      "path": "factor_lab/factor_engine.py",
+      "py_files": 1,
+      "type": "module"
+    },
+    {
+      "module": "ic_analyzer",
+      "path": "factor_lab/ic_analyzer.py",
+      "py_files": 1,
+      "type": "module"
+    },
+    {
+      "module": "leader",
+      "path": "factor_lab/leader",
+      "py_files": 4,
+      "type": "package"
+    },
+    {
+      "module": "live",
+      "path": "factor_lab/live",
+      "py_files": 9,
+      "type": "package"
+    },
+    {
+      "module": "metrics",
+      "path": "factor_lab/metrics.py",
+      "py_files": 1,
+      "type": "module"
+    },
+    {
+      "module": "notify",
+      "path": "factor_lab/notify.py",
+      "py_files": 1,
+      "type": "module"
+    },
+    {
+      "module": "orchestration",
+      "path": "factor_lab/orchestration",
+      "py_files": 2,
+      "type": "package"
+    },
+    {
+      "module": "order",
+      "path": "factor_lab/order",
+      "py_files": 1,
+      "type": "package"
+    },
+    {
+      "module": "orthogonality",
+      "path": "factor_lab/orthogonality",
+      "py_files": 2,
+      "type": "package"
+    },
+    {
+      "module": "paper",
+      "path": "factor_lab/paper",
+      "py_files": 3,
+      "type": "package"
+    },
+    {
+      "module": "pipeline",
+      "path": "factor_lab/pipeline.py",
+      "py_files": 1,
+      "type": "module"
+    },
+    {
+      "module": "pool",
+      "path": "factor_lab/pool",
+      "py_files": 2,
+      "type": "package"
+    },
+    {
+      "module": "portfolio",
+      "path": "factor_lab/portfolio",
+      "py_files": 4,
+      "type": "package"
+    },
+    {
+      "module": "report_html",
+      "path": "factor_lab/report_html.py",
+      "py_files": 1,
+      "type": "module"
+    },
+    {
+      "module": "reports",
+      "path": "factor_lab/reports",
+      "py_files": 6,
+      "type": "package"
+    },
+    {
+      "module": "risk",
+      "path": "factor_lab/risk",
+      "py_files": 2,
+      "type": "package"
+    },
+    {
+      "module": "scoring",
+      "path": "factor_lab/scoring",
+      "py_files": 5,
+      "type": "package"
+    },
+    {
+      "module": "strategy",
+      "path": "factor_lab/strategy",
+      "py_files": 4,
+      "type": "package"
+    },
+    {
+      "module": "validate_composites",
+      "path": "factor_lab/validate_composites.py",
+      "py_files": 1,
+      "type": "module"
+    },
+    {
+      "module": "validate_factor",
+      "path": "factor_lab/validate_factor.py",
+      "py_files": 1,
+      "type": "module"
+    },
+    {
+      "module": "validate_orthogonality",
+      "path": "factor_lab/validate_orthogonality.py",
+      "py_files": 1,
+      "type": "module"
+    },
+    {
+      "module": "validate_strategies",
+      "path": "factor_lab/validate_strategies.py",
+      "py_files": 1,
+      "type": "module"
+    },
+    {
+      "module": "validation",
+      "path": "factor_lab/validation",
+      "py_files": 4,
+      "type": "package"
+    },
+    {
+      "module": "walk_forward",
+      "path": "factor_lab/walk_forward.py",
+      "py_files": 1,
+      "type": "module"
+    }
+  ],
+  "cli": {
+    "handlers": [
+      "announcements:parse",
+      "architecture:audit",
+      "backtest:factor-top",
+      "backtest:walk-forward",
+      "bg:clean",
+      "bg:kill",
+      "bg:list",
+      "bg:log",
+      "bg:status",
+      "data:freshness-check",
+      "data:gap-report",
+      "factor:batch",
+      "factor:composites",
+      "factor:daily-premarket",
+      "factor:etf-selector",
+      "factor:evolve",
+      "factor:list",
+      "factor:mine",
+      "factor:orthogonality",
+      "factor:premarket",
+      "factor:signal",
+      "factor:strategies",
+      "factor:validate",
+      "fundamentals:update",
+      "fundamentals:update-from-baostock",
+      "intraday:check-once",
+      "intraday:prepare",
+      "intraday:publish-alerts",
+      "intraday:stop",
+      "intraday:watch",
+      "leader:dispatch",
+      "leader:inspect",
+      "market:update-daily",
+      "market:update-live-snapshot",
+      "market:update-priority-minute",
+      "package:publish-all",
+      "package:publish-intraday-alerts",
+      "package:publish-market",
+      "package:publish-preopen",
+      "policy:update-events",
+      "stock:card",
+      "strategy-lab:build-latest-signals",
+      "strategy-lab:build-review-material",
+      "strategy-lab:build-universe",
+      "strategy-lab:init",
+      "strategy-lab:mine-candidates",
+      "strategy-lab:publish-results",
+      "strategy-lab:rank-strategies",
+      "strategy-lab:run-backtest",
+      "strategy-lab:run-parameter-search",
+      "strategy-lab:run-regime-analysis",
+      "strategy-lab:run-walk-forward",
+      "tags:update",
+      "wechat:send-digest",
+      "wechat:test"
+    ],
+    "startswith_handlers": [
+      "alpha:",
+      "mx:",
+      "stock:context"
+    ],
+    "help_commands": [
+      "alpha:evaluation-plan",
+      "alpha:init-samples",
+      "alpha:list",
+      "alpha:migrate-existing-factors",
+      "alpha:retire",
+      "alpha:show",
+      "architecture:audit",
+      "backtest:factor-top",
+      "backtest:walk-forward",
+      "bg:clean",
+      "bg:kill",
+      "bg:list",
+      "bg:log",
+      "bg:status",
+      "broker:miniqmt-status",
+      "data:freshness-check",
+      "data:gap-report",
+      "factor:adaptive-recommend",
+      "factor:approval",
+      "factor:batch",
+      "factor:composites",
+      "factor:daily-premarket",
+      "factor:decision-log",
+      "factor:etf-selector",
+      "factor:evolve",
+      "factor:list",
+      "factor:live-readiness",
+      "factor:manual-approval",
+      "factor:mine",
+      "factor:order-preview",
+      "factor:orthogonality",
+      "factor:paper-apply",
+      "factor:paper-dashboard",
+      "factor:paper-promotion-review",
+      "factor:paper-review",
+      "factor:paper-trade",
+      "factor:position-import",
+      "factor:premarket",
+      "factor:rebalance-diff",
+      "factor:recommendation-backtest",
+      "factor:review-decisions",
+      "factor:shadow-forward",
+      "factor:signal",
+      "factor:strategies",
+      "factor:validate",
+      "fundamentals:update-from-baostock",
+      "intraday:check-once",
+      "intraday:prepare",
+      "intraday:publish-alerts",
+      "intraday:stop",
+      "intraday:watch",
+      "leader:dispatch",
+      "leader:inspect",
+      "market:update-daily",
+      "market:update-live-snapshot",
+      "mx:data",
+      "mx:search",
+      "mx:xuangu",
+      "package:publish-all",
+      "package:publish-intraday-alerts",
+      "package:publish-market",
+      "package:publish-preopen",
+      "stock:context",
+      "strategy-lab:build-latest-signals",
+      "strategy-lab:build-review-material",
+      "strategy-lab:build-universe",
+      "strategy-lab:init",
+      "strategy-lab:mine-candidates",
+      "strategy-lab:run-backtest",
+      "wechat:send-digest",
+      "wechat:test"
+    ],
+    "help_only": [
+      "broker:miniqmt-status",
+      "factor:adaptive-recommend",
+      "factor:approval",
+      "factor:decision-log",
+      "factor:live-readiness",
+      "factor:manual-approval",
+      "factor:order-preview",
+      "factor:paper-apply",
+      "factor:paper-dashboard",
+      "factor:paper-promotion-review",
+      "factor:paper-review",
+      "factor:paper-trade",
+      "factor:position-import",
+      "factor:rebalance-diff",
+      "factor:recommendation-backtest",
+      "factor:review-decisions",
+      "factor:shadow-forward"
+    ],
+    "has_alpha_router": true,
+    "has_leader_inspect": true,
+    "has_leader_dispatch": true
+  },
+  "reports": [
+    {
+      "name": "architecture_audit",
+      "path": "/mnt/d/HermesReports/architecture_audit",
+      "exists": true,
+      "runs": 1,
+      "latest": "/mnt/d/HermesReports/architecture_audit/20260705_094853",
+      "latest_mtime": "2026-07-05T09:48:55.355002+08:00"
+    },
+    {
+      "name": "alpha_factory",
+      "path": "/mnt/d/HermesReports/alpha_factory",
+      "exists": true,
+      "runs": 1,
+      "latest": "/mnt/d/HermesReports/alpha_factory/20260705_110700",
+      "latest_mtime": "2026-07-05T11:07:00.746422+08:00"
+    },
+    {
+      "name": "alpha_factor_migration",
+      "path": "/mnt/d/HermesReports/alpha_factor_migration",
+      "exists": true,
+      "runs": 18,
+      "latest": "/mnt/d/HermesReports/alpha_factor_migration/20260705_112449_205316",
+      "latest_mtime": "2026-07-05T11:24:49.259138+08:00"
+    },
+    {
+      "name": "factor_leaderboard",
+      "path": "/mnt/d/HermesReports/factor_leaderboard",
+      "exists": true,
+      "runs": 1,
+      "latest": "/mnt/d/HermesReports/factor_leaderboard/20260704_155707",
+      "latest_mtime": "2026-07-04T15:57:07.549587+08:00"
+    },
+    {
+      "name": "factor_validation",
+      "path": "/mnt/d/HermesReports/factor_validation",
+      "exists": true,
+      "runs": 7,
+      "latest": "/mnt/d/HermesReports/factor_validation/acceleration_gate_20260705_085237",
+      "latest_mtime": "2026-07-05T08:52:37.951762+08:00"
+    },
+    {
+      "name": "logs",
+      "path": "/home/ly/.hermes/research-assistant/logs",
+      "exists": true,
+      "runs": 0,
+      "latest": null,
+      "latest_mtime": null
+    },
+    {
+      "name": "factor_lab",
+      "path": "/home/ly/.hermes/research-assistant/research_outputs/factor_lab",
+      "exists": true,
+      "runs": 4,
+      "latest": "/home/ly/.hermes/research-assistant/research_outputs/factor_lab/20260704_091454",
+      "latest_mtime": "2026-07-04T09:15:27.692331+08:00"
+    }
+  ],
+  "alpha_registry": {
+    "root": "/mnt/d/HermesData/alpha_registry",
+    "exists": true,
+    "count": 174,
+    "status_counts": {
+      "registered": 130,
+      "retired": 41,
+      "draft": 3
+    },
+    "sample": [
+      {
+        "alpha_id": "alpha_20260705_110614",
+        "name": "ret5_momentum",
+        "status": "registered",
+        "version": "0.0.1",
+        "created_at": "2026-07-05T11:06:14.859340+08:00"
+      },
+      {
+        "alpha_id": "alpha_20260705_110614",
+        "name": "low_vol_quality",
+        "status": "registered",
+        "version": "0.0.1",
+        "created_at": "2026-07-05T11:06:14.901176+08:00"
+      },
+      {
+        "alpha_id": "alpha_20260705_110614",
+        "name": "sector_relative_strength",
+        "status": "registered",
+        "version": "0.0.1",
+        "created_at": "2026-07-05T11:06:14.946282+08:00"
+      },
+      {
+        "alpha_id": "alpha_20260705_110636",
+        "name": "test_alpha",
+        "status": "registered",
+        "version": "0.0.1",
+        "created_at": "2026-07-05T11:06:36.183400+08:00"
+      },
+      {
+        "alpha_id": "alpha_20260705_110636",
+        "name": "test_alpha",
+        "status": "registered",
+        "version": "0.0.1",
+        "created_at": "2026-07-05T11:06:36.228365+08:00"
+      }
+    ]
+  },
+  "factor_catalog": {
+    "count": 88,
+    "category_counts": {
+      "breakout": 6,
+      "evolved": 27,
+      "fund_flow": 6,
+      "liquidity": 6,
+      "momentum": 7,
+      "pullback": 4,
+      "quality": 6,
+      "ret5_filter": 5,
+      "reversal": 2,
+      "sentiment": 3,
+      "trend": 5,
+      "volatility": 6,
+      "volume": 5
+    },
+    "sample": [
+      {
+        "name": "ret60",
+        "category": "momentum"
+      },
+      {
+        "name": "ret20",
+        "category": "momentum"
+      },
+      {
+        "name": "ret10",
+        "category": "momentum"
+      },
+      {
+        "name": "ret5",
+        "category": "momentum"
+      },
+      {
+        "name": "ret_std20",
+        "category": "momentum"
+      },
+      {
+        "name": "max_high60",
+        "category": "momentum"
+      },
+      {
+        "name": "min_low60",
+        "category": "momentum"
+      },
+      {
+        "name": "ma20_gt_ma60",
+        "category": "trend"
+      }
+    ]
+  },
+  "tests": [
+    {
+      "file": "tests/test_adaptive_recommend.py",
+      "tests": 6,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_alpha_factory.py",
+      "tests": 11,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_alpha_factory_leader.py",
+      "tests": 6,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_anti_overfit_ic_stability.py",
+      "tests": 4,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_approval.py",
+      "tests": 6,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_architecture_audit.py",
+      "tests": 10,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_broker_adapter.py",
+      "tests": 7,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_composite_validator.py",
+      "tests": 9,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_core_framework.py",
+      "tests": 12,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_daily_premarket.py",
+      "tests": 6,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_daily_premarket_boundary.py",
+      "tests": 9,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_decision_review.py",
+      "tests": 7,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_etf_registry_load.py",
+      "tests": 4,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_etf_reject_report_plan.py",
+      "tests": 6,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_etf_selector_scoring.py",
+      "tests": 5,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_etf_substitution_framework.py",
+      "tests": 3,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_etf_theme_classifier.py",
+      "tests": 4,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_execution_review.py",
+      "tests": 7,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_factor_catalog_migration.py",
+      "tests": 6,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_factor_correlation_composite.py",
+      "tests": 10,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_factor_family_classifier.py",
+      "tests": 7,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_factor_score_gate.py",
+      "tests": 5,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_ic_decay.py",
+      "tests": 3,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_live_readiness.py",
+      "tests": 6,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_manual_approval.py",
+      "tests": 6,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_migration_compat.py",
+      "tests": 10,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_miniqmt_adapter.py",
+      "tests": 9,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_no_borrowed_account_instruction.py",
+      "tests": 3,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_no_silent_fallback.py",
+      "tests": 2,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_order_preview.py",
+      "tests": 7,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_orthogonality_v16.py",
+      "tests": 7,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_paper_apply.py",
+      "tests": 7,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_paper_dashboard.py",
+      "tests": 6,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_paper_promotion_review.py",
+      "tests": 6,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_paper_review.py",
+      "tests": 6,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_paper_trading.py",
+      "tests": 6,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_placebo_random_baseline.py",
+      "tests": 3,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_portfolio_review_deep.py",
+      "tests": 6,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_position_source_integration.py",
+      "tests": 6,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_raw_signal_keeps_star_market.py",
+      "tests": 3,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_readiness_split.py",
+      "tests": 3,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_rebalance_diff.py",
+      "tests": 8,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_recommendation_backtest.py",
+      "tests": 6,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_restricted_board_candidates_output.py",
+      "tests": 4,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_restricted_not_in_rebalance_plan.py",
+      "tests": 2,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_rolling_validator_no_future_leakage.py",
+      "tests": 2,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_scoring_policy_config.py",
+      "tests": 16,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_self_account_excludes_star_chinext.py",
+      "tests": 4,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_self_account_recompute_not_filter_only.py",
+      "tests": 2,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_shadow_forward.py",
+      "tests": 6,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_shadow_forward_hardening.py",
+      "tests": 6,
+      "has_safety_test": false
+    },
+    {
+      "file": "tests/test_unified_premarket.py",
+      "tests": 10,
+      "has_safety_test": true
+    },
+    {
+      "file": "tests/test_validation_report_outputs.py",
+      "tests": 4,
+      "has_safety_test": false
+    }
+  ],
+  "findings": [],
+  "roadmap": [
+    {
+      "version": "V3.0",
+      "name": "Alpha Factory Foundation",
+      "objective": "建立 AlphaSpec、AlphaRegistry、生命周期、样例 Alpha，形成 Alpha 工厂底座。",
+      "trading_mode": "none",
+      "stage_gate": "foundation_ready",
+      "owner_role": "foundation_engineer",
+      "required_outputs": [
+        "AlphaSpec",
+        "AlphaRegistry",
+        "Lifecycle",
+        "SampleAlphas",
+        "Alpha CLI"
+      ],
+      "acceptance": [
+        "所有 Alpha 默认 enabled=false / paper_enabled=false / live_enabled=false",
+        "注册、列表、查看、退役、评估计划可运行",
+        "输出 manifest 与 audit，不调用 broker/miniqmt"
+      ]
+    },
+    {
+      "version": "V3.0.1",
+      "name": "Existing Factor Catalog Migration",
+      "objective": "把现有因子目录纳入 Alpha Registry，形成可治理、可审计的 Alpha Catalog。",
+      "trading_mode": "none",
+      "stage_gate": "catalog_migrated",
+      "owner_role": "migration_engineer",
+      "required_outputs": [
+        "factor_catalog_registry.csv",
+        "factor_migration_report.html",
+        "factor_migration_summary.md"
+      ],
+      "acceptance": [
+        "现有 factor_base 注册表中的因子全部生成 AlphaSpec 或明确 skipped/duplicate 原因",
+        "迁移过程不触发回测、不修改 paper/live 配置、不调用交易接口",
+        "重复迁移幂等：重复运行只记录 duplicates，不重复污染 registry"
+      ]
+    },
+    {
+      "version": "V3.1",
+      "name": "Industry Relative Alpha Pack",
+      "objective": "实现行业相对、行业中性、行业内排序 Alpha Pack。",
+      "trading_mode": "none",
+      "stage_gate": "industry_relative_alpha_ready",
+      "owner_role": "alpha_engineer",
+      "required_outputs": [
+        "industry_relative_alpha_specs",
+        "industry_neutralization_report",
+        "industry_rank_report"
+      ],
+      "acceptance": [
+        "AlphaSpec 只描述信号，不直接写入策略配置",
+        "行业暴露、行业内排序、行业中性处理均有报告和测试",
+        "每个 Alpha 都进入 Alpha Registry，默认 disabled"
+      ]
+    },
+    {
+      "version": "V3.2",
+      "name": "Factor Evaluation & Orthogonality",
+      "objective": "统一 IC、ICIR、相关性、行业暴露、OOS、Walk Forward 与评估门禁。",
+      "trading_mode": "none",
+      "stage_gate": "evaluation_gate_ready",
+      "owner_role": "evaluation_engineer",
+      "required_outputs": [
+        "evaluation_pipeline",
+        "orthogonality_matrix",
+        "walk_forward_report",
+        "gate_report"
+      ],
+      "acceptance": [
+        "所有评估结果绑定 alpha_id/run_id/manifest/audit",
+        "相关性、行业暴露、OOS、Walk Forward 可作为 GateEngine 输入",
+        "报告区分 passed/warning/blocker，禁止 silent fallback"
+      ]
+    },
+    {
+      "version": "V3.3",
+      "name": "Data Enrichment Alpha Pack",
+      "objective": "接入北向、两融、资金流等增强数据，生成可审计 AlphaSpec。",
+      "trading_mode": "none",
+      "stage_gate": "data_enrichment_ready",
+      "owner_role": "data_alpha_engineer",
+      "required_outputs": [
+        "northbound_alpha_specs",
+        "margin_alpha_specs",
+        "fund_flow_alpha_specs",
+        "data_coverage_report"
+      ],
+      "acceptance": [
+        "所有增强数据有 freshness/coverage/as-of 校验",
+        "历史不足的数据标记 pending，不伪造回测结论",
+        "Alpha 默认 disabled，不进入实盘链路"
+      ]
+    },
+    {
+      "version": "V3.4",
+      "name": "Technical Pattern Control Pack",
+      "objective": "把 MACD/KDJ/Bollinger 作为对照和冗余检测工具，而非核心预测因子。",
+      "trading_mode": "none",
+      "stage_gate": "technical_control_ready",
+      "owner_role": "control_alpha_engineer",
+      "required_outputs": [
+        "technical_control_specs",
+        "redundancy_report",
+        "benchmark_comparison_report"
+      ],
+      "acceptance": [
+        "技术指标只作为 control/baseline/redundancy 检测",
+        "不得把常见技术形态直接包装为高置信 Alpha",
+        "输出与现有 Alpha 的相关性和增量价值判断"
+      ]
+    },
+    {
+      "version": "V3.5",
+      "name": "Event-driven Alpha Pack",
+      "objective": "围绕解禁、回购、分红、业绩预告等事件构建事件驱动 Alpha。",
+      "trading_mode": "none",
+      "stage_gate": "event_alpha_ready",
+      "owner_role": "event_alpha_engineer",
+      "required_outputs": [
+        "event_alpha_specs",
+        "event_calendar",
+        "event_study_report"
+      ],
+      "acceptance": [
+        "事件日期、公告日期、可交易日期必须分离，避免未来函数",
+        "事件窗口收益、覆盖率、缺失率均入报告",
+        "所有信号只注册/评估，不自动交易"
+      ]
+    },
+    {
+      "version": "V3.6",
+      "name": "Alpha Portfolio Intelligence",
+      "objective": "实现多 Alpha 组合、淘汰、降权、晋级与 Paper 组合治理。",
+      "trading_mode": "paper",
+      "stage_gate": "paper_portfolio_ready",
+      "owner_role": "portfolio_engineer",
+      "required_outputs": [
+        "alpha_portfolio_engine",
+        "promotion_policy",
+        "deweight_retire_report"
+      ],
+      "acceptance": [
+        "只允许进入 Paper，不直接进入 live",
+        "组合权重、淘汰、降权、晋级均需人审 Gate",
+        "所有变更有 rollback 与 audit trail"
+      ]
+    },
+    {
+      "version": "V3.7",
+      "name": "LLM Alpha Discovery",
+      "objective": "让 LLM 生成 AlphaSpec 候选，不直接写策略代码或实盘策略。",
+      "trading_mode": "none",
+      "stage_gate": "llm_alpha_spec_ready",
+      "owner_role": "llm_alpha_researcher",
+      "required_outputs": [
+        "llm_alpha_spec_generator",
+        "candidate_review_queue",
+        "prompt_audit"
+      ],
+      "acceptance": [
+        "LLM 只能输出 AlphaSpec 草案，不直接改策略配置",
+        "每个候选必须附 hypothesis/evidence/risk_notes",
+        "候选进入人工 review queue 后才可注册"
+      ]
+    },
+    {
+      "version": "V4.0",
+      "name": "Controlled Live Alpha Pipeline",
+      "objective": "通过 V2 治理链路后进入小权限、可回滚、人工确认的实盘 Alpha Pipeline。",
+      "trading_mode": "human_controlled_live",
+      "stage_gate": "controlled_live_gate_ready",
+      "owner_role": "live_governance_engineer",
+      "required_outputs": [
+        "controlled_live_gate",
+        "kill_switch",
+        "human_confirm_workflow",
+        "live_audit_report"
+      ],
+      "acceptance": [
+        "必须经过 V2 风控/审批/审计链路",
+        "实盘只能小权限、人工确认、可回滚",
+        "任何自动下单默认禁止，除非显式通过 Controlled Live Gate"
+      ]
+    }
+  ],
+  "safety": {
+    "auto_apply": false,
+    "requires_human_approval": true,
+    "no_live_trade": true,
+    "broker_adapter_called": false,
+    "miniqmt_called": false,
+    "paper_config_modified": false,
+    "live_config_modified": false,
+    "task_generation_only": true
+  }
+}

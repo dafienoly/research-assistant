@@ -1,0 +1,5 @@
+symbol,name,shares,available_shares,cost_price,current_price,market_value,weight,board,source,updated_at
+000620,新华联,200,200,3.20,3.60,720,0.014,main,manual,2026-07-03
+002396,星网锐捷,100,100,22.50,23.40,2340,0.047,main,manual,2026-07-03
+603501,韦尔股份,100,100,95.00,98.50,9850,0.197,main,manual,2026-07-03
+CASH,,,,,,25000,,,,
