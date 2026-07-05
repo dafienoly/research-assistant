@@ -263,6 +263,7 @@ class AgentRunner:
             "--output-format", "stream-json",
             "--include-partial-messages",
             "--input-format", "text",
+            "--verbose",
             "--permission-mode", "bypassPermissions",
             "--dangerously-skip-permissions",
             "--add-dir", str(COMMANDS_DIR),

@@ -20,7 +20,11 @@ def _read_latest():
             return json.loads(p.read_text())
         except Exception:
             return None
-    return None
+        return None
+
+
+def _new_run_id(prefix: str = "auto") -> str:
+    return f"{prefix}_{datetime.now(CST).strftime('%Y%m%d_%H%M%S_%f')}"
 
 
 def _write_latest(run_id, run_dir, version, task_count):
@@ -65,7 +69,7 @@ def _ensure_latest_clean(version):
     if (not latest or latest.get("current") != version
             or not str(latest.get("run_id", "")).startswith("auto_")
             or _latest_has_polluted_tasks(latest)):
-        tid = f"auto_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}"
+        tid = _new_run_id()
         run_dir = TASKS_DIR / tid
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "tasks").mkdir(exist_ok=True)
@@ -117,7 +121,7 @@ def auto_run_once():
             pending_tasks = latest
 
     if not pending_tasks:
-        tid = f"auto_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}"
+        tid = _new_run_id()
         run_dir = TASKS_DIR / tid
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "tasks").mkdir(exist_ok=True)
