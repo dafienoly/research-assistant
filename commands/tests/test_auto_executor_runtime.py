@@ -8,6 +8,26 @@ from factor_lab.leader.workloop import release_lock, TASKS_DIR
 from factor_lab.leader.backend_policy import need_code_change
 
 
+def test_auto_loop_once_and_watch_entrypoints(monkeypatch):
+    from factor_lab.leader import auto_loop, auto_executor
+
+    monkeypatch.setattr(auto_executor, "auto_run_once",
+                        lambda: {"status": "completed", "version": "TEST"})
+    once = auto_loop.loop_once()
+    assert once["result"]["status"] == "completed"
+
+    watched = auto_loop.loop_watch(interval_seconds=0, max_ticks=1)
+    assert watched["result"]["version"] == "TEST"
+
+
+def test_auto_executor_does_not_clear_running_lock(monkeypatch):
+    from factor_lab.leader import auto_executor
+
+    monkeypatch.setattr(auto_executor, "is_locked", lambda: True)
+    result = auto_executor.auto_run_once()
+    assert result == {"status": "running", "reason": "another_agent_run_in_progress"}
+
+
 def test_get_version_returns_roadmap_item():
     v = get_version("V3.0.1")
     assert v is not None

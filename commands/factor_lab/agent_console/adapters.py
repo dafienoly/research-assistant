@@ -16,14 +16,17 @@ COMMANDS = "/home/ly/.hermes/research-assistant/commands"
 ADAPTER_INFO = {
     "hermes_demo": {
         "label": "Hermes Agent (演示模式)", "streaming": "buffered",
+        "supports_realtime_delta": False,
         "description": "运行 leader:dispatch --dry-run，用于验证链路",
     },
     "hermes_research": {
         "label": "Hermes Agent (研究模式)", "streaming": "buffered",
-        "description": "运行投研分析: leader:automation-status + 盘前信号分析",
+        "supports_realtime_delta": False,
+        "description": "运行投研分析: leader:automation-status + roadmap-status",
     },
     "claude_code": {
         "label": "Claude Code (--print)", "streaming": "buffered",
+        "supports_realtime_delta": False,
         "description": "Claude Code --print 模式，回答缓冲后一次性输出。"
         "实验性 PTY 路径在 adapters.py 中预留。",
     },
@@ -92,10 +95,18 @@ def _run_hermes_research(sid: str, prompt: str):
             ([VENV, CLI, "leader:roadmap-status"], "路线图"),
         ]
         full_answer = ""
+        failed_commands = []
         for cmd, label in cmds:
             append_event(sid, AgentEvent("diagnostic", sid, data=f"运行: {' '.join(cmd[-2:])}"))
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30, cwd=COMMANDS)
             output = proc.stdout + proc.stderr
+            if proc.returncode != 0:
+                failed_commands.append((label, proc.returncode))
+                append_event(sid, AgentEvent(
+                    "diagnostic", sid,
+                    data=f"{label} failed with returncode={proc.returncode}",
+                    status="failed",
+                ))
             full_answer += f"\n### {label}\n\n"
             # 提取可读内容作为 answer
             for line in output.split("\n"):
@@ -111,9 +122,12 @@ def _run_hermes_research(sid: str, prompt: str):
         for chunk in _chunkify(full_answer):
             append_event(sid, AgentEvent("answer_delta", sid, data=chunk, status="running"))
 
-        status = "completed"
-        append_event(sid, AgentEvent("answer_delta", sid,
-                     data="\n---\n*分析完成。诊断信息见折叠面板。*", status=status))
+        status = "failed" if failed_commands else "completed"
+        completion_text = "\n---\n*分析完成。诊断信息见折叠面板。*"
+        if failed_commands:
+            failed_labels = ", ".join(f"{label}(rc={rc})" for label, rc in failed_commands)
+            completion_text = f"\n---\n*分析未完全完成：{failed_labels}。诊断信息见折叠面板。*"
+        append_event(sid, AgentEvent("answer_delta", sid, data=completion_text, status=status))
         append_event(sid, AgentEvent("done", sid, data="", status=status))
         update_status(sid, status)
     except Exception as e:
@@ -135,6 +149,7 @@ def _run_claude(sid: str, prompt: str):
     try:
         # 尝试 PTY 模式 (实验性)
         pty_used = False
+        returncode = None
         try:
             master_fd, slave_fd = pty.openpty()
             proc = subprocess.Popen([claude_bin, "--print", "--add-dir", COMMANDS],
@@ -144,6 +159,7 @@ def _run_claude(sid: str, prompt: str):
             proc.stdin.write(prompt)
             proc.stdin.close()
             output = ""
+            started = time.time()
             while True:
                 try:
                     r, _, _ = select.select([master_fd], [], [], 0.5)
@@ -156,10 +172,14 @@ def _run_claude(sid: str, prompt: str):
                     else:
                         if proc.poll() is not None:
                             break
+                    if time.time() - started > 300:
+                        proc.kill()
+                        append_event(sid, AgentEvent("error", sid, data="Claude Code 超时", status="failed"))
+                        break
                 except (OSError, ValueError):
                     break
             os.close(master_fd)
-            proc.wait(timeout=5)
+            returncode = proc.wait(timeout=5)
             pty_used = True
         except Exception:
             # PTY 失败，回退到 buffered --print
@@ -172,11 +192,16 @@ def _run_claude(sid: str, prompt: str):
             output = proc.stdout if proc.stdout.strip() else proc.stderr
             for chunk in _chunkify(output):
                 append_event(sid, AgentEvent("answer_delta", sid, data=chunk, status="running"))
+            returncode = proc.returncode
 
         streaming_mode = "pty" if pty_used else "buffered"
         append_event(sid, AgentEvent("diagnostic", sid,
                      data=f"[Claude streaming mode: {streaming_mode}]"))
-        status = "completed"
+        status = "completed" if returncode == 0 else "failed"
+        if returncode != 0:
+            append_event(sid, AgentEvent("diagnostic", sid,
+                         data=f"Claude Code failed with returncode={returncode}",
+                         status="failed"))
         append_event(sid, AgentEvent("done", sid, data="", status=status))
         update_status(sid, status)
     except subprocess.TimeoutExpired:

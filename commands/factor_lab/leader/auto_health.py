@@ -46,12 +46,19 @@ def health() -> dict:
     # latest.json pending tasks
     latest = TASKS_DIR / "latest.json"
     pending_consumable = False
+    ld = {}
     if latest.exists():
         try:
             ld = json.loads(latest.read_text())
             pending_consumable = ld.get("status") == "pending" and ld.get("task_count", 0) > 0
         except Exception:
             pass
+
+    latest_current = ld.get("current", "") if isinstance(ld, dict) else ""
+    comp_version = comp.get("version", "") if comp else ""
+    completion_matches_current = not comp_version or not latest_current or comp_version == latest_current
+    completion_status = comp.get("status", "none") if comp else "none"
+    current_completion_status = completion_status if completion_matches_current else "stale"
 
     return {
         "crontab_registered": crontab_registered,
@@ -61,7 +68,9 @@ def health() -> dict:
         "tick_age_seconds": tick_age,
         "tick_count": s.get("tick_count", 0),
         "lock_status": "running" if is_locked() else "free",
-        "latest_completion_status": comp.get("status", "none") if comp else "none",
+        "latest_completion_status": completion_status,
+        "current_completion_status": current_completion_status,
+        "latest_completion_version": comp_version or "none",
         "latest_pending_consumable": pending_consumable,
         "agent_log_size": log_size,
         "checked_at": datetime.now(CST).isoformat(),

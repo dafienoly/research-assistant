@@ -309,10 +309,15 @@ def _derive_state(health_info: dict[str, Any], latest: dict[str, Any], completio
         bump("red", f"latest.current({latest_current}) != cursor.current_version({cursor_current})")
 
     comp_status = completion.get("status")
-    if comp_status in {"blocked", "failed"}:
-        bump("red", f"latest_completion.status={comp_status}")
-    elif comp_status in {"partial", "running"}:
-        bump("yellow", f"latest_completion.status={comp_status}")
+    comp_version = completion.get("version")
+    completion_matches_current = not comp_version or comp_version in {latest_current, cursor_current}
+    if completion_matches_current:
+        if comp_status in {"blocked", "failed"}:
+            bump("red", f"latest_completion.status={comp_status}")
+        elif comp_status in {"partial", "running"}:
+            bump("yellow", f"latest_completion.status={comp_status}")
+    elif comp_status:
+        reasons.append(f"忽略旧 completion: {comp_version} status={comp_status}")
 
     if latest.get("current") in {"V2.15", "live_execution", "unsafe"}:
         bump("red", f"latest.current={latest.get('current')} 属于旧污染或危险任务")
@@ -572,15 +577,26 @@ class _DashboardHandler(BaseHTTPRequestHandler):
             ).encode("utf-8")
             self._send(200, body, "application/json; charset=utf-8")
             return
+        if parsed.path == "/api/agent-console/adapters":
+            from factor_lab.agent_console.adapters import get_adapters
+            body = json.dumps({"adapters": get_adapters()}, ensure_ascii=False, indent=2).encode("utf-8")
+            self._send(200, body, "application/json; charset=utf-8")
+            return
 
         # --- Agent Console API ---
         if parsed.path == "/api/agent-console/sessions":
             import uuid as _uuid
             qs = parse_qs(parsed.query)
-            agent = qs.get("agent", ["hermes"])[0]
+            agent = qs.get("agent", ["hermes_research"])[0]
             prompt = qs.get("prompt", [""])[0]
             if not prompt.strip():
                 self._send(400, b'{"error":"prompt required"}', "application/json")
+                return
+            from factor_lab.agent_console.adapters import get_adapters
+            adapter_ids = {item["id"] for item in get_adapters()}
+            if agent not in adapter_ids:
+                body = json.dumps({"error": f"unknown agent: {agent}"}).encode()
+                self._send(400, body, "application/json; charset=utf-8")
                 return
             from factor_lab.agent_console.sessions import create_session
             from factor_lab.agent_console.adapters import start_session
@@ -593,7 +609,7 @@ class _DashboardHandler(BaseHTTPRequestHandler):
 
         if parsed.path.startswith("/api/agent-console/sessions/"):
             parts = parsed.path.split("/")
-            if len(parts) >= 5 and parts[5] == "stream":
+            if len(parts) >= 6 and parts[5] == "stream":
                 sid = parts[4]
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream; charset=utf-8")
@@ -601,12 +617,11 @@ class _DashboardHandler(BaseHTTPRequestHandler):
                 self.send_header("Connection", "keep-alive")
                 self.end_headers()
                 import time as _time
-                from factor_lab.agent_console.sessions import stream_events
+                from factor_lab.agent_console.sessions import SESSIONS_DIR
                 last_count = 0
                 while True:
                     try:
-                        el = __import__("pathlib").Path(
-                            f"/home/ly/.hermes/research-assistant/agent_tasks/agent_console_sessions/{sid}/events.jsonl")
+                        el = SESSIONS_DIR / sid / "events.jsonl"
                         if el.exists():
                             lines = el.read_text().splitlines()
                             for line in lines[last_count:]:
@@ -623,7 +638,7 @@ class _DashboardHandler(BaseHTTPRequestHandler):
                         break
                 return
 
-            if len(parts) >= 5 and parts[5] == "cancel":
+            if len(parts) >= 6 and parts[5] == "cancel":
                 sid = parts[4]
                 from factor_lab.agent_console.adapters import cancel_session
                 cancel_session(sid)
@@ -648,10 +663,16 @@ class _DashboardHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/api/agent-console/sessions":
             qs = parse_qs(parsed.query)
-            agent = qs.get("agent", ["hermes"])[0]
+            agent = qs.get("agent", ["hermes_research"])[0]
             prompt = qs.get("prompt", [""])[0]
             if not prompt.strip():
                 self._send(400, b'{"error":"prompt required"}', "application/json")
+                return
+            from factor_lab.agent_console.adapters import get_adapters
+            adapter_ids = {item["id"] for item in get_adapters()}
+            if agent not in adapter_ids:
+                body = json.dumps({"error": f"unknown agent: {agent}"}).encode()
+                self._send(400, body, "application/json; charset=utf-8")
                 return
             from factor_lab.agent_console.sessions import create_session
             from factor_lab.agent_console.adapters import start_session

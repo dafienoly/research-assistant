@@ -2,8 +2,22 @@
 import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from pathlib import Path
+import pytest
 from factor_lab.leader.agent_runner import AgentRunner, DEFAULT_BACKEND, BACKEND_PRIORITY, loop_once
-from factor_lab.leader.workloop import write_completion, release_lock, LATEST_COMPLETION, TASKS_DIR
+from factor_lab.leader.workloop import write_completion, release_lock, LATEST_COMPLETION, TASKS_DIR, LOCK_FILE
+
+
+@pytest.fixture(autouse=True)
+def _preserve_runtime_state():
+    paths = [TASKS_DIR / "latest.json", LATEST_COMPLETION, LOCK_FILE]
+    snapshots = {path: path.read_bytes() if path.exists() else None for path in paths}
+    yield
+    for path, data in snapshots.items():
+        if data is None:
+            path.unlink(missing_ok=True)
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
 
 
 def _setup_task():
@@ -26,6 +40,7 @@ def test_backend_priority():
 
 
 def test_dry_run_backend():
+    release_lock("completed")
     runner = AgentRunner(backend="dry-run")
     result = runner.run_once()
     # dry-run 应执行成功 (不管是否有任务)
@@ -33,12 +48,14 @@ def test_dry_run_backend():
 
 
 def test_runner_reads_latest():
+    release_lock("completed")
     runner = AgentRunner(backend="dry-run")
     result = runner.run_once()
     assert "status" in result
 
 
 def test_runner_writes_completed():
+    release_lock("completed")
     runner = AgentRunner(backend="dry-run")
     result = runner.run_once()
     if result.get("status") == "completed":
