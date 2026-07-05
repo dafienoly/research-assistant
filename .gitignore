@@ -55,3 +55,6 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+
+/agent_tasks/github_sync_latest.json
+/agent_tasks/auto_loop_state.json

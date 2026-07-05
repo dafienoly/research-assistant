@@ -28,6 +28,16 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--summary", default="", help="提交说明摘要")
     sp.add_argument("--dry-run", action="store_true", help="只显示将提交的变更")
 
+    sp = sub.add_parser("loop-once")
+    sp.add_argument("--consume", action="store_true")
+    sp.add_argument("--no-github", action="store_true")
+
+    sp = sub.add_parser("loop-watch")
+    sp.add_argument("--interval", type=int, default=180)
+    sp.add_argument("--max-ticks", type=int, default=0)
+    sp.add_argument("--consume", action="store_true")
+    sp.add_argument("--no-github", action="store_true")
+
     args = parser.parse_args(argv)
 
     if args.command == "inspect":
@@ -48,6 +58,13 @@ def main(argv: list[str] | None = None) -> None:
         print(json.dumps(result, indent=2, ensure_ascii=False))
         if result.get("pushed"):
             print(f"\n✅ 已推送到 GitHub: {result['remote']} @ {result['commit']}")
+    elif args.command == "loop-once":
+        from factor_lab.leader.auto_loop import loop_once
+        result = loop_once(auto_consume=args.consume, auto_github=not args.no_github)
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    elif args.command == "loop-watch":
+        from factor_lab.leader.auto_loop import loop_watch
+        loop_watch(interval_seconds=args.interval, max_ticks=args.max_ticks, auto_consume=args.consume, auto_github=not args.no_github)
     else:
         parser.print_help()
 
