@@ -45,6 +45,8 @@ def _extract_claude_stream_text(line: str) -> str:
 
     event_type = event.get("type") or event.get("event") or "event"
     subtype = event.get("subtype") or event.get("name") or ""
+    if event_type in {"stream_event"} or (event_type == "system" and subtype in {"init", "status"}):
+        return ""
     label = f"[claude:{event_type}{':' + subtype if subtype else ''}]"
     return label + "\n"
 
@@ -115,9 +117,10 @@ def _run_streaming_process(cmd, log_file: Path, input_text: str | None = None,
                     stream_closed = True
                 else:
                     rendered = line_transform(item) if line_transform else item
-                    output_parts.append(rendered)
-                    lf.write(rendered)
-                    lf.flush()
+                    if rendered:
+                        output_parts.append(rendered)
+                        lf.write(rendered)
+                        lf.flush()
             except queue.Empty:
                 pass
 

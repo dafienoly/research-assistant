@@ -73,6 +73,7 @@ def test_runner_releases_lock():
 
 def test_runner_blocks_unsafe_stage():
     """不安全阶段应 blocked"""
+    release_lock("completed")
     write_completion("pending", "live_execution", "unsafe",
                      remaining_tasks=["dangerous_task"])
     from factor_lab.leader.workloop import dispatch_from_completion
@@ -133,3 +134,11 @@ def test_find_task_file_prefers_exact_clean_task(tmp_path):
     (tasks / "T001_some_task.md").write_text("some_task V2.15")
     (tasks / "T001.md").write_text("clean task")
     assert _find_task_file(tasks, "T001") == "clean task"
+
+
+def test_claude_stream_transform_suppresses_noisy_events():
+    from factor_lab.leader.agent_runner import _extract_claude_stream_text
+
+    assert _extract_claude_stream_text('{"type":"stream_event"}') == ""
+    assert _extract_claude_stream_text('{"type":"system","subtype":"status"}') == ""
+    assert _extract_claude_stream_text('{"type":"assistant","message":{"content":[{"text":"hello"}]}}') == "hello"
