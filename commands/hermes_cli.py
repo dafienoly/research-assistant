@@ -122,6 +122,7 @@ def show_help():
   leader:loop-once               Leader 循环: 读取 completion 并派发下一轮
   leader:lock-status             查看当前任务锁状态
 
+leader:automation-status       后台自动工作流健康状态检查
 Leader 自动派发:
   leader:inspect                 Leader 只读检查本地报告/代码/Registry，判断 V3 阶段
   leader:dispatch [--dry-run]    按 Alpha Factory 路线图生成 agent_tasks 任务包
@@ -745,6 +746,13 @@ run_daily_premarket(no_notify=True)
     elif command == "leader:loop-once":
         from factor_lab.leader.agent_runner import loop_once
         loop_once()
+
+    elif command == "leader:automation-status":
+        from factor_lab.leader.auto_health import health
+        import json
+        h = health()
+        for k, v in h.items():
+            print(f"  {k}: {v}")
 
     elif command == "leader:accept":
         from factor_lab.leader.leader_cli import main as leader_main
