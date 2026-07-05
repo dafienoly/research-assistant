@@ -125,6 +125,8 @@ Leader 自动派发:
   leader:accept [--full-tests]   自动验收 / local CI，生成 acceptance 报告
   leader:github-sync --version Vx.y.z [--summary TEXT]
                                 版本完成后提交并推送到 GitHub
+  leader:loop-once              自动工作循环单次 tick
+  leader:loop-watch             自动工作循环轮询运行
   
 后台任务管理:
   bg:list                      列出所有持久化后台任务
@@ -721,6 +723,14 @@ run_daily_premarket(no_notify=True)
     elif command == "leader:github-sync":
         from factor_lab.leader.leader_cli import main as leader_main
         leader_main(["github-sync"] + args)
+
+    elif command == "leader:loop-once":
+        from factor_lab.leader.leader_cli import main as leader_main
+        leader_main(["loop-once"] + args)
+
+    elif command == "leader:loop-watch":
+        from factor_lab.leader.leader_cli import main as leader_main
+        leader_main(["loop-watch"] + args)
 
     elif command == "architecture:audit":
         from factor_lab.architecture.architecture_audit import run_architecture_audit

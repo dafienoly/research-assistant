@@ -127,8 +127,9 @@ def dispatch_from_completion():
     }, indent=2))
 
     print(f"\n  ✅ 自动派发 {len(tasks)} 个任务")
-    for t in tasks:
-        print(f"    {t['tid']}: {t['title']}")
+    for i, t in enumerate(tasks):
+        tid = t.get("tid") or f"T{i+1:03d}"
+        print(f"    {tid}: {t['title']}")
     print(f"  📁 {run_dir}")
     print(f"  latest.json updated")
 
@@ -302,7 +303,7 @@ def consume_latest_task():
     write_completion("partial", data.get("current", "?"), data.get("next", "?"),
                       completed_tasks=[], remaining_tasks=task_ids,
                       next_question="请在任务完成后更新 completion")
-    release_lock("running")
+    release_lock("completed")
 
 
 def main():
