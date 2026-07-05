@@ -204,6 +204,34 @@ def _agent_output_snapshot(latest: dict[str, Any], completion: dict[str, Any], l
     return {"log_files": [s["file"] for s in snippets], "snippets": snippets}
 
 
+def _current_answer_snapshot(latest: dict[str, Any], lines: int = 240) -> dict[str, Any]:
+    run_id = latest.get("run_id", "")
+    current = latest.get("current", "")
+    log_file = AGENT_LOG_ROOT / run_id / "T001.log" if run_id else None
+    raw_lines = _tail(log_file, lines) if log_file else []
+    command_line = raw_lines[0] if raw_lines and raw_lines[0].startswith("$ ") else ""
+    is_stream_json = "stream-json" in command_line
+    is_buffered = " --print" in command_line and not is_stream_json
+    status = "waiting"
+    if raw_lines:
+        status = "streaming" if not any(line.startswith("# finished_at=") for line in raw_lines) else "finished"
+    body_lines = []
+    for line in raw_lines:
+        if line.startswith("$ ") or line.startswith("# started_at="):
+            continue
+        body_lines.append(line)
+    return {
+        "run_id": run_id,
+        "version": current,
+        "file": str(log_file) if log_file else "",
+        "status": status,
+        "streaming_mode": "stream-json" if is_stream_json else "buffered" if is_buffered else "unknown",
+        "permission_mode": "bypassPermissions" if "bypassPermissions" in command_line else "default",
+        "updated_at": datetime.fromtimestamp(log_file.stat().st_mtime, tz=CST).isoformat() if log_file and log_file.exists() else "",
+        "text": "\n".join(body_lines[-lines:]).strip(),
+    }
+
+
 def _roadmap_details() -> list[dict[str, Any]]:
     rows = []
     for item in get_roadmap():
@@ -353,6 +381,7 @@ def collect_status() -> dict[str, Any]:
     progress = _roadmap_progress(cursor)
     task_snapshot = _latest_task_snapshot(latest)
     agent_output = _agent_output_snapshot(latest, completion)
+    current_answer = _current_answer_snapshot(latest)
     state = _derive_state(health_info, latest, completion, cursor, log_lines, git)
     return {
         "generated_at": _now(),
@@ -366,6 +395,7 @@ def collect_status() -> dict[str, Any]:
         "backend": backend,
         "git": git,
         "latest_task_snapshot": task_snapshot,
+        "current_answer": current_answer,
         "agent_output": agent_output,
         "log_tail": log_lines[-60:],
     }
@@ -388,7 +418,10 @@ DASHBOARD_HTML = r"""
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
     .card { background: #121a35; border: 1px solid #26304f; border-radius: 14px; padding: 16px; box-shadow: 0 6px 24px #0005; }
     .card h2 { margin: 0 0 12px; font-size: 15px; color: #cdd6f8; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .section-head h2 { margin: 0; }
     .status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; font-weight: 700; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 999px; border: 1px solid #26304f; color: #cdd6f8; background: #080d1c; font-size: 12px; }
     .green { background: #0f3d2e; color: #7df0bd; }
     .yellow { background: #44380c; color: #ffdc7a; }
     .red { background: #4a1620; color: #ff8ba0; }
@@ -407,6 +440,9 @@ DASHBOARD_HTML = r"""
     th { color: #9aa7c7; position: sticky; top: 0; background: #121a35; }
     .wide { grid-column: 1 / -1; }
     #streamOutput { max-height: 520px; white-space: pre-wrap; }
+    #currentAnswer { min-height: 220px; max-height: 520px; white-space: pre-wrap; font-size: 13px; line-height: 1.55; }
+    .answer-panel { border-color: #2f4962; }
+    .answer-meta { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
   </style>
 </head>
 <body>
@@ -427,6 +463,14 @@ DASHBOARD_HTML = r"""
       <div class="card"><h2>最近完成/阻断</h2><div id="completion"></div></div>
       <div class="card"><h2>Backend</h2><div id="backend"></div></div>
       <div class="card"><h2>Git</h2><div id="git"></div></div>
+    </section>
+
+    <section class="card wide answer-panel">
+      <div class="section-head">
+        <h2>当前自动开发回答</h2>
+        <div class="answer-meta" id="currentAnswerMeta"></div>
+      </div>
+      <pre id="currentAnswer">等待当前自动开发输出...</pre>
     </section>
 
     <section class="card wide">
@@ -458,6 +502,23 @@ function renderRoadmapDetails(rows, cursor){
   }).join('') + '</tbody></table>';
   document.getElementById('roadmapDetails').innerHTML = html;
 }
+let currentAnswerFile = '';
+function renderCurrentAnswer(answer){
+  currentAnswerFile = answer?.file || '';
+  const mode = answer?.streaming_mode || 'unknown';
+  const status = answer?.status || 'waiting';
+  const modeClass = mode === 'stream-json' ? 'green' : mode === 'buffered' ? 'yellow' : '';
+  const statusClass = status === 'streaming' ? 'green' : status === 'finished' ? 'yellow' : '';
+  document.getElementById('currentAnswerMeta').innerHTML = [
+    `<span class="pill mono">${esc(answer?.version || '')}</span>`,
+    `<span class="pill ${statusClass}">${esc(status)}</span>`,
+    `<span class="pill ${modeClass}">${esc(mode)}</span>`,
+    `<span class="pill mono">${esc(answer?.permission_mode || '')}</span>`,
+    `<span class="pill mono">${esc(answer?.run_id || '')}</span>`
+  ].join('');
+  document.getElementById('currentAnswer').textContent =
+    answer?.text || (mode === 'buffered' ? 'Claude backend buffered; 等待命令完成后输出。' : '等待当前自动开发输出...');
+}
 function appendStream(kind, text){
   const el = document.getElementById('streamOutput');
   const prefix = kind ? `\n### ${kind}\n` : '';
@@ -472,7 +533,18 @@ function startStream(){
   es.addEventListener('open', () => appendStream('SSE', '已连接日志流。\n'));
   es.addEventListener('status', ev => { try { renderStatus(JSON.parse(ev.data)); } catch(e){} });
   es.addEventListener('runner_log', ev => { const x = JSON.parse(ev.data); appendStream('runner ' + x.file, x.chunk); });
-  es.addEventListener('agent_log', ev => { const x = JSON.parse(ev.data); appendStream('agent ' + x.file, x.chunk); });
+  es.addEventListener('agent_log', ev => {
+    const x = JSON.parse(ev.data);
+    appendStream('agent ' + x.file, x.chunk);
+    if (x.file && x.file === currentAnswerFile) {
+      const el = document.getElementById('currentAnswer');
+      if (el.textContent === '等待当前自动开发输出...' || el.textContent === 'Claude backend buffered; 等待命令完成后输出。') {
+        el.textContent = '';
+      }
+      el.textContent += x.chunk;
+      el.scrollTop = el.scrollHeight;
+    }
+  });
   es.onerror = () => appendStream('SSE', '连接中断，浏览器会自动重连。\n');
 }
 function renderStatus(s){
@@ -508,6 +580,7 @@ function renderStatus(s){
   ]);
 
   document.getElementById('tasks').textContent = JSON.stringify(s?.latest_task_snapshot || {}, null, 2);
+  renderCurrentAnswer(s?.current_answer || {});
   document.getElementById('agentOutput').textContent = JSON.stringify(s?.agent_output || {}, null, 2);
   document.getElementById('logs').textContent = (s?.log_tail || []).join('\n');
   renderRoadmapDetails(s?.roadmap_details || [], s?.cursor || {});
