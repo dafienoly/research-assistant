@@ -129,6 +129,8 @@ leader:task-submit --text "..." --title "任务标题"
                               提交新任务到 inbox
 leader:auto-run-once          自动执行器: 读取路线图 cursor，执行当前版本
 leader:auto-status            自动执行器状态
+leader:dashboard --host 127.0.0.1 --port 8766
+                              Dashboard + Agent Console Web 页面
 leader:dashboard [--host 127.0.0.1] [--port 8765]
                               本地只读 Web 监控台: 自动版本推进实时状态
 leader:dashboard-json         输出 dashboard 使用的状态 JSON
