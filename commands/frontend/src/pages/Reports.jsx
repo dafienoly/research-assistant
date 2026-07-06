@@ -78,29 +78,29 @@ export default function Reports() {
           <Descriptions.Item label="目标" span={2}>{detail.objective}</Descriptions.Item>
         </Descriptions>
 
+        {/* Git 提交记录 */}
+        {report.completion_detail?.commits?.length > 0 && detail.version === report.completion_detail.version && <div style={{ marginTop: 16 }}>
+          <h4 style={{ color: '#0F172A' }}>Git 提交记录</h4>
+          <Table dataSource={report.completion_detail.commits} columns={[
+            { title: 'Hash', dataIndex: 'hash', key: 'h', width: 80, render: v => <code style={{ color: '#2563EB', fontSize: 11 }}>{v.slice(0,7)}</code> },
+            { title: '提交信息', dataIndex: 'message', key: 'm' },
+          ]} rowKey="hash" size="small" pagination={false} />
+        </div>}
+
+        {report.completion_detail?.files_changed?.length > 0 && detail.version === report.completion_detail.version && <div style={{ marginTop: 12 }}>
+          <h4 style={{ color: '#0F172A' }}>文件变更</h4>
+          {report.completion_detail.files_changed.map((f, i) => <div key={i} style={{ color: '#64748B', fontSize: 12, fontFamily: 'monospace', padding: '2px 0' }}>{f}</div>)}
+          {report.completion_detail.stats?.diff_shortstat && <p style={{ color: '#64748B', fontSize: 12, marginTop: 4 }}>{report.completion_detail.stats.diff_shortstat}</p>}
+        </div>}
+
         {sessionDetail && <div style={{ marginTop: 16 }}>
           <h4 style={{ color: '#0F172A' }}>🤖 Agent 开发回答</h4>
-          <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: 16, maxHeight: 300, overflow: 'auto', marginTop: 8 }}>
+          <div class="markdown-body" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: 16, maxHeight: 300, overflow: 'auto', marginTop: 8 }}>
             {sessionDetail.answer ? <Markdown remarkPlugins={[remarkGfm]}>{sessionDetail.answer}</Markdown> : <span style={{ color: '#94A3B8' }}>无回答</span>}
           </div>
         </div>}
       </div>}
     </Modal>
-
-    {report.completion_detail && <Card title={<span style={{ color: '#0F172A', fontWeight: 600 }}>📦 版本完成详情 — {report.completion_detail.version}</span>} style={cardStyle}>
-      {report.completion_detail.commits?.length > 0 && <div style={{ marginBottom: 12 }}>
-        <h4 style={{ color: '#0F172A', fontSize: 14 }}>Git 提交记录</h4>
-        <Table dataSource={report.completion_detail.commits} columns={[
-          { title: 'Hash', dataIndex: 'hash', key: 'h', width: 80, render: v => <code style={{ color: '#2563EB', fontSize: 11 }}>{v.slice(0,7)}</code> },
-          { title: '提交信息', dataIndex: 'message', key: 'm' },
-        ]} rowKey="hash" size="small" pagination={false} />
-      </div>}
-      {report.completion_detail.files_changed?.length > 0 && <div>
-        <h4 style={{ color: '#0F172A', fontSize: 14 }}>文件变更</h4>
-        {report.completion_detail.files_changed.map((f, i) => <div key={i} style={{ color: '#64748B', fontSize: 12, fontFamily: 'monospace', padding: '2px 0' }}>{f}</div>)}
-      </div>}
-      {report.completion_detail.stats?.diff_shortstat && <p style={{ color: '#64748B', fontSize: 12, marginTop: 8 }}>{report.completion_detail.stats.diff_shortstat}</p>}
-    </Card>}
 
     <Card title={<span style={{ color: '#0F172A', fontWeight: 600 }}>💾 Session 历史与备份</span>} style={cardStyle}>
       <Table dataSource={sessions} columns={scols} rowKey="id" size="small" pagination={{ pageSize: 10 }} />
