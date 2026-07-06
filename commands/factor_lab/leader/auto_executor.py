@@ -215,6 +215,12 @@ def auto_run_once():
         _status = "completed"
         version_completed(current, cv.name, f"{cv.objective} — 测试通过")
         record_end(current, "completed")
+        # 捕获版本完成详情
+        try:
+            from factor_lab.leader.version_detail import capture_completion
+            capture_completion(current, cv.name)
+        except Exception:
+            pass
     else:
         write_completion("partial", current, cv.name,
                           report_dir=report_path,

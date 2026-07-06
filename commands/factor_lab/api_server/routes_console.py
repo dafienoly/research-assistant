@@ -85,9 +85,14 @@ async def backup_session(sid: str):
 
 @router.get("/versions/report/detail")
 async def version_report_detail():
-    """详细版本报告，含 Agent 输出摘要"""
+    """详细版本报告，含 Agent 输出摘要和 git 变更记录"""
     from factor_lab.leader.version_report import generate_report
     report = generate_report()
+    # 附上版本完成详情
+    from factor_lab.leader.version_detail import get_completion_detail
+    detail = get_completion_detail()
+    if "error" not in detail:
+        report["completion_detail"] = detail
     # 附上最近的 agent_logs 输出
     log_dir = Path("/home/ly/.hermes/research-assistant/agent_tasks/agent_logs")
     logs = []
