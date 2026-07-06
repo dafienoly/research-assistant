@@ -48,13 +48,31 @@ async def list_sessions(limit: int = 50):
                 af = d / "answer.md"
                 if af.exists():
                     answer_md = af.read_text()[:500]
+                req = {}
+                rf = d / "request.json"
+                if rf.exists():
+                    req = json.loads(rf.read_text())
+                # 计算耗时
+                duration = ""
+                start = req.get("created_at", "")
+                end = summary.get("updated_at", "")
+                if start and end:
+                    try:
+                        sd = datetime.fromisoformat(start)
+                        ed = datetime.fromisoformat(end)
+                        delta = ed - sd
+                        duration = f"{delta.total_seconds():.0f}s"
+                        if delta.total_seconds() > 3600:
+                            duration = f"{delta.total_seconds()/3600:.1f}h"
+                        elif delta.total_seconds() > 60:
+                            duration = f"{delta.total_seconds()/60:.0f}m"
+                    except:
+                        pass
                 sessions.append({
-                    "id": d.name,
-                    "status": summary.get("status", "unknown"),
-                    "agent": summary.get("agent", "?"),
-                    "prompt": summary.get("prompt", "")[:100],
+                    "id": d.name, "status": summary.get("status", "unknown"),
+                    "agent": req.get("agent", "?"), "prompt": req.get("prompt", "")[:100],
                     "updated_at": summary.get("updated_at", d.name[3:19]),
-                    "answer_preview": answer_md[:200],
+                    "answer_preview": answer_md[:200], "duration": duration,
                 })
                 if len(sessions) >= limit:
                     break
@@ -107,6 +125,13 @@ async def version_report_detail():
                 })
     report["agent_outputs"] = logs
     return report
+
+
+@router.post("/agent-console/cleanup")
+async def cleanup_sessions(days: int = 30):
+    from factor_lab.agent_console.sessions import cleanup_sessions as _clean
+    count = _clean(days)
+    return {"cleaned": count, "retention_days": days}
 
 
 @router.get("/agent-console/sessions/{sid}/stream")
