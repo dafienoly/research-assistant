@@ -109,6 +109,16 @@ def auto_run_once():
     record_start(current)
     auto_backup()
 
+    # 创建 Agent Console session 记录本次 auto-run-once
+    try:
+        from factor_lab.agent_console.sessions import create_session as _cs, update_status as _us
+        from factor_lab.agent_console.adapters import start_session as _start_agent
+        import threading as _t
+        _sid = _cs(f"hermes_auto", f"版本 {current}: {cv.name if cv else current}")
+        _t.Thread(target=_start_agent, args=(_sid, "hermes_demo", f"Auto execute version {current}: {cv.name if cv else ''}"), daemon=True).start()
+    except Exception:
+        pass
+
     # 1. Check backlog (before backend, before stale handling)
     if cv is None:
         write_completion("blocked", current, "unknown", remaining_tasks=[current],

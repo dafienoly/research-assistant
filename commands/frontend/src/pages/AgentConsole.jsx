@@ -1,108 +1,76 @@
 import { useState, useEffect, useRef } from 'react'
-import { Card, Tag, Spin } from 'antd'
+import { Card, Table, Tag, Button, Row, Col, Statistic, Spin, Descriptions, Empty } from 'antd'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { API } from '../App'
 
-const cardStyle = { background: '#121a35', border: '1px solid #26304f', borderRadius: 12, marginBottom: 16 }
+const cardStyle = { background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 10, marginBottom: 16 }
 
 export default function AgentConsole() {
-  const [status, setStatus] = useState(null)
-  const [answer, setAnswer] = useState('')
-  const [diag, setDiag] = useState('')
-  const [agent, setAgent] = useState('?')
+  const [sessions, setSessions] = useState([])
+  const [selected, setSelected] = useState(null)
+  const [detail, setDetail] = useState(null)
+  const [loading, setLoading] = useState(true)
   const answerRef = useRef(null)
-  const [autoConnected, setAutoConnected] = useState(false)
 
-  // 轮询状态，检测运行中 session
-  useEffect(() => {
-    const t = setInterval(async () => {
-      try {
-        const r = await fetch(`${API}/api/status`);
-        const d = await r.json();
-        setStatus(d);
-        // 有 running lock 时自动连接最新 session
-        if (d.health?.lock_status === 'running' && !autoConnected) {
-          tryConnectLatest();
-        }
-      } catch (e) {}
-    }, 3000);
-    return () => clearInterval(t);
-  }, [autoConnected]);
+  const load = () => {
+    setLoading(true)
+    fetch(`${API}/api/agent-console/sessions?limit=50`).then(r => r.json()).then(d => {
+      setSessions(d.sessions || [])
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }
 
-  const tryConnectLatest = async () => {
-    try {
-      const r = await fetch(`${API}/api/agent-console/sessions?limit=5`);
-      const d = await r.json();
-      if (d.sessions?.length > 0) {
-        // 找 running 状态的 session
-        const running = d.sessions.find(s => s.status === 'running') || d.sessions[0];
-        setAgent(running.agent || '?');
-        setAutoConnected(true);
-        // 开始轮询 session 内容
-        pollSession(running.id);
-      }
-    } catch (e) {}
-  };
+  useEffect(() => { load(); const t = setInterval(load, 5000); return () => clearInterval(t) }, [])
 
-  const pollSession = (sid) => {
-    const t = setInterval(async () => {
-      try {
-        const r = await fetch(`${API}/api/agent-console/sessions/${sid}`);
-        const d = await r.json();
-        if (d.answer) setAnswer(d.answer);
-        if (d.events) {
-          const last = d.events[d.events.length - 1];
-          if (last.type === 'done' || last.status === 'completed') {
-            setAutoConnected(false);
-            clearInterval(t);
-          }
-          // 显示最近的诊断
-          const diags = d.events.filter(e => e.type === 'diagnostic').slice(-20);
-          if (diags.length) setDiag(diags.map(e => e.data).join('\n'));
-        }
-      } catch (e) {}
-    }, 2000);
-  };
+  const showDetail = async (sid) => {
+    const r = await fetch(`${API}/api/agent-console/sessions/${sid}`)
+    const d = await r.json()
+    setDetail(d)
+    setSelected(sid)
+  }
 
-  useEffect(() => { if (answerRef.current) answerRef.current.scrollTop = answerRef.current.scrollHeight }, [answer]);
+  useEffect(() => { if (answerRef.current) answerRef.current.scrollTop = answerRef.current.scrollHeight }, [detail?.answer])
 
-  const h = status?.health || {};
-  const isRunning = h.lock_status === 'running';
-  const agentLabel = { hermes_demo: 'Hermes Agent (演示)', hermes_research: 'Hermes Agent (研究)', claude_code: 'Claude Code (缓冲)' };
+  const cols = [
+    { title: 'Session', dataIndex: 'id', key: 'id', width: 140, render: v => <code style={{ color: '#2563EB', fontSize: 11 }}>{v.slice(0,24)}</code> },
+    { title: 'Agent', dataIndex: 'agent', key: 'a', width: 80, render: v => <Tag color={v === 'claude_code' ? 'blue' : 'green'}>{v?.split('_')[0] || v}</Tag> },
+    { title: '状态', dataIndex: 'status', key: 's', width: 70, render: v => <Tag color={v === 'completed' ? 'success' : v === 'running' ? 'processing' : 'default'}>{v}</Tag> },
+    { title: '时长', dataIndex: 'duration', key: 'd', width: 60 },
+    { title: 'Prompt', dataIndex: 'prompt', key: 'p', ellipsis: true },
+    { title: '时间', dataIndex: 'updated_at', key: 't', width: 100 },
+    { title: '操作', key: 'act', width: 70, render: (_, r) => <Button size="small" type={selected === r.id ? 'primary' : 'default'} onClick={() => showDetail(r.id)}>查看</Button> },
+  ]
 
   return <div>
-    <Card style={cardStyle}>
-      <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-        <Tag color={isRunning ? 'processing' : 'default'} style={{ fontSize: 13, padding: '4px 12px' }}>
-          {isRunning ? '⚡ 版本推进中' : '⏸️ 空闲'}
-        </Tag>
-        <Tag color={agent === 'claude_code' ? 'blue' : 'green'}>{agentLabel[agent] || agent}</Tag>
-        <span style={{ color: '#9aa7c7', fontSize: 12 }}>Lock: {h.lock_status}</span>
-        <span style={{ color: '#9aa7c7', fontSize: 12 }}>tick: {h.tick_count}</span>
-        {autoConnected && <span style={{ color: '#7df0bd', fontSize: 12 }}>🔄 自动追踪中</span>}
-      </div>
+    <Card title={<span style={{ color: '#0F172A', fontWeight: 600 }}>💬 Agent Console — Session 列表</span>}
+      extra={<Button size="small" onClick={load}>🔄 刷新</Button>} style={cardStyle}>
+      {loading ? <Spin /> : <Table dataSource={sessions} columns={cols} rowKey="id" size="small"
+        pagination={{ pageSize: 10 }} locale={{ emptyText: '暂无 session' }} />}
     </Card>
 
-    <Card style={cardStyle} title={<span style={{ color: '#cdd6f8' }}>💬 Agent 实时回答</span>}>
-      {!answer && !isRunning && <p style={{ color: '#9aa7c7' }}>等待版本推进任务开始，页面将自动追踪 Agent 输出...</p>}
-      <div ref={answerRef} style={{
-        background: '#080d1c', padding: 16, borderRadius: 8,
-        minHeight: 300, maxHeight: 500, overflow: 'auto',
-        border: '1px solid #26304f'
-      }}>
-        {answer ? <Markdown remarkPlugins={[remarkGfm]} components={{
-          code: ({ children }) => <code style={{ background: '#1a2340', padding: '2px 6px', borderRadius: 4, color: '#e8ecf8' }}>{children}</code>,
-          pre: ({ children }) => <pre style={{ background: '#0b1020', padding: 12, borderRadius: 8, overflow: 'auto' }}>{children}</pre>,
-        }}>{answer}</Markdown> : (isRunning ? <p style={{ color: '#9aa7c7' }}>⏳ 等待 Agent 输出...</p> : '')}
-      </div>
-    </Card>
+    {detail && <Card title={<span style={{ color: '#0F172A', fontWeight: 600 }}>Session: {detail.session_id?.slice(0,30)}</span>} style={cardStyle}>
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col span={6}><Statistic title="Agent" value={detail.agent} valueStyle={{ fontSize: 16 }} /></Col>
+        <Col span={6}><Statistic title="状态" value={detail.status} valueStyle={{ fontSize: 16 }} /></Col>
+        <Col span={6}><Statistic title="耗时" value={detail.duration || '-'} valueStyle={{ fontSize: 16 }} /></Col>
+        <Col span={6}><Statistic title="Git" value={detail.git_commit?.slice(0,7) || '-'} valueStyle={{ fontSize: 12 }} /></Col>
+      </Row>
 
-    <details style={{ marginBottom: 16 }}>
-      <summary style={{ color: '#9aa7c7', cursor: 'pointer', fontSize: 12, padding: '8px 0' }}>
-        📋 诊断/日志 {diag ? `(${diag.split('\n').length} 行)` : ''}
-      </summary>
-      <pre style={{ background: '#080d1c', color: '#9aa7c7', padding: 10, borderRadius: 8, fontSize: 12, maxHeight: 300, overflow: 'auto', marginTop: 8, border: '1px solid #26304f' }}>{diag || '无日志'}</pre>
-    </details>
+      <h4 style={{ color: '#0F172A', marginBottom: 8 }}>Prompt</h4>
+      <div style={{ background: '#F8FAFC', padding: 10, borderRadius: 6, marginBottom: 16, fontSize: 13, color: '#64748B' }}>{detail.prompt || '(空)'}</div>
+
+      <h4 style={{ color: '#0F172A', marginBottom: 8 }}>回答</h4>
+      <div ref={answerRef} style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: 16, minHeight: 200, maxHeight: 400, overflow: 'auto' }}>
+        {detail.answer ? <Markdown remarkPlugins={[remarkGfm]}>{detail.answer}</Markdown> : <span style={{ color: '#94A3B8' }}>无回答</span>}
+      </div>
+
+      {detail.diagnostics?.length > 0 && <details style={{ marginTop: 16 }}>
+        <summary style={{ color: '#64748B', cursor: 'pointer', fontSize: 12 }}>📋 诊断日志 ({detail.diagnostics.length} 条)</summary>
+        <pre style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: 10, marginTop: 8, fontSize: 12, maxHeight: 200, overflow: 'auto', color: '#64748B' }}>
+          {detail.diagnostics.join('\n')}
+        </pre>
+      </details>}
+    </Card>}
   </div>
 }
