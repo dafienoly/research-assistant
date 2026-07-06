@@ -91,6 +91,19 @@ def auto_run_once():
 
     cursor = get_cursor()
     current = cursor["current_version"]
+    if not current:
+        # 修复空的 current_version
+        from factor_lab.leader.roadmap import get_roadmap
+        completed = set(cursor.get("completed_versions", []))
+        for item in get_roadmap():
+            if item.version not in completed:
+                current = item.version
+                cursor["current_version"] = current
+                from factor_lab.leader.roadmap_cursor import CURSOR_FILE
+                import json
+                CURSOR_FILE.write_text(json.dumps(cursor, indent=2))
+                break
+
     cv = get_version(current)
 
     record_start(current)
