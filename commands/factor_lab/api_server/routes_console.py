@@ -1,5 +1,7 @@
 """API Agent Console routes — SSE 流式 session"""
 import json, asyncio
+from pathlib import Path
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
@@ -30,9 +32,76 @@ async def create_session_api(body: CreateSessionBody):
     return {"session_id": sid, "status": "running"}
 
 
+@router.get("/agent-console/sessions")
+async def list_sessions(limit: int = 50):
+    """列出所有 session，按时间倒序"""
+    from factor_lab.agent_console.sessions import SESSIONS_DIR
+    sessions = []
+    if SESSIONS_DIR.exists():
+        for d in sorted(SESSIONS_DIR.iterdir(), reverse=True):
+            if d.is_dir() and d.name.startswith("ac_"):
+                summary = {}
+                sf = d / "summary.json"
+                if sf.exists():
+                    summary = json.loads(sf.read_text())
+                answer_md = ""
+                af = d / "answer.md"
+                if af.exists():
+                    answer_md = af.read_text()[:500]
+                sessions.append({
+                    "id": d.name,
+                    "status": summary.get("status", "unknown"),
+                    "agent": summary.get("agent", "?"),
+                    "prompt": summary.get("prompt", "")[:100],
+                    "updated_at": summary.get("updated_at", d.name[3:19]),
+                    "answer_preview": answer_md[:200],
+                })
+                if len(sessions) >= limit:
+                    break
+    return {"sessions": sessions}
+
+
 @router.get("/agent-console/sessions/{sid}")
 async def get_session_api(sid: str):
+    from factor_lab.agent_console.sessions import get_session
     return get_session(sid)
+
+
+@router.post("/agent-console/sessions/{sid}/backup")
+async def backup_session(sid: str):
+    """备份指定 session 到 HermesReports"""
+    import shutil
+    from pathlib import Path
+    src = SESSIONS_DIR / sid
+    if not src.exists():
+        return {"error": "not found"}
+    dst = Path("/mnt/d/HermesReports/session_backups") / sid
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if dst.exists():
+        shutil.rmtree(dst)
+    shutil.copytree(src, dst)
+    return {"status": "backed_up", "path": str(dst)}
+
+
+@router.get("/versions/report/detail")
+async def version_report_detail():
+    """详细版本报告，含 Agent 输出摘要"""
+    from factor_lab.leader.version_report import generate_report
+    report = generate_report()
+    # 附上最近的 agent_logs 输出
+    log_dir = Path("/home/ly/.hermes/research-assistant/agent_tasks/agent_logs")
+    logs = []
+    if log_dir.exists():
+        for f in sorted(log_dir.iterdir(), reverse=True)[:5]:
+            if f.is_file():
+                logs.append({
+                    "file": f.name,
+                    "size": f.stat().st_size,
+                    "mtime": datetime.fromtimestamp(f.stat().st_mtime, tz=CST).isoformat(),
+                    "preview": f.read_text()[:500] if f.stat().st_size < 50000 else "(large)",
+                })
+    report["agent_outputs"] = logs
+    return report
 
 
 @router.get("/agent-console/sessions/{sid}/stream")

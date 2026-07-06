@@ -1,45 +1,33 @@
 import { useState, useEffect } from 'react'
-import { Card, Row, Col, Statistic, Table, Tag, Spin, Alert, Descriptions } from 'antd'
+import { Card, Row, Col, Statistic, Table, Tag, Spin, Alert, Descriptions, Modal, Typography } from 'antd'
+import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { API } from '../App'
 
 const darkCard = { background: '#121a35', border: '1px solid #26304f', borderRadius: 12, marginBottom: 16 }
-const labelStyle = { color: '#9aa7c7', fontSize: 12 }
-const valStyle = { color: '#e8ecf8', fontSize: 13, fontFamily: 'monospace' }
-
-function Metric({ label, value, color }) {
-  return <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #25304c' }}>
-    <span style={labelStyle}>{label}</span>
-    <span style={{ ...valStyle, color: color || '#e8ecf8' }}>{String(value ?? '-')}</span>
-  </div>
-}
 
 export default function Dashboard() {
   const [data, setData] = useState(null)
-  const [err, setErr] = useState(null)
+  const [detail, setDetail] = useState(null)
+  const [fetchDetail, setFetchDetail] = useState(null)
   useEffect(() => {
-    fetch(`${API}/api/status`).then(r => r.json()).then(setData).catch(e => setErr(e.message))
+    fetch(`${API}/api/status`).then(r => r.json()).then(setData).catch(() => {})
     const t = setInterval(() => fetch(`${API}/api/status`).then(r => r.json()).then(setData).catch(() => {}), 5000)
     return () => clearInterval(t)
   }, [])
-  if (err) return <Alert type="error" message={`无法连接 FastAPI (${API})`} description={err} />
   if (!data) return <Spin style={{ display: 'block', marginTop: 80 }} />
 
-  const s = data.state || {}
-  const h = data.health || {}
-  const c = data.cursor || {}
-  const l = data.latest || {}
-  const r = data.report || {}
-  const be = data.backend || {}
+  const s = data.state || {}; const h = data.health || {}; const c = data.cursor || {}
+  const r = data.report || {}; const be = data.backend || {}
   const bg = s.level === 'green' ? '#0f3d2e' : s.level === 'red' ? '#4a1620' : '#44380c'
   const fg = s.level === 'green' ? '#7df0bd' : s.level === 'red' ? '#ff8ba0' : '#ffdc7a'
 
   const cols = [
-    { title: '版本', dataIndex: 'version', key: 'v' },
-    { title: '名称', dataIndex: 'name', key: 'n' },
-    { title: '状态', dataIndex: 'status', key: 's',
+    { title: '版本', dataIndex: 'version', key: 'v', width: 80 },
+    { title: '名称', dataIndex: 'name', key: 'n', width: 160 },
+    { title: '状态', dataIndex: 'status', key: 's', width: 80,
       render: v => <Tag color={v === 'completed' ? 'green' : v === 'current' ? 'blue' : v === 'failed' ? 'red' : 'default'}>{v}</Tag> },
-    { title: '自动', dataIndex: 'auto_allowed', key: 'a', render: v => v ? '✅' : '❌' },
-    { title: '人工', dataIndex: 'manual_required', key: 'm', render: v => v ? '⚠️' : '—' },
+    { title: '目标', dataIndex: 'objective', key: 'o', ellipsis: true },
   ]
 
   return <div>
@@ -49,31 +37,40 @@ export default function Dashboard() {
       </span>
       <span style={{ color: '#9aa7c7', fontSize: 12 }}>{h.checked_at || ''}</span>
     </div>
-
     <Row gutter={16}>
       <Col span={8}><Card style={darkCard}><h3 style={{ color: '#cdd6f8', fontSize: 14, margin: '0 0 12px' }}>🚀 版本推进</h3>
-        <Metric label="当前版本" value={c.current_version} />
-        <Metric label="已完成" value={r.total_completed} />
-        <Metric label="失败的版本" value={r.total_failed} color={r.total_failed > 0 ? '#ff8ba0' : undefined} />
-        <Metric label="自动允许至" value={c.auto_allowed_until} />
+        <Row><Col span={12}><Statistic title="当前版本" value={c.current_version || '-'} valueStyle={{ color: '#7df0bd', fontSize: 20 }} /></Col>
+        <Col span={12}><Statistic title="已完成" value={r.total_completed || 0} valueStyle={{ color: '#7df0bd', fontSize: 20 }} /></Col></Row>
+        <Row><Col span={12}><Statistic title="失败" value={r.total_failed || 0} valueStyle={{ color: r.total_failed > 0 ? '#ff8ba0' : '#e8ecf8', fontSize: 20 }} /></Col>
+        <Col span={12}><Statistic title="允许至" value={c.auto_allowed_until || '-'} valueStyle={{ color: '#9aa7c7', fontSize: 16 }} /></Col></Row>
       </Card></Col>
       <Col span={8}><Card style={darkCard}><h3 style={{ color: '#cdd6f8', fontSize: 14, margin: '0 0 12px' }}>🔒 系统状态</h3>
-        <Metric label="Lock" value={h.lock_status} color={h.lock_status === 'free' ? '#7df0bd' : '#ff8ba0'} />
-        <Metric label="Cron" value={h.cron_service_running ? '✅ running' : '❌ stopped'} />
-        <Metric label="Tick 计数" value={h.tick_count} />
-        <Metric label="Latest.json" value={l.current || '-'} />
+        <Row><Col span={12}><Statistic title="Lock" value={h.lock_status || '?'} valueStyle={{ color: h.lock_status === 'free' ? '#7df0bd' : '#ff8ba0', fontSize: 16 }} /></Col>
+        <Col span={12}><Statistic title="Cron" value={h.cron_service_running ? '运行中' : '已停止'} valueStyle={{ color: h.cron_service_running ? '#7df0bd' : '#ff8ba0', fontSize: 16 }} /></Col></Row>
+        <Row><Col span={12}><Statistic title="Tick" value={h.tick_count || 0} valueStyle={{ color: '#e8ecf8', fontSize: 16 }} /></Col>
+        <Col span={12}><Statistic title="Latest" value={c.current_version || '-'} valueStyle={{ color: '#e8ecf8', fontSize: 16 }} /></Col></Row>
       </Card></Col>
       <Col span={8}><Card style={darkCard}><h3 style={{ color: '#cdd6f8', fontSize: 14, margin: '0 0 12px' }}>⚡ Backend</h3>
-        <Metric label="后端" value={be.claude_bin_path || 'dry-run'} />
-        <Metric label="Coding Backend" value={be.coding_backend_configured ? '✅ 已配置' : '❌ 未配置'} />
-        <Metric label="Cron Safe" value={be.cron_safe ? '✅' : '❌'} />
+        <Row><Col span={24}><Statistic title="Coding Backend" value={be.coding_backend_configured ? '已配置' : '未配置'} valueStyle={{ color: be.coding_backend_configured ? '#7df0bd' : '#ff8ba0', fontSize: 16 }} /></Col></Row>
+        <Row><Col span={24} style={{ marginTop: 8 }}><Statistic title="Claude 路径" value={be.claude_bin_path || '未找到'} valueStyle={{ color: '#9aa7c7', fontSize: 12 }} /></Col></Row>
       </Card></Col>
     </Row>
-
-    <Card style={darkCard} title={<span style={{ color: '#cdd6f8' }}>📋 版本列表</span>}>
-      <Table dataSource={r.versions || []} columns={cols} rowKey="version" pagination={false}
-        size="small" style={{ background: 'transparent' }}
-        locale={{ emptyText: <span style={{ color: '#9aa7c7' }}>无数据</span> }} />
+    <Card style={darkCard} title={<span style={{ color: '#cdd6f8' }}>📋 版本列表 <span style={{ fontSize: 12, color: '#9aa7c7' }}>(点击版本查看详情)</span></span>}>
+      <Table dataSource={r.versions || []} columns={cols} rowKey="version" size="small" pagination={{ pageSize: 10 }}
+        onRow={v => ({ onClick: () => setDetail(v), style: { cursor: 'pointer' } })} />
     </Card>
+    <Modal open={!!detail} onCancel={() => setDetail(null)} footer={null} width={640}
+      title={<span style={{ color: '#cdd6f8' }}>{detail?.version} — {detail?.name}</span>}>
+      {detail && <Descriptions column={1} size="small" bordered
+        styles={{ label: { background: '#121a35', color: '#9aa7c7' }, content: { background: '#0b1020', color: '#e8ecf8' } }}>
+        <Descriptions.Item label="版本">{detail.version}</Descriptions.Item>
+        <Descriptions.Item label="名称">{detail.name}</Descriptions.Item>
+        <Descriptions.Item label="目标">{detail.objective}</Descriptions.Item>
+        <Descriptions.Item label="状态"><Tag color={detail.status === 'completed' ? 'green' : detail.status === 'current' ? 'blue' : 'default'}>{detail.status}</Tag></Descriptions.Item>
+        <Descriptions.Item label="自动允许">{detail.auto_allowed ? '✅' : '❌'}</Descriptions.Item>
+        <Descriptions.Item label="手动门禁">{detail.manual_required ? '⚠️ 需要' : '—'}</Descriptions.Item>
+        <Descriptions.Item label="交易模式">{detail.trading_mode || 'research'}</Descriptions.Item>
+      </Descriptions>}
+    </Modal>
   </div>
 }
