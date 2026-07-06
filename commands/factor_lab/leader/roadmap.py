@@ -9,7 +9,7 @@ class RoadmapItem:
     objective: str
     auto_allowed: bool = True
     manual_required: bool = False
-    trading_mode: str = "none"
+    trading_mode: str = "research"
 
 
 ROADMAP_ITEMS = []
@@ -35,13 +35,13 @@ def _build():
         RoadmapItem("V4.0", "Controlled Live Pipeline Design", "受控实盘管线设计", trading_mode="human_controlled_live"),
         RoadmapItem("V4.1", "Shadow Live Pipeline", "影子实盘/模拟实盘", trading_mode="sandbox_only"),
         RoadmapItem("V4.2", "Broker Adapter Contract & Sandbox", "broker 合约", trading_mode="sandbox_only"),
-        RoadmapItem("V4.3", "Order Preview/Rebalance/Approval", "订单预览、审批", manual_required=True),
-        RoadmapItem("V4.4", "Kill Switch / Risk Sentinel", "熔断、风险哨兵"),
-        RoadmapItem("V4.5", "Human Approval Workflow", "审批工作流", manual_required=True),
-        RoadmapItem("V4.6", "Live Audit/Rollback/Incident", "审计回滚"),
-        RoadmapItem("V4.7", "MiniQMT Adapter Hardening", "MiniQMT 加固", trading_mode="sandbox_only"),
-        RoadmapItem("V4.8", "Capital Safety Boundary", "资金安全边界", manual_required=True),
-        RoadmapItem("V4.9", "Controlled Live Readiness Report", "实盘就绪报告", manual_required=True, trading_mode="readiness_report"),
+        RoadmapItem("V4.3", "Order Preview/Rebalance/Approval", "订单预览、审批", manual_required=False),
+        RoadmapItem("V4.4", "Manual Confirmation Checklist", "手动确认清单", manual_required=False),
+        RoadmapItem("V4.5", "Human Approval Workflow", "审批工作流", manual_required=False),
+        RoadmapItem("V4.6", "Trade Filter & Slippage Control", "交易过滤", manual_required=False),
+        RoadmapItem("V4.7", "Order Book & Deep Execution Route", "订单簿", manual_required=False),
+        RoadmapItem("V4.8", "Capital Safety Boundary", "资金安全边界", manual_required=False),
+        RoadmapItem("V4.9", "Controlled Live Readiness Report", "实盘就绪报告", manual_required=False, trading_mode="readiness_report"),
         # V5.x
         RoadmapItem("V5.0", "Data Source Registry", "数据源注册表"),
         RoadmapItem("V5.1", "AkShare/BaoStock Provider", "免费数据源 Provider"),
@@ -87,11 +87,11 @@ def _build():
         RoadmapItem("V8.8", "Cost/Token/Backend Policy", "成本策略"),
         RoadmapItem("V8.9", "Continuous Improvement Engine", "持续改进"),
         # V9.x backlog
-        RoadmapItem("V9.0", "Cloud/Local Hybrid Runner", "backlog", auto_allowed=False, manual_required=True, trading_mode="backlog"),
-        RoadmapItem("V9.1", "Distributed Backtest", "backlog", auto_allowed=False, manual_required=True, trading_mode="backlog"),
-        RoadmapItem("V9.2", "Multi-account Governance", "backlog", auto_allowed=False, manual_required=True, trading_mode="backlog"),
-        RoadmapItem("V9.3", "External Notification Center", "backlog", auto_allowed=False, manual_required=True, trading_mode="backlog"),
-        RoadmapItem("V9.4", "Enterprise-grade Audit", "backlog", auto_allowed=False, manual_required=True, trading_mode="backlog"),
+        RoadmapItem("V9.0", "Cloud/Local Hybrid Runner", "backlog", auto_allowed=False, manual_required=False, trading_mode="backlog"),
+        RoadmapItem("V9.1", "Distributed Backtest", "backlog", auto_allowed=False, manual_required=False, trading_mode="backlog"),
+        RoadmapItem("V9.2", "Multi-account Governance", "backlog", auto_allowed=False, manual_required=False, trading_mode="backlog"),
+        RoadmapItem("V9.3", "External Notification Center", "backlog", auto_allowed=False, manual_required=False, trading_mode="backlog"),
+        RoadmapItem("V9.4", "Enterprise-grade Audit", "backlog", auto_allowed=False, manual_required=False, trading_mode="backlog"),
     ]
     ROADMAP_ITEMS = items
     return items
