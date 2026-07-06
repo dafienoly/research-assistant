@@ -9,7 +9,14 @@ from factor_lab.agent_console.adapters import get_adapters
 from factor_lab.agent_console.schemas import AgentEvent
 from factor_lab.agent_console.server import CONSOLE_HTML
 from factor_lab.agent_console.sessions import append_event
-from factor_lab.leader.dashboard import DASHBOARD_HTML, _DashboardHandler, _current_answer_snapshot, _derive_state, collect_status
+from factor_lab.leader.dashboard import (
+    DASHBOARD_HTML,
+    _DashboardHandler,
+    _annotate_completion,
+    _current_answer_snapshot,
+    _derive_state,
+    collect_status,
+)
 
 
 def _serve_dashboard():
@@ -104,16 +111,46 @@ def test_agent_console_post_endpoints_are_implemented():
 
 
 def test_dashboard_ignores_stale_completion_status():
+    latest = {"current": "V3.0.1", "status": "pending"}
+    cursor = {"current_version": "V3.0.1"}
+    completion = _annotate_completion({"version": "live_execution", "status": "blocked"}, latest, cursor)
     state = _derive_state(
         health_info={"cron_service_running": True, "crontab_registered": True, "tick_age_seconds": 1, "lock_status": "free"},
-        latest={"current": "V3.0.1", "status": "pending"},
-        completion={"version": "live_execution", "status": "blocked"},
-        cursor={"current_version": "V3.0.1"},
+        latest=latest,
+        completion=completion,
+        cursor=cursor,
         log_lines=[],
         git={"dirty": False},
     )
     assert state["level"] == "green"
+    assert completion["effective_status"] == "stale"
     assert any("忽略旧 completion" in reason for reason in state["reasons"])
+
+
+def test_dashboard_does_not_block_on_polluted_stale_latest():
+    state = _derive_state(
+        health_info={"cron_service_running": True, "crontab_registered": True, "tick_age_seconds": 1, "lock_status": "free"},
+        latest={"current": "V2.15", "status": "pending", "path": ""},
+        completion={},
+        cursor={"current_version": "V3.0.1"},
+        log_lines=[],
+        git={"dirty": False},
+    )
+    assert state["level"] == "yellow"
+    assert any("忽略旧 latest.current" in reason for reason in state["reasons"])
+
+
+def test_dashboard_does_not_block_on_older_latest_than_cursor():
+    state = _derive_state(
+        health_info={"cron_service_running": True, "crontab_registered": True, "tick_age_seconds": 1, "lock_status": "free"},
+        latest={"current": "V3.0.1", "status": "pending", "path": ""},
+        completion={},
+        cursor={"current_version": "V3.2", "completed_versions": ["V3.0", "V3.1"]},
+        log_lines=[],
+        git={"dirty": False},
+    )
+    assert state["level"] == "yellow"
+    assert any("忽略旧 latest.current" in reason for reason in state["reasons"])
 
 
 def test_agent_console_adapter_metadata_declares_buffered_claude():

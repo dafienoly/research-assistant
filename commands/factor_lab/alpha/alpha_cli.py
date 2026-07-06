@@ -32,6 +32,73 @@ def main():
     sp.add_argument("--dry-run", action="store_true")
     sp.add_argument("--category")
 
+    # V3.7 LLM Alpha Discovery subcommands
+    sp = sub.add_parser("llm-discover")
+    sp.add_argument("--context", default="")
+    sp.add_argument("--num", type=int, default=3)
+
+    sp = sub.add_parser("llm-candidates")
+    sp.add_argument("--status", default="")
+
+    sp = sub.add_parser("llm-approve")
+    sp.add_argument("--candidate-id", required=True)
+
+    sp = sub.add_parser("llm-reject")
+    sp.add_argument("--candidate-id", required=True)
+    sp.add_argument("--reason", default="")
+
+    sub.add_parser("llm-rejected-report")
+
+    sp = sub.add_parser("llm-validate")
+    sp.add_argument("--spec", required=True)
+
+    # V3.8 Alpha Governance subcommands
+    sp = sub.add_parser("review")
+    sp.add_argument("--candidate-id", required=True, help="候选 ID")
+    sp.add_argument("--verdict", default="", choices=["approve", "reject", ""],
+                    help="强制审核结论 (默认自动判断)")
+
+    sub.add_parser("governance-report")
+    sp.add_argument("--candidate-id", default="", help="候选 ID (空=全部)")
+
+    sub.add_parser("governance-list")
+
+    # V3.9 Alpha Promotion/Retirement Engine subcommands
+    sp = sub.add_parser("promote")
+    sp.add_argument("--candidate-id", required=True, help="候选 ID")
+    sp.add_argument("--override", action="store_true", help="跳过治理审核检查")
+
+    sp = sub.add_parser("batch-promote")
+    sp.add_argument("--max-count", type=int, default=0, help="最大晋级数 (0=不限)")
+
+    sp = sub.add_parser("promotion-queue-add")
+    sp.add_argument("--candidate-id", required=True, help="候选 ID")
+    sp.add_argument("--priority", type=float, default=0.5, help="优先级 (0-1)")
+    sp.add_argument("--notes", default="", help="备注")
+
+    sp = sub.add_parser("promotion-queue-list")
+    sp.add_argument("--status", default="", help="筛选状态")
+
+    sub.add_parser("promotion-queue-stats")
+    sub.add_parser("promotion-report")
+    sub.add_parser("promotion-list")
+
+    sp = sub.add_parser("retire")
+    sp.add_argument("--alpha-id", required=True, help="Alpha ID")
+    sp.add_argument("--reason", default="", help="退役原因")
+    sp.add_argument("--force", action="store_true", help="强制执行")
+
+    sp = sub.add_parser("auto-retire")
+    sp.add_argument("--dry-run", action="store_true", help="仅报告不执行")
+
+    sub.add_parser("retirement-report")
+    sub.add_parser("retirement-list")
+    sub.add_parser("retirement-policy")
+
+    sp = sub.add_parser("retirement-policy-update")
+    sp.add_argument("--key", required=True, help="策略键名")
+    sp.add_argument("--value", required=True, help="新值 (JSON)")
+
     args = parser.parse_args()
 
     if args.command == "register":
@@ -48,6 +115,52 @@ def main():
         _cmd_init_samples()
     elif args.command == "migrate-existing-factors":
         _cmd_migrate_existing_factors(dry_run=args.dry_run, category=args.category)
+    elif args.command == "llm-discover":
+        _cmd_llm_discover(args.context, args.num)
+    elif args.command == "llm-candidates":
+        _cmd_llm_candidates(args.status)
+    elif args.command == "llm-approve":
+        _cmd_llm_approve(args.candidate_id)
+    elif args.command == "llm-reject":
+        _cmd_llm_reject(args.candidate_id, args.reason)
+    elif args.command == "llm-rejected-report":
+        _cmd_llm_rejected_report()
+    elif args.command == "llm-validate":
+        _cmd_llm_validate(args.spec)
+    elif args.command == "review":
+        _cmd_governance_review(args.candidate_id, args.verdict)
+    elif args.command == "governance-report":
+        _cmd_governance_report(args.candidate_id)
+    elif args.command == "governance-list":
+        _cmd_governance_list()
+    # V3.9
+    elif args.command == "promote":
+        _cmd_promotion_promote(args.candidate_id, args.override)
+    elif args.command == "batch-promote":
+        _cmd_batch_promote(args.max_count)
+    elif args.command == "promotion-queue-add":
+        _cmd_promotion_queue_add(args.candidate_id, args.priority, args.notes)
+    elif args.command == "promotion-queue-list":
+        _cmd_promotion_queue_list(args.status)
+    elif args.command == "promotion-queue-stats":
+        _cmd_promotion_queue_stats()
+    elif args.command == "promotion-report":
+        _cmd_promotion_report()
+    elif args.command == "promotion-list":
+        _cmd_promotion_list()
+    elif args.command == "retire":
+        _cmd_retirement_retire(args.alpha_id, args.reason, args.force)
+    elif args.command == "auto-retire":
+        _cmd_auto_retire(args.dry_run)
+    elif args.command == "retirement-report":
+        _cmd_retirement_report()
+    elif args.command == "retirement-list":
+        _cmd_retirement_list()
+    elif args.command == "retirement-policy":
+        _cmd_retirement_policy_show()
+    elif args.command == "retirement-policy-update":
+        import json as _json
+        _cmd_retirement_policy_update(args.key, _json.loads(args.value))
     else:
         parser.print_help()
 
@@ -198,6 +311,132 @@ th {{ color:#888; }}
     print(f"  All enabled=false | No broker/miniqmt | No config modified")
     print(f"  📁 {out}")
     print(f"{'='*60}\n")
+
+
+# ─── V3.7 LLM Alpha Discovery ────────────────────────────
+
+
+def _cmd_llm_discover(context: str = "", num: int = 3):
+    from factor_lab.alpha.llm_alpha_discovery import cmd_discover
+    result = cmd_discover(context, num)
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+def _cmd_llm_candidates(status: str = ""):
+    from factor_lab.alpha.llm_alpha_discovery import cmd_list_candidates
+    cmd_list_candidates(status)
+
+
+def _cmd_llm_approve(candidate_id: str):
+    from factor_lab.alpha.llm_alpha_discovery import cmd_approve
+    cmd_approve(candidate_id)
+
+
+def _cmd_llm_reject(candidate_id: str, reason: str = ""):
+    from factor_lab.alpha.llm_alpha_discovery import cmd_reject
+    cmd_reject(candidate_id, reason)
+
+
+def _cmd_llm_rejected_report():
+    from factor_lab.alpha.llm_alpha_discovery import cmd_rejected_report
+    cmd_rejected_report()
+
+
+# ─── V3.8 Alpha Governance ────────────────────────────────
+
+
+def _cmd_governance_review(candidate_id: str, verdict: str = ""):
+    from factor_lab.alpha.governance import cmd_review
+    cmd_review(candidate_id)
+
+
+def _cmd_governance_report(candidate_id: str = ""):
+    from factor_lab.alpha.governance import cmd_governance_report
+    cmd_governance_report(candidate_id)
+
+
+def _cmd_governance_list():
+    from factor_lab.alpha.governance import cmd_governance_list
+    cmd_governance_list()
+
+
+def _cmd_llm_validate(spec_path: str):
+    import json
+    from factor_lab.alpha.llm_alpha_discovery import AlphaSpecValidator
+    with open(spec_path) as f:
+        spec = json.load(f)
+    validator = AlphaSpecValidator()
+    ok = validator.validate(spec)
+    report = validator.get_report()
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+
+
+# ─── V3.9 Alpha Promotion/Retirement Engine ──────────────────
+
+
+def _cmd_promotion_promote(candidate_id: str, override: bool = False):
+    from factor_lab.alpha.promotion_engine import cmd_promote
+    cmd_promote(candidate_id, override=override)
+
+
+def _cmd_batch_promote(max_count: int = 0):
+    from factor_lab.alpha.promotion_engine import cmd_batch_promote
+    cmd_batch_promote(max_count=max_count)
+
+
+def _cmd_promotion_queue_add(candidate_id: str, priority: float = 0.5, notes: str = ""):
+    from factor_lab.alpha.promotion_engine import cmd_promotion_queue_add
+    cmd_promotion_queue_add(candidate_id, priority=priority, notes=notes)
+
+
+def _cmd_promotion_queue_list(status: str = ""):
+    from factor_lab.alpha.promotion_engine import cmd_promotion_queue_list
+    cmd_promotion_queue_list(status=status)
+
+
+def _cmd_promotion_queue_stats():
+    from factor_lab.alpha.promotion_engine import cmd_promotion_queue_stats
+    cmd_promotion_queue_stats()
+
+
+def _cmd_promotion_report():
+    from factor_lab.alpha.promotion_engine import cmd_promotion_report
+    cmd_promotion_report()
+
+
+def _cmd_promotion_list():
+    from factor_lab.alpha.promotion_engine import cmd_promotion_list
+    cmd_promotion_list()
+
+
+def _cmd_retirement_retire(alpha_id: str, reason: str = "", force: bool = False):
+    from factor_lab.alpha.retirement_engine import cmd_retire
+    cmd_retire(alpha_id, reason=reason, force=force)
+
+
+def _cmd_auto_retire(dry_run: bool = False):
+    from factor_lab.alpha.retirement_engine import cmd_auto_retire
+    cmd_auto_retire(dry_run=dry_run)
+
+
+def _cmd_retirement_report():
+    from factor_lab.alpha.retirement_engine import cmd_retirement_report
+    cmd_retirement_report()
+
+
+def _cmd_retirement_list():
+    from factor_lab.alpha.retirement_engine import cmd_retirement_list
+    cmd_retirement_list()
+
+
+def _cmd_retirement_policy_show():
+    from factor_lab.alpha.retirement_engine import cmd_retirement_policy_show
+    cmd_retirement_policy_show()
+
+
+def _cmd_retirement_policy_update(key: str, value):
+    from factor_lab.alpha.retirement_engine import cmd_retirement_policy_update
+    cmd_retirement_policy_update(key, value)
 
 
 if __name__ == "__main__":

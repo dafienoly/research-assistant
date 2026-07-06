@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom'
-import { Layout, Menu, Typography, Spin } from 'antd'
+import { Layout, Menu, Typography } from 'antd'
 import {
   DashboardOutlined, RobotOutlined, ForkOutlined, FileTextOutlined, HistoryOutlined
 } from '@ant-design/icons'
@@ -26,19 +26,19 @@ const MENU = [
 export default function App() {
   const [collapsed, setCollapsed] = useState(false)
   return (
-    <Layout style={{ minHeight: '100vh', background: '#0b1020' }}>
+    <Layout style={{ minHeight: '100vh', background: '#F8FAFC' }}>
       <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed}
         theme="dark" width={200}
-        style={{ background: '#111832', borderRight: '1px solid #26304f' }}>
-        <div style={{ height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #26304f' }}>
-          <Typography.Title level={5} style={{ margin: 0, color: '#cdd6f8', fontSize: 14 }}>
-            {collapsed ? '⚡' : '⚡ Hermes Auto Dashboard'}
+        style={{ background: '#0F172A', borderRight: '1px solid #E2E8F0' }}>
+        <div style={{ height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #1E293B' }}>
+          <Typography.Title level={5} style={{ margin: 0, color: '#FFFFFF', fontSize: 14 }}>
+            {collapsed ? '⚡' : '⚡ Hermes Dashboard'}
           </Typography.Title>
         </div>
         <Menu mode="inline" theme="dark" defaultSelectedKeys={['/']}
           items={MENU} style={{ background: 'transparent', borderInlineEnd: 'none' }} />
       </Sider>
-      <Layout style={{ background: '#0b1020' }}>
+      <Layout style={{ background: '#F8FAFC' }}>
         <Content style={{ padding: 24, overflow: 'auto' }}>
           <Routes>
             <Route path="/" element={<Dashboard />} />

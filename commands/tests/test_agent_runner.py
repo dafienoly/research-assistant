@@ -1,32 +1,32 @@
-"""测试: V2.15.2 Agent Runner"""
-import sys, os, json
+"""测试: V2.15.2 Agent Runner，不污染真实运行状态。"""
+import json
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from pathlib import Path
+
 import pytest
-from factor_lab.leader.agent_runner import AgentRunner, DEFAULT_BACKEND, BACKEND_PRIORITY, loop_once
-from factor_lab.leader.workloop import write_completion, release_lock, LATEST_COMPLETION, TASKS_DIR, LOCK_FILE
+
+from factor_lab.leader import agent_runner, workloop
+from factor_lab.leader.agent_runner import AgentRunner, BACKEND_PRIORITY, DEFAULT_BACKEND, loop_once
 
 
-@pytest.fixture(autouse=True)
-def _preserve_runtime_state():
-    paths = [TASKS_DIR / "latest.json", LATEST_COMPLETION, LOCK_FILE]
-    snapshots = {path: path.read_bytes() if path.exists() else None for path in paths}
-    yield
-    for path, data in snapshots.items():
-        if data is None:
-            path.unlink(missing_ok=True)
-        else:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(data)
+@pytest.fixture()
+def isolated_runner(tmp_path, monkeypatch):
+    monkeypatch.setattr(workloop, "TASKS_DIR", tmp_path)
+    monkeypatch.setattr(workloop, "LOCK_FILE", tmp_path / "current_run.lock")
+    monkeypatch.setattr(workloop, "LATEST_COMPLETION", tmp_path / "latest_completion.json")
+    monkeypatch.setattr(workloop, "_cursor_current_version", lambda: "V3.0.1")
+    monkeypatch.setattr(agent_runner, "TASKS_DIR", tmp_path)
+    return tmp_path
 
 
-def _setup_task():
-    """创建测试用的任务包"""
-    release_lock("completed")
-    from factor_lab.leader.workloop import dispatch_from_completion
-    write_completion("partial", "V2.15.2", "test", remaining_tasks=["dry_run_test"])
-    dispatch_from_completion()
-    latest = TASKS_DIR / "latest.json"
+def _setup_task(tmp_path):
+    """创建测试用的任务包。"""
+    workloop.release_lock("completed")
+    workloop.write_completion("partial", "V3.0.1", "test", remaining_tasks=["dry_run_test"])
+    workloop.dispatch_from_completion()
+    latest = tmp_path / "latest.json"
     return json.loads(latest.read_text()) if latest.exists() else {}
 
 
@@ -39,64 +39,69 @@ def test_backend_priority():
     assert BACKEND_PRIORITY.index("claude") < BACKEND_PRIORITY.index("codex")
 
 
-def test_dry_run_backend():
-    release_lock("completed")
+def test_dry_run_backend(isolated_runner):
+    _setup_task(isolated_runner)
     runner = AgentRunner(backend="dry-run")
     result = runner.run_once()
-    # dry-run 应执行成功 (不管是否有任务)
     assert result.get("status") in ("completed", "partial", "no_tasks", "blocked")
 
 
-def test_runner_reads_latest():
-    release_lock("completed")
+def test_runner_reads_latest(isolated_runner):
+    _setup_task(isolated_runner)
     runner = AgentRunner(backend="dry-run")
     result = runner.run_once()
     assert "status" in result
 
 
-def test_runner_writes_completed():
-    release_lock("completed")
+def test_runner_writes_completed(isolated_runner):
+    _setup_task(isolated_runner)
     runner = AgentRunner(backend="dry-run")
     result = runner.run_once()
     if result.get("status") == "completed":
-        comp = json.loads(LATEST_COMPLETION.read_text()) if LATEST_COMPLETION.exists() else {}
+        comp = json.loads(workloop.LATEST_COMPLETION.read_text()) if workloop.LATEST_COMPLETION.exists() else {}
         assert comp.get("status") == "completed"
 
 
-def test_runner_releases_lock():
-    release_lock("completed")
+def test_runner_releases_lock(isolated_runner):
+    _setup_task(isolated_runner)
     runner = AgentRunner(backend="dry-run")
     runner.run_once()
-    from factor_lab.leader.workloop import is_locked
-    assert not is_locked()
+    assert not workloop.is_locked()
 
 
-def test_runner_blocks_unsafe_stage():
-    """不安全阶段应 blocked"""
-    release_lock("completed")
-    write_completion("pending", "live_execution", "unsafe",
-                     remaining_tasks=["dangerous_task"])
-    from factor_lab.leader.workloop import dispatch_from_completion
-    dispatch_from_completion()
+def test_runner_blocks_unsafe_stage(isolated_runner):
+    """不安全阶段应 blocked。"""
+    workloop.release_lock("completed")
+    run_dir = isolated_runner / "unsafe_run"
+    tasks_dir = run_dir / "tasks"
+    tasks_dir.mkdir(parents=True)
+    (tasks_dir / "T001.md").write_text("dangerous task")
+    (run_dir / "tasks.json").write_text(json.dumps(["T001"]))
+    (isolated_runner / "latest.json").write_text(json.dumps({
+        "run_id": "unsafe_run",
+        "path": str(run_dir),
+        "status": "pending",
+        "current": "live_execution",
+        "next": "unsafe",
+        "task_count": 1,
+    }))
     runner = AgentRunner(backend="dry-run")
     result = runner.run_once()
-    assert result.get("status") in ("blocked", "completed", "partial")
+    assert result.get("status") == "blocked"
 
 
-def test_loop_once_no_crash():
+def test_loop_once_no_crash(isolated_runner):
+    workloop.write_completion("partial", "V3.0.1", "test")
     loop_once()
 
 
 def test_runner_does_not_require_codex():
-    """不指定 --backend codex 时不得调用 codex"""
-    # 验证默认 backend 不是 codex
-    runner = AgentRunner()  # default
+    """不指定 --backend codex 时不得调用 codex。"""
+    runner = AgentRunner()
     assert runner.backend != "codex"
 
 
 def test_claude_backend_uses_stream_json_and_bypass(monkeypatch, tmp_path):
-    from factor_lab.leader import agent_runner
-
     captured = {}
     monkeypatch.setenv("HERMES_CLAUDE_BIN", "/opt/claude")
 

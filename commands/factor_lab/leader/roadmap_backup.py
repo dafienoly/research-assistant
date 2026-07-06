@@ -40,9 +40,13 @@ def list_backups():
             cursor_file = d / "roadmap_cursor.json"
             if cursor_file.exists():
                 c = json.loads(cursor_file.read_text())
-                backups.append({"id": d.name, "current_version": c.get("current_version", "?"),
+                # 去掉 roadmap_backup_ 前缀，与 recover 函数兼容
+                name = d.name
+                if name.startswith("roadmap_backup_"):
+                    name = name[len("roadmap_backup_"):]
+                backups.append({"id": name, "current_version": c.get("current_version", "?"),
                                 "completed": len(c.get("completed_versions", [])),
-                                "backup_at": d.name.replace("roadmap_backup_", "")})
+                                "backup_at": name})
     return backups
 
 
