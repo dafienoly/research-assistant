@@ -134,6 +134,22 @@ async def cleanup_sessions(days: int = 30):
     return {"cleaned": count, "retention_days": days}
 
 
+@router.get("/agent-console/backups")
+async def list_backups():
+    from factor_lab.agent_console.sessions import list_backups as _lb
+    return {"backups": _lb()}
+
+
+@router.post("/agent-console/backups/{backup_id}/restore")
+async def restore_backup(backup_id: str):
+    from factor_lab.agent_console.sessions import restore_backup as _rb
+    result = _rb(backup_id)
+    if "error" in result:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(result, status_code=404)
+    return result
+
+
 @router.get("/agent-console/sessions/{sid}/stream")
 async def stream_session(sid: str):
     async def event_gen():
