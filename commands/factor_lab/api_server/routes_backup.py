@@ -32,3 +32,15 @@ async def trigger_auto_run():
 @router.get("/versions/report")
 async def version_report():
     return generate_report()
+
+
+@router.get("/data/health")
+async def data_health():
+    from factor_lab.data_health import health_check
+    return health_check()
+
+
+@router.get("/data/sources")
+async def data_sources():
+    from factor_lab.data_source_registry import list_sources
+    return {"sources": list_sources()}
