@@ -13,21 +13,24 @@ export default function AgentConsole() {
   const [loading, setLoading] = useState(true)
   const answerRef = useRef(null)
 
-  const load = () => {
-    setLoading(true)
+  const load = (keepDetail = false) => {
+    if (!keepDetail) setLoading(true)
     fetch(`${API}/api/agent-console/sessions?limit=50`).then(r => r.json()).then(d => {
       setSessions(d.sessions || [])
-      setLoading(false)
-    }).catch(() => setLoading(false))
+      if (!keepDetail) setLoading(false)
+      // 刷新后重新获取选中 session 的详情
+      if (keepDetail && selected) {
+        fetch(`${API}/api/agent-console/sessions/${selected}`).then(r => r.json()).then(setDetail)
+      }
+    }).catch(() => {})
   }
 
-  useEffect(() => { load(); const t = setInterval(load, 5000); return () => clearInterval(t) }, [])
+  useEffect(() => { load(); const t = setInterval(() => load(true), 5000); return () => clearInterval(t) }, [])
 
   const showDetail = async (sid) => {
-    const r = await fetch(`${API}/api/agent-console/sessions/${sid}`)
-    const d = await r.json()
-    setDetail(d)
     setSelected(sid)
+    const r = await fetch(`${API}/api/agent-console/sessions/${sid}`)
+    setDetail(await r.json())
   }
 
   useEffect(() => { if (answerRef.current) answerRef.current.scrollTop = answerRef.current.scrollHeight }, [detail?.answer])

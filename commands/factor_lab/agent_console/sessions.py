@@ -51,11 +51,11 @@ def get_session(sid: str) -> dict:
     duration = _calc_duration(start, end)
     return {
         "session_id": sid, "events": events[-200:], "answer": answer,
-        "diagnostics": diagnostics[-50:], "duration": duration,
+        "diagnostics": diagnostics[-50:], "duration": duration or "—",
         "status": summary.get("status", "unknown"),
         "agent": req.get("agent", "?"), "prompt": req.get("prompt", "")[:200],
-        "version": req.get("version", ""),
-        "git_commit": _last_git_commit(), "created_at": req.get("created_at", ""),
+        "version": req.get("version", "") or "—",
+        "git_commit": _last_git_commit() or "—", "created_at": req.get("created_at", ""),
     }
 
 
@@ -137,7 +137,7 @@ def list_backups() -> list:
                 if sf.exists():
                     summary = json.loads(sf.read_text())
                 backups.append({
-                    "id": d.name, "version": req.get("version", ""),
+                    "id": d.name, "version": req.get("version", "") or "—",
                     "agent": req.get("agent", "?"), "prompt": req.get("prompt", "")[:100],
                     "status": summary.get("status", "unknown"),
                     "backed_up_at": datetime.fromtimestamp(d.stat().st_mtime, tz=CST).isoformat(),
