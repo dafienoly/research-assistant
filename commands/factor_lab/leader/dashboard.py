@@ -119,6 +119,10 @@ def _roadmap_progress(cursor: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+POLLUTED_LATEST_CURRENTS = {"V2.15", "live_execution", "unsafe"}
+POLLUTION_MARKERS = ("dry_run_completion", "some_task", "rebalance_diff", "V2.15", "live_execution", "unsafe")
+
+
 def _latest_task_snapshot(latest: dict[str, Any]) -> dict[str, Any]:
     run_path = latest.get("path")
     if not run_path:
@@ -132,10 +136,57 @@ def _latest_task_snapshot(latest: dict[str, Any]) -> dict[str, Any]:
             text = f.read_text(encoding="utf-8", errors="replace")[:4000]
         except Exception:
             text = ""
-        for marker in ("dry_run_completion", "some_task", "rebalance_diff", "V2.15", "live_execution", "unsafe"):
+        for marker in POLLUTION_MARKERS:
             if marker in text or marker in f.name:
                 bad.append({"file": f.name, "marker": marker})
     return {"task_files": names, "bad_markers": bad}
+
+
+def _latest_is_polluted(latest: dict[str, Any]) -> bool:
+    current = latest.get("current")
+    if current in POLLUTED_LATEST_CURRENTS:
+        return True
+    return bool(_latest_task_snapshot(latest).get("bad_markers"))
+
+
+def _roadmap_rank(version: str | None) -> int | None:
+    if not version:
+        return None
+    versions = [item.version for item in get_roadmap()]
+    try:
+        return versions.index(version)
+    except ValueError:
+        return None
+
+
+def _latest_is_stale_for_cursor(latest: dict[str, Any], cursor: dict[str, Any]) -> bool:
+    if _latest_is_polluted(latest):
+        return True
+    latest_current = latest.get("current")
+    cursor_current = cursor.get("current_version")
+    if latest_current in set(cursor.get("completed_versions", []) or []):
+        return True
+    latest_rank = _roadmap_rank(latest_current)
+    cursor_rank = _roadmap_rank(cursor_current)
+    return latest_rank is not None and cursor_rank is not None and latest_rank < cursor_rank
+
+
+def _completion_matches_current(completion: dict[str, Any], latest: dict[str, Any], cursor: dict[str, Any]) -> bool:
+    comp_version = completion.get("version")
+    latest_current = latest.get("current")
+    cursor_current = cursor.get("current_version")
+    return not comp_version or comp_version in {latest_current, cursor_current}
+
+
+def _annotate_completion(completion: dict[str, Any], latest: dict[str, Any], cursor: dict[str, Any]) -> dict[str, Any]:
+    if not completion:
+        return {}
+    annotated = dict(completion)
+    matches_current = _completion_matches_current(completion, latest, cursor)
+    annotated["stale"] = not matches_current
+    annotated["effective_status"] = completion.get("status", "none") if matches_current else "stale"
+    annotated["effective_version"] = completion.get("version") if matches_current else (cursor.get("current_version") or latest.get("current"))
+    return annotated
 
 
 def _related_run_ids(run_id: str | None) -> list[str]:
@@ -346,22 +397,25 @@ def _derive_state(health_info: dict[str, Any], latest: dict[str, Any], completio
 
     latest_current = latest.get("current")
     cursor_current = cursor.get("current_version")
+    latest_stale = _latest_is_stale_for_cursor(latest, cursor)
     if latest_current and cursor_current and latest_current != cursor_current:
-        bump("red", f"latest.current({latest_current}) != cursor.current_version({cursor_current})")
+        if latest_stale:
+            bump("yellow", f"忽略旧 latest.current({latest_current})，当前游标为 {cursor_current}")
+        else:
+            bump("red", f"latest.current({latest_current}) != cursor.current_version({cursor_current})")
 
-    comp_status = completion.get("status")
+    comp_status = completion.get("effective_status", completion.get("status"))
     comp_version = completion.get("version")
-    completion_matches_current = not comp_version or comp_version in {latest_current, cursor_current}
-    if completion_matches_current:
+    if not completion.get("stale", False):
         if comp_status in {"blocked", "failed"}:
-            bump("red", f"latest_completion.status={comp_status}")
+            bump("red", f"latest_completion.effective_status={comp_status}")
         elif comp_status in {"partial", "running"}:
-            bump("yellow", f"latest_completion.status={comp_status}")
-    elif comp_status:
-        reasons.append(f"忽略旧 completion: {comp_version} status={comp_status}")
+            bump("yellow", f"latest_completion.effective_status={comp_status}")
+    elif comp_version:
+        reasons.append(f"忽略旧 completion: {comp_version} status={completion.get('status')}")
 
-    if latest.get("current") in {"V2.15", "live_execution", "unsafe"}:
-        bump("red", f"latest.current={latest.get('current')} 属于旧污染或危险任务")
+    if latest.get("current") in POLLUTED_LATEST_CURRENTS and not (latest_current and cursor_current and latest_current != cursor_current):
+        bump("yellow", f"latest.current={latest.get('current')} 属于旧污染或危险任务，等待自动对齐")
 
     recent_errors = [line for line in log_lines[-80:] if any(p in line for p in ERROR_PATTERNS)]
     if recent_errors:
@@ -387,7 +441,7 @@ def collect_status() -> dict[str, Any]:
     health_info = health()
     cursor = get_cursor()
     latest = _read_json(LATEST)
-    completion = _read_json(COMPLETION)
+    completion = _annotate_completion(_read_json(COMPLETION), latest, cursor)
     backend = policy_status()
     git = _git()
     log_lines = _tail(LOG_PATH, 120)
@@ -577,13 +631,15 @@ function renderStatus(s){
 
   renderMetrics('health', s?.health || {}, [
     ['cron_service_running','cron'], ['crontab_registered','crontab'],
-    ['tick_age_seconds','tick_age_seconds'], ['lock_status','lock_status']
+    ['tick_age_seconds','tick_age_seconds'], ['lock_status','lock_status'],
+    ['current_completion_status','current_completion_status']
   ]);
   renderMetrics('latest', s?.latest || {}, [
     ['run_id','run_id'], ['current','current'], ['next','next'], ['status','status'], ['path','path']
   ]);
   renderMetrics('completion', s?.latest_completion || {}, [
-    ['status','status'], ['version','version'], ['stage','stage'], ['report_dir','report_dir'], ['next_question','next_question']
+    ['effective_status','effective_status'], ['stale','stale'], ['status','raw_status'],
+    ['version','version'], ['stage','stage'], ['report_dir','report_dir'], ['next_question','next_question']
   ]);
   renderMetrics('backend', s?.backend || {}, [
     ['recommended_backend','recommended'], ['coding_backend_configured','configured'], ['claude_bin_path','claude_bin']

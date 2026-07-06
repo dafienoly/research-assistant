@@ -69,6 +69,22 @@ def read_completion() -> dict:
     return {}
 
 
+def _cursor_current_version() -> str:
+    try:
+        from factor_lab.leader.roadmap_cursor import get_cursor
+        return get_cursor().get("current_version", "")
+    except Exception:
+        return ""
+
+
+def _completion_is_stale(comp: dict) -> bool:
+    version = comp.get("version", "")
+    cursor_current = _cursor_current_version()
+    if not version or not cursor_current:
+        return False
+    return version != cursor_current
+
+
 # ─── Dispatch from completion ──────────────────────────────────
 
 def dispatch_from_completion():
@@ -76,13 +92,18 @@ def dispatch_from_completion():
     comp = read_completion()
     if not comp:
         print("  ⚠️ latest_completion.json 不存在")
-        return
+        return {"status": "skipped", "reason": "no_completion"}
 
     status = comp.get("status", "")
     version = comp.get("version", "")
     stage = comp.get("stage", "")
     next_q = comp.get("next_question", "")
     remaining = comp.get("remaining_tasks", [])
+
+    if _completion_is_stale(comp):
+        cursor_current = _cursor_current_version()
+        print(f"  ⚠️ stale completion ignored: {version} != cursor.current_version({cursor_current})")
+        return {"status": "skipped", "reason": "stale_completion", "version": version, "cursor_current": cursor_current}
 
     run_id = f"auto_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}"
     run_dir = TASKS_DIR / run_id
