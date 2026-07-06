@@ -34,7 +34,8 @@ export default function AgentConsole() {
 
   const cols = [
     { title: 'Session', dataIndex: 'id', key: 'id', width: 140, render: v => <code style={{ color: '#2563EB', fontSize: 11 }}>{v.slice(0,24)}</code> },
-    { title: 'Agent', dataIndex: 'agent', key: 'a', width: 80, render: v => <Tag color={v === 'claude_code' ? 'blue' : 'green'}>{v?.split('_')[0] || v}</Tag> },
+    { title: '版本', dataIndex: 'version', key: 'ver', width: 60 },
+    { title: 'Agent', dataIndex: 'agent', key: 'a', width: 100, render: v => <Tag color={v === 'claude_code' ? 'blue' : v === 'hermes_auto' ? 'purple' : 'green'}>{v?.split('_')[0] || v}</Tag> },
     { title: '状态', dataIndex: 'status', key: 's', width: 70, render: v => <Tag color={v === 'completed' ? 'success' : v === 'running' ? 'processing' : 'default'}>{v}</Tag> },
     { title: '时长', dataIndex: 'duration', key: 'd', width: 60 },
     { title: 'Prompt', dataIndex: 'prompt', key: 'p', ellipsis: true },
@@ -51,10 +52,11 @@ export default function AgentConsole() {
 
     {detail && <Card title={<span style={{ color: '#0F172A', fontWeight: 600 }}>Session: {detail.session_id?.slice(0,30)}</span>} style={cardStyle}>
       <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={6}><Statistic title="Agent" value={detail.agent} valueStyle={{ fontSize: 16 }} /></Col>
-        <Col span={6}><Statistic title="状态" value={detail.status} valueStyle={{ fontSize: 16 }} /></Col>
-        <Col span={6}><Statistic title="耗时" value={detail.duration || '-'} valueStyle={{ fontSize: 16 }} /></Col>
-        <Col span={6}><Statistic title="Git" value={detail.git_commit?.slice(0,7) || '-'} valueStyle={{ fontSize: 12 }} /></Col>
+        <Col span={4}><Statistic title="Agent" value={detail.agent} valueStyle={{ fontSize: 16 }} /></Col>
+        <Col span={5}><Statistic title="版本" value={detail.version || '-'} valueStyle={{ fontSize: 16 }} /></Col>
+        <Col span={5}><Statistic title="状态" value={detail.status} valueStyle={{ fontSize: 16 }} /></Col>
+        <Col span={5}><Statistic title="耗时" value={detail.duration || '-'} valueStyle={{ fontSize: 16 }} /></Col>
+        <Col span={5}><Statistic title="Git" value={detail.git_commit?.slice(0,7) || '-'} valueStyle={{ fontSize: 12 }} /></Col>
       </Row>
 
       <h4 style={{ color: '#0F172A', marginBottom: 8 }}>Prompt</h4>
