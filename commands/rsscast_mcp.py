@@ -1,9 +1,12 @@
-"""RSScast MCP 客户端 — 通过 MCP 协议调用 RSScast A 股数据服务
+"""RSScast MCP Client — A-share data via MCP protocol
 
-环境变量: RSSCAST_API_KEY (已在 WSL 环境中)
-文档: https://app-cn.rsscast.io
+Environment: RSSCAST_API_KEY
+Docs: https://app-cn.rsscast.io
+
+Proxy policy: ALL domestic financial data sources bypass Clash proxy
+(eastmoney, sina, tencent, joinquant, csindex, rsscast, etc.)
+Overseas APIs (Tavily, Firecrawl) keep using proxy.
 """
-
 import json
 import os
 import urllib.request
@@ -12,6 +15,48 @@ from typing import Any, Optional
 from datetime import datetime, timezone
 
 from config import now_str
+
+# 国内数据源域名字典（用于 NO_PROXY，保持与 dive_prediction/proxy_bypass.py 同步）
+# DataHub 管线所有 HTTP 请求自动绕过 Clash proxy 访问国内金融数据源
+_DOMESTIC_DOMAINS = [
+    # 东方财富
+    "eastmoney.com", "push2.eastmoney.com", "push2his.eastmoney.com",
+    "17.push2.eastmoney.com", "datacenter.eastmoney.com",
+    "datacenter-web.eastmoney.com", "quote.eastmoney.com",
+    "data.eastmoney.com", "www.eastmoney.com",
+    # 新浪
+    "sina.com.cn", "hq.sinajs.cn", "vip.stock.finance.sina.com.cn",
+    "finance.sina.com.cn",
+    # 腾讯
+    "gtimg.cn", "qt.gtimg.cn", "web.ifzq.gtimg.cn", "ifzq.gtimg.cn",
+    # 聚宽
+    "joinquant.com", "dataapi.joinquant.com", "www.joinquant.com",
+    # 中证指数
+    "csindex.com.cn", "www.csindex.com.cn",
+    # RSScast
+    "rsscast.io", "app-cn.rsscast.io",
+]
+
+# 模块加载时自动将国内数据源加入 NO_PROXY
+_NO_PROXY_ADDED = False
+def _ensure_no_proxy():
+    global _NO_PROXY_ADDED
+    if _NO_PROXY_ADDED:
+        return
+    existing = set()
+    for val in [os.environ.get("NO_PROXY", ""), os.environ.get("no_proxy", "")]:
+        for d in val.split(","):
+            d = d.strip()
+            if d:
+                existing.add(d)
+    for d in _DOMESTIC_DOMAINS:
+        existing.add(d)
+    merged = ",".join(sorted(existing))
+    os.environ["NO_PROXY"] = merged
+    os.environ["no_proxy"] = merged
+    _NO_PROXY_ADDED = True
+
+_ensure_no_proxy()
 
 
 # === MCP 客户端 ===

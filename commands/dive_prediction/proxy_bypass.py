@@ -16,6 +16,7 @@ import os, contextlib
 from urllib.parse import urlparse
 
 # 已知数据源域名 → 需要绕过 proxy 的
+# 国内数据源全部绕开 Clash proxy（境外 IP 被拒），境外 API 保持走 proxy
 BYPASS_DOMAINS = {
     "eastmoney": [
         "eastmoney.com",
@@ -25,12 +26,33 @@ BYPASS_DOMAINS = {
         "datacenter.eastmoney.com",
         "datacenter-web.eastmoney.com",
         "quote.eastmoney.com",
+        "data.eastmoney.com",
         "www.eastmoney.com",
     ],
     "sina": [
         "sina.com.cn",
         "hq.sinajs.cn",
         "vip.stock.finance.sina.com.cn",
+        "finance.sina.com.cn",
+    ],
+    "tencent": [
+        "gtimg.cn",
+        "qt.gtimg.cn",
+        "web.ifzq.gtimg.cn",
+        "ifzq.gtimg.cn",
+    ],
+    "cninfo": [
+        "cninfo.com.cn",
+        "www.cninfo.com.cn",
+    ],
+    "sse": [
+        "sse.com.cn",
+        "www.sse.com.cn",
+        "query.sse.com.cn",
+    ],
+    "szse": [
+        "szse.cn",
+        "www.szse.cn",
     ],
     "baostock": [
         "baostock.com",
@@ -40,9 +62,6 @@ BYPASS_DOMAINS = {
         "joinquant.com",
         "dataapi.joinquant.com",
         "www.joinquant.com",
-    ],
-    "akshare": [
-        "emweb.securities.eastmoney.com",
     ],
 }
 
