@@ -109,31 +109,20 @@ def auto_run_once():
     record_start(current)
     auto_backup()
 
-    # 创建 Agent Console session 记录本次 auto-run-once
-    try:
-        from factor_lab.agent_console.sessions import create_session as _cs
-        from factor_lab.agent_console.adapters import start_session as _start_agent
-        import threading as _t
-        _ver = current
-        _sid = _cs("hermes_auto", f"版本 {_ver}: {cv.name if cv else _ver}", version=_ver)
-        _t.Thread(target=_start_agent, args=(_sid, "hermes_demo", f"Auto execute {_ver}: {cv.name if cv else ''}"), daemon=True).start()
-    except Exception:
-        pass
-
-    # 1. Check backlog (before backend, before stale handling)
+    # 1. Check backlog / manual_required BEFORE creating session
     if cv is None:
         write_completion("blocked", current, "unknown", remaining_tasks=[current],
                           next_question=f"{current} not in roadmap")
         _ensure_latest_clean(current)
         version_blocked(current, "unknown", "不在路线图中")
-        return {"status": "blocked", "reason": "not_in_roadmap"}
+        return {"status": "blocked", "reason": "not_in_roadmap", "version": current}
 
     if cv.trading_mode == "backlog":
         write_completion("blocked", current, current, next_question=f"{current} is backlog",
                           remaining_tasks=[current])
         _ensure_latest_clean(current)
         version_blocked(current, cv.name or current, "backlog 版本不自动执行")
-        return {"status": "blocked", "reason": "backlog"}
+        return {"status": "blocked", "reason": "backlog", "version": current}
 
     if cv.manual_required:
         write_completion("blocked", current, current,
@@ -142,7 +131,7 @@ def auto_run_once():
         set_blocked(current, cv.objective)
         _ensure_latest_clean(current)
         version_blocked(current, cv.name, cv.objective)
-        return {"status": "blocked", "reason": "manual_required"}
+        return {"status": "blocked", "reason": "manual_required", "version": current}
 
     # 2. Check/align latest.json with cursor.current_version (BEFORE backend check)
     latest = _read_latest()
@@ -167,28 +156,62 @@ def auto_run_once():
         _write_latest(tid, run_dir, current, 1)
         pending_tasks = {"run_id": tid, "status": "pending"}
 
-    # 3. Check backend (after latest is aligned)
+    # 3. Check backend
     backend = select_backend("code_change")
     if backend is None:
-        # latest is already aligned, safe to block
         write_completion("blocked", current, cv.name,
                           next_question="coding_backend_not_configured",
                           remaining_tasks=[current])
         _ensure_latest_clean(current)
-        return {"status": "blocked", "reason": "coding_backend_not_configured"}
+        return {"status": "blocked", "reason": "coding_backend_not_configured", "version": current}
+
+    # 4. 创建 Agent Console session — 只有当真正要执行时才创建
+    #    检查此版本是否已有 session（防重复创建）
+    _created_session = False
+    try:
+        from factor_lab.agent_console.sessions import create_session as _cs
+        from factor_lab.agent_console.sessions import SESSIONS_DIR as _SDIR
+        # 检查是否已为此版本创建过 session
+        _existing = list(_SDIR.glob("*/request.json"))
+        _has_session = False
+        for _f in _existing:
+            try:
+                _r = json.loads(_f.read_text())
+                if _r.get("version") == current:
+                    _has_session = True
+                    break
+            except Exception:
+                continue
+        if not _has_session:
+            from factor_lab.agent_console.adapters import start_session as _start_agent
+            import threading as _t
+            # 根据后端选择相应的 adapter
+            _agent_adapter = "claude_code" if backend in ("claude", "command") else "hermes_demo"
+            _sid = _cs(_agent_adapter, f"版本 {current}: {cv.name}", version=current)
+            _t.Thread(target=_start_agent, args=(_sid, _agent_adapter,
+                       f"Auto execute {current}: {cv.name if cv else ''}"), daemon=True).start()
+            _created_session = True
+    except Exception:
+        pass
 
     # 5. Execute agent-runner
     agent_log_dir = TASKS_DIR / "agent_logs"
     agent_log_dir.mkdir(parents=True, exist_ok=True)
+    agent_ok = False
+    agent_error = ""
     try:
         result = subprocess.run(
             [VENV, CLI, "leader:agent-runner", "--once", "--backend", backend],
             capture_output=True, text=True, timeout=3600)
         agent_ok = result.returncode == 0 and "Status: completed" in result.stdout
+        if not agent_ok:
+            agent_error = f"rc={result.returncode}, stdout_snip={result.stdout[:300]}, stderr_snip={result.stderr[:300]}"
     except subprocess.TimeoutExpired:
         agent_ok = False
-    except Exception:
+        agent_error = "timeout=3600 expired"
+    except Exception as e:
         agent_ok = False
+        agent_error = f"{type(e).__name__}: {e}"
 
     # 6. Run tests
     test_ok = False
@@ -203,10 +226,10 @@ def auto_run_once():
     except Exception:
         test_ok = False
 
-    # 7. Acceptance: 必须 agent_ok AND test_ok 才能 advance
-    commit = ""
-    report_path = str(agent_log_dir)
+    # 7. Build human-readable summary
     if agent_ok and test_ok:
+        commit = ""
+        report_path = str(agent_log_dir)
         try:
             r = subprocess.run(["git", "rev-parse", "HEAD"],
                                 capture_output=True, text=True,
@@ -226,23 +249,51 @@ def auto_run_once():
         _status = "completed"
         version_completed(current, cv.name, f"{cv.objective} — 测试通过")
         record_end(current, "completed")
-        # 捕获版本完成详情
         try:
             from factor_lab.leader.version_detail import capture_completion
             capture_completion(current, cv.name)
         except Exception:
             pass
+        # 向 Agent Console session 写入 markdown 格式结果
+        if _created_session:
+            try:
+                from factor_lab.agent_console.sessions import append_event, update_status
+                from factor_lab.agent_console.schemas import AgentEvent
+                _md = f"## ✅ 版本 {current} 完成\n\n- **版本**: {current}\n- **名称**: {cv.name}\n- **状态**: 完成\n- **提交**: {commit}\n- **下一个**: {next_q}\n"
+                append_event(_sid, AgentEvent("answer_delta", _sid, data=_md, status="completed"))
+                append_event(_sid, AgentEvent("done", _sid, data="", status="completed"))
+                update_status(_sid, "completed")
+            except Exception:
+                pass
     else:
+        if _created_session:
+            try:
+                from factor_lab.agent_console.sessions import append_event, update_status
+                from factor_lab.agent_console.schemas import AgentEvent
+                _md = f"## ⏳ 版本 {current} 执行中…\n\n- **版本**: {current}\n- **名称**: {cv.name}\n- **状态**: partial (agent_ok={agent_ok}, test_ok={test_ok})\n- **后端**: {backend}\n- **说明**: Agent 执行完成但测试未通过，将在下一 tick 重试\n"
+                append_event(_sid, AgentEvent("answer_delta", _sid, data=_md, status="running"))
+                append_event(_sid, AgentEvent("done", _sid, data="", status="partial"))
+                update_status(_sid, "partial")
+            except Exception:
+                pass
         write_completion("partial", current, cv.name,
-                          report_dir=report_path,
+                          report_dir=str(agent_log_dir),
                           summary={"passed": 0, "failed": 1,
-                                   "note": f"agent_ok={agent_ok} test_ok={test_ok}"},
+                                   "note": f"agent_ok={agent_ok} test_ok={test_ok}",
+                                   "agent_error": agent_error},
                           remaining_tasks=[current],
                           next_question="fix before continuing")
         _status = "partial"
 
     _post_cleanup()
-    return {"status": _status, "version": current, "backend": backend, "commit": commit}
+    return {
+        "status": _status,
+        "version": current,
+        "name": cv.name,
+        "backend": backend,
+        "commit": commit,
+        "outcome": "✅ 执行完成，测试通过" if _status == "completed" else "⏳ 测试未通过，下个周期重试",
+    }
 
 
 def _post_cleanup():

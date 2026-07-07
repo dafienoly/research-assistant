@@ -10,7 +10,7 @@ BACKENDS = {
 
 
 def _resolve_binary(name):
-    """解析二进制路径，优先环境变量，再搜索常见路径"""
+    """解析二进制路径，优先环境变量，再搜索常见路径及 nvm"""
     env_var = {"claude": "HERMES_CLAUDE_BIN"}.get(name, "")
     if env_var and os.environ.get(env_var):
         return os.environ[env_var]
@@ -20,9 +20,21 @@ def _resolve_binary(name):
         return which
     # 常见路径
     common = {
-        "claude": ["/usr/local/bin/claude", "/home/ly/.local/bin/claude",
-                   "/home/ly/.npm-global/bin/claude", "/snap/bin/claude"],
+        "claude": [
+            "/usr/local/bin/claude",
+            "/home/ly/.local/bin/claude",
+            "/home/ly/.npm-global/bin/claude",
+            "/snap/bin/claude",
+            "/home/ly/.nvm/versions/node/v22.16.0/bin/claude",
+        ],
     }
+    # 还扫描 ~/.nvm/versions/node/*/bin/claude
+    nvm_root = os.path.expanduser("~/.nvm/versions/node")
+    if name == "claude" and os.path.isdir(nvm_root):
+        for ver_dir in sorted(os.listdir(nvm_root), reverse=True):
+            candidate = os.path.join(nvm_root, ver_dir, "bin", "claude")
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                return candidate
     for p in common.get(name, []):
         if os.path.isfile(p) and os.access(p, os.X_OK):
             return p
