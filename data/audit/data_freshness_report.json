@@ -1,46 +1,46 @@
 {
-  "check_time": "2026-07-02T22:13:17+08:00",
-  "overall_status": "missing_files",
+  "check_time": "2026-07-07T11:39:36+08:00",
+  "overall_status": "stale",
   "files": [
     {
       "path": "market/pool.csv",
       "status": "ok",
-      "last_updated": "2026-07-02T21:57:14+08:00",
+      "last_updated": "2026-07-07T11:37:51+08:00",
       "max_age_seconds": 86400,
-      "actual_age_seconds": 963,
+      "actual_age_seconds": 105,
       "note": ""
     },
     {
       "path": "market/live_snapshot.csv",
-      "status": "ok",
-      "last_updated": "2026-07-02T22:13:16+08:00",
+      "status": "stale",
+      "last_updated": "2026-07-07T11:18:40+08:00",
       "max_age_seconds": 60,
-      "actual_age_seconds": 1,
-      "note": ""
+      "actual_age_seconds": 1255,
+      "note": "延迟 1255s > 阈值 60s"
     },
     {
       "path": "fundamentals/financial_snapshot.csv",
       "status": "ok",
-      "last_updated": "2026-07-02T21:57:14+08:00",
+      "last_updated": "2026-07-03T17:11:26+08:00",
       "max_age_seconds": 604800,
-      "actual_age_seconds": 963,
+      "actual_age_seconds": 325689,
       "note": ""
     },
     {
       "path": "events/preopen_events.csv",
       "status": "ok",
-      "last_updated": "2026-07-02T21:57:14+08:00",
+      "last_updated": "2026-07-07T11:14:31+08:00",
       "max_age_seconds": 64800,
-      "actual_age_seconds": 963,
+      "actual_age_seconds": 1505,
       "note": ""
     },
     {
       "path": "intraday/live_snapshot_priority.csv",
-      "status": "missing",
-      "last_updated": null,
-      "max_age_seconds": 0,
-      "actual_age_seconds": 0,
-      "note": "文件不存在"
+      "status": "stale",
+      "last_updated": "2026-07-03T14:32:13+08:00",
+      "max_age_seconds": 60,
+      "actual_age_seconds": 335242,
+      "note": "延迟 335242s > 阈值 60s"
     }
   ],
   "blocking": true

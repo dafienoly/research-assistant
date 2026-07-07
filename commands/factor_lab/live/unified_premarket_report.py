@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """V1.11 Unified Premarket Decision Report — 合并 V1.9+V1.10 输出"""
 import sys, os, json, argparse, csv
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from copy import deepcopy

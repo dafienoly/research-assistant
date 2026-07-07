@@ -40,6 +40,37 @@ class PositionLoader:
             data = json.load(f)
         return self._validate(data, "json")
 
+    def from_qmt(self, connect_if_needed: bool = True) -> list:
+        """从 QMT 客户端拉取实时持仓（只读）
+
+        需要:
+            - QMT 客户端在本地运行
+            - pip install xtquant -i https://pypi.org/simple
+
+        无 QMT 时返回空列表，不报错。
+        """
+        try:
+            from factor_lab.miniqmt import connect, query_positions, query_account
+
+            if connect_if_needed:
+                connect()
+
+            positions = query_positions()
+            account = query_account()
+
+            if positions:
+                self.cash = account.get("cash", 0)
+                return self._validate(positions, "qmt")
+
+            self.warnings.append("QMT 未返回持仓数据（客户端未运行或未登录）")
+            return []
+        except ImportError:
+            self.warnings.append("xtquant 未安装，无法连接 QMT")
+            return []
+        except Exception as e:
+            self.errors.append(f"QMT 连接异常: {e}")
+            return []
+
     def _validate(self, rows: list, source: str) -> list:
         """校验持仓字段"""
         validated = []
