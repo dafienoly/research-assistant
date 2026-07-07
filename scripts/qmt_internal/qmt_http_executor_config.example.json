@@ -1,0 +1,11 @@
+{
+  "HOST": "127.0.0.1",
+  "PORT": 18765,
+  "TOKEN": "replace-with-a-long-random-token",
+  "ACCOUNT_ID": "replace-with-your-qmt-account-id",
+  "LIVE_TRADING_ENABLED": false,
+  "FUNCTION_TRADING_ENABLED": false,
+  "MAX_ORDER_VALUE": 10000.0,
+  "MAX_DAILY_TRADE_VALUE": 50000.0,
+  "ALLOW_CANCEL": false
+}

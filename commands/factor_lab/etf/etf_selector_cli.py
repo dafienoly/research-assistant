@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """V1.10 ETF Selector — 从 restricted 受限信号筛选 ETF 替代"""
 import sys, os, json, argparse
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 import csv

@@ -20,9 +20,6 @@ def main():
     sp = sub.add_parser("show")
     sp.add_argument("--alpha-id", required=True)
 
-    sp = sub.add_parser("retire")
-    sp.add_argument("--alpha-id", required=True)
-
     sp = sub.add_parser("evaluation-plan")
     sp.add_argument("--alpha-id", required=True)
 
@@ -58,7 +55,7 @@ def main():
     sp.add_argument("--verdict", default="", choices=["approve", "reject", ""],
                     help="强制审核结论 (默认自动判断)")
 
-    sub.add_parser("governance-report")
+    sp = sub.add_parser("governance-report")
     sp.add_argument("--candidate-id", default="", help="候选 ID (空=全部)")
 
     sub.add_parser("governance-list")
@@ -107,8 +104,6 @@ def main():
         _cmd_list()
     elif args.command == "show":
         _cmd_show(args.alpha_id)
-    elif args.command == "retire":
-        _cmd_retire(args.alpha_id)
     elif args.command == "evaluation-plan":
         _cmd_evaluation(args.alpha_id)
     elif args.command == "init-samples":

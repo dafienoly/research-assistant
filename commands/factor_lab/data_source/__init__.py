@@ -24,6 +24,15 @@ from factor_lab.data_source.adapters import (
 )
 from factor_lab.data_source.ingest import RealtimeQuoteEngine
 
+# V5.4 — Data Quality Gate
+from factor_lab.data_source.quality import (
+    QualityDimension,
+    QualitySeverity,
+    QualityRuleResult,
+    QualityReport,
+    DataQualityGate,
+)
+
 __all__ = [
     # V5.0
     "DataSourceSpec", "DataSourceCategory", "DataSourceCapability", "DataSourceStatus",
@@ -37,4 +46,8 @@ __all__ = [
     "TencentQuoteAdapter", "SinaQuoteAdapter",
     "get_adapter", "list_adapters",
     "RealtimeQuoteEngine",
+    # V5.4
+    "QualityDimension", "QualitySeverity",
+    "QualityRuleResult", "QualityReport",
+    "DataQualityGate",
 ]

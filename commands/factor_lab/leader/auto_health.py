@@ -24,7 +24,7 @@ def health() -> dict:
 
     comp = read_completion()
 
-    # crontab
+    # crontab (legacy) — 仍注册但不再依赖
     crontab_registered = False
     try:
         r = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
@@ -32,12 +32,41 @@ def health() -> dict:
     except Exception:
         pass
 
-    # cron service
+    # Hermes 守护进程检查 (优先于系统 cron)
+    daemon_running = False
+    gateway_running = False
     cron_running = False
+
+    # 1) 检查 tmux 守护会话 (hermes-daemon)
     try:
-        cron_running = subprocess.run(["pgrep", "cron"], capture_output=True).returncode == 0
+        r = subprocess.run(
+            ["tmux", "has-session", "-t", "hermes-daemon"],
+            capture_output=True
+        )
+        daemon_running = r.returncode == 0
     except Exception:
         pass
+
+    # 2) 检查 Hermes gateway 内部 cron ticker
+    try:
+        r = subprocess.run(
+            ["hermes", "cron", "status"],
+            capture_output=True, text=True, timeout=5
+        )
+        gateway_running = r.returncode == 0 and "ticker heartbeat" in r.stdout.lower()
+    except Exception:
+        pass
+
+    # 3) 检查系统 cron (备用，WSL 下可能不可用)
+    try:
+        cron_running = subprocess.run(
+            ["pgrep", "cron"], capture_output=True
+        ).returncode == 0
+    except Exception:
+        pass
+
+    # 健康判定：Hermes 守护或系统 cron 任一运行即可
+    scheduler_healthy = daemon_running or gateway_running or cron_running
 
     # log
     log_path = Path("/tmp/hermes_agent_runner.log")
@@ -62,7 +91,10 @@ def health() -> dict:
 
     return {
         "crontab_registered": crontab_registered,
-        "cron_service_running": cron_running,
+        "cron_service_running": scheduler_healthy,
+        "daemon_running": daemon_running,
+        "gateway_running": gateway_running,
+        "system_cron_running": cron_running,
         "windows_task_registered": False,
         "latest_tick_at": last_ts_str or "never",
         "tick_age_seconds": tick_age,

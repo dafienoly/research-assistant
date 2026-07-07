@@ -8,3 +8,5 @@ data/intraday/
 performance/backtests/
 performance/signals/
 VERSION_TRACK
+scripts/qmt_windows/qmt_bridge.env
+scripts/qmt_windows/runtime/

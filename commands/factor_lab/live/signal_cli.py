@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """V1.9 ret5_ma20_gate 盘前信号 — 三流信号+替代执行路径"""
 import sys, os, json, argparse, csv
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 import pandas as pd

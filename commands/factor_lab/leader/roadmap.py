@@ -9,7 +9,7 @@ class RoadmapItem:
     objective: str
     auto_allowed: bool = True
     manual_required: bool = False
-    trading_mode: str = "research"
+    trading_mode: str = "none"
 
 
 ROADMAP_ITEMS = []
@@ -41,7 +41,7 @@ def _build():
         RoadmapItem("V4.6", "Trade Filter & Slippage Control", "交易过滤", manual_required=False),
         RoadmapItem("V4.7", "Order Book & Deep Execution Route", "订单簿", manual_required=False),
         RoadmapItem("V4.8", "Capital Safety Boundary", "资金安全边界", manual_required=False),
-        RoadmapItem("V4.9", "Controlled Live Readiness Report", "实盘就绪报告", manual_required=False, trading_mode="readiness_report"),
+        RoadmapItem("V4.9", "Controlled Live Readiness Report", "实盘就绪报告", manual_required=True, trading_mode="none"),
         # V5.x
         RoadmapItem("V5.0", "Data Source Registry", "数据源注册表"),
         RoadmapItem("V5.1", "AkShare/BaoStock Provider", "免费数据源 Provider"),
