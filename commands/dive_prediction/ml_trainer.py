@@ -186,7 +186,7 @@ def train_lstm(force: bool = False) -> dict:
         return {"status": "error", "msg": "数据不足"}
     X_train, X_val, y_train, y_val, features = result
 
-    lstm_path = MODEL_DIR / "lstm_dive.pkl"
+    lstm_path = MODEL_DIR / "lstm_dive.keras"
     if lstm_path.exists() and not force:
         return {"status": "skipped", "msg": "LSTM 模型已存在"}
 
@@ -213,16 +213,22 @@ def train_lstm(force: bool = False) -> dict:
         ])
         model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
-        # 验证集也做序列化
-        X_val_seq = np.array([X_val[max(0, i-seq_len+1):i+1] for i in range(len(X_val))])
-        # padding if needed
-        if X_val_seq.shape[1] < seq_len:
-            pad = np.zeros((X_val_seq.shape[0], seq_len - X_val_seq.shape[1], n_features))
-            X_val_seq = np.concatenate([pad, X_val_seq], axis=1)
+        # 验证集序列化（用最后 seq_len 条填充，保证形状一致）
+        if len(X_val) < seq_len:
+            pad = np.tile(X_val[:1], (seq_len - len(X_val), 1))
+            X_val_seq = np.vstack([pad, X_val])[np.newaxis, :]
+        else:
+            X_val_seq = np.array([X_val[i-seq_len:i] for i in range(seq_len, len(X_val))])
+        y_val_seq = y_val[seq_len:] if len(y_val) > seq_len else y_val
+
+        # 确保验证集和训练集形状匹配
+        if len(X_val_seq) > 0 and len(X_val_seq) != len(y_val_seq):
+            min_len = min(len(X_val_seq), len(y_val_seq))
+            X_val_seq, y_val_seq = X_val_seq[:min_len], y_val_seq[:min_len]
 
         history = model.fit(X_seq, y_seq, epochs=20, batch_size=4,
-                            validation_data=(X_val_seq, y_val),
-                            verbose=0)
+                            validation_data=(X_val_seq, y_val_seq) if len(X_val_seq) > 0 else None,
+                            verbose=1)
         val_acc = history.history['val_accuracy'][-1] if history.history.get('val_accuracy') else 0
 
         # 保存
