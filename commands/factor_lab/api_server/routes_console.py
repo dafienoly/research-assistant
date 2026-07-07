@@ -71,7 +71,8 @@ async def list_sessions(limit: int = 50):
                         pass
                 sessions.append({
                     "id": d.name, "status": summary.get("status", "unknown"),
-                    "agent": req.get("agent", "?"), "prompt": req.get("prompt", "")[:100],
+                    "agent": req.get("agent", "?"), "version": req.get("version", ""),
+                    "prompt": req.get("prompt", "")[:100],
                     "updated_at": summary.get("updated_at", d.name[3:19]),
                     "answer_preview": answer_md[:200], "duration": duration,
                 })

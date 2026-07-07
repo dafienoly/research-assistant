@@ -726,6 +726,19 @@ class _DashboardHandler(BaseHTTPRequestHandler):
             return
 
         # --- Agent Console API ---
+        if parsed.path == "/api/agent-console/sessions-list":
+            from factor_lab.agent_console.sessions import list_sessions
+            qs = parse_qs(parsed.query)
+            limit = int(qs.get("limit", ["50"])[0])
+            agent = qs.get("agent", [""])[0]
+            version = qs.get("version", [""])[0]
+            status_filter = qs.get("status", [""])[0]
+            sessions = list_sessions(limit=limit, agent=agent,
+                                     version=version, status_filter=status_filter)
+            body = json.dumps({"sessions": sessions}, ensure_ascii=False).encode("utf-8")
+            self._send(200, body, "application/json; charset=utf-8")
+            return
+
         if parsed.path == "/api/agent-console/sessions":
             import uuid as _uuid
             qs = parse_qs(parsed.query)

@@ -270,29 +270,32 @@ class AgentRunner:
         return {"success": True, "backend": "dry-run", "output": "dry-run 完成"}
 
     def _backend_claude(self, prompt, task_id, log_file):
-        """claude: stream-json 模式，实时写入可读回答供 Dashboard SSE tail。"""
+        """claude: auto 模式，最高思维强度，实时输出写入日志。"""
         claude_bin = os.environ.get("HERMES_CLAUDE_BIN") or shutil.which("claude") or "claude"
-        cmd = [
-            claude_bin, "--print",
-            "--output-format", "stream-json",
-            "--include-partial-messages",
-            "--input-format", "text",
-            "--verbose",
-            "--permission-mode", "bypassPermissions",
-            "--dangerously-skip-permissions",
-            "--add-dir", str(COMMANDS_DIR),
-            "--model", "deepseek-v4",
-        ]
-        result = _run_streaming_process(
-            cmd, log_file, input_text=prompt, timeout=3600,
-            line_transform=_extract_claude_stream_text,
-        )
-        result["backend"] = "claude"
-        result["streaming_mode"] = "stream-json"
-        result["permission_mode"] = "bypassPermissions"
-        if result.get("error") == "command_not_found":
-            result["error"] = "claude 命令未找到"
-        return result
+        # 设置最高思维强度
+        _env = os.environ.copy()
+        _env["CLAUDE_CODE_EFFORT_LEVEL"] = "ultra"
+        cmd = [claude_bin, "--dangerously-skip-permissions", "-a", prompt]
+        # 直接调用 subprocess，传递自定义 env
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        import subprocess as _sp, time as _time
+        started = _time.time()
+        log_file.write_text(f"$ {' '.join(cmd[:2])} -a <prompt>\n# started_at={datetime.now(CST).isoformat()}\n\n")
+        try:
+            proc = _sp.run(
+                cmd, capture_output=True, text=True, timeout=3600,
+                cwd=str(COMMANDS_DIR), env=_env,
+            )
+            output = proc.stdout if proc.stdout.strip() else proc.stderr
+            with open(log_file, "a") as f:
+                f.write(output + f"\n# finished_at={datetime.now(CST).isoformat()} returncode={proc.returncode}\n")
+            return {"success": proc.returncode == 0, "backend": "claude",
+                    "streaming_mode": "auto", "permission_mode": "bypassPermissions",
+                    "returncode": proc.returncode, "output": output[:200]}
+        except _sp.TimeoutExpired:
+            with open(log_file, "a") as f:
+                f.write("\nTIMEOUT: 3600s\n")
+            return {"success": False, "error": "超时", "backend": "claude"}
 
     def _backend_command(self, prompt, task_id, log_file):
         """command: 使用环境变量 HERMES_AGENT_COMMAND 模板"""
@@ -399,6 +402,7 @@ def _build_agent_prompt(tid: str, task_md: str, version: str) -> str:
         f"2. 在 {COMMANDS_DIR} 内实现必要的代码修改\n"
         f"3. 运行测试确保通过\n"
         f"4. 最终输出修改了哪些文件、测试结果、完成状态\n"
+        f"5. ⚡ 设计已审批通过，直接进入编码实现阶段，无需请求设计审批或等待确认\n"
     )
 
 

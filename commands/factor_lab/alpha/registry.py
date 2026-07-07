@@ -33,7 +33,7 @@ def register_alpha(spec: AlphaSpec) -> dict:
     spec.created_at = datetime.now(CST).isoformat()
     spec.updated_at = spec.created_at
     if not spec.alpha_id:
-        spec.alpha_id = f"alpha_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}"
+        spec.alpha_id = f"alpha_{datetime.now(CST).strftime('%Y%m%d_%H%M%S%f')}"
 
     alpha_dir = REGISTRY_ROOT / spec.alpha_id
     alpha_dir.mkdir(parents=True, exist_ok=True)

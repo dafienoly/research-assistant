@@ -104,6 +104,57 @@ def update_status(sid: str, status: str, agent: str = "", prompt: str = ""):
         (sdir / "summary.json").write_text(json.dumps(data, indent=2))
 
 
+def list_sessions(limit: int = 50, agent: str = "", version: str = "",
+                  status_filter: str = "") -> list[dict]:
+    """列出所有 session，按创建时间降序排列"""
+    if not SESSIONS_DIR.exists():
+        return []
+    sessions = []
+    for d in sorted(SESSIONS_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+        if not d.is_dir() or not d.name.startswith("ac_"):
+            continue
+        req = {}
+        rf = d / "request.json"
+        if rf.exists():
+            req = json.loads(rf.read_text())
+        summary = {}
+        sf = d / "summary.json"
+        if sf.exists():
+            summary = json.loads(sf.read_text())
+        agent_name = req.get("agent", "")
+        ver = req.get("version", "")
+        st = summary.get("status", "unknown")
+        if agent and agent_name != agent:
+            continue
+        if version and ver != version:
+            continue
+        if status_filter and st != status_filter:
+            continue
+        answer = ""
+        am = d / "answer.md"
+        if am.exists():
+            answer = am.read_text()[:500]
+        events_count = 0
+        el = d / "events.jsonl"
+        if el.exists():
+            events_count = len(el.read_text().splitlines())
+        sessions.append({
+            "session_id": d.name,
+            "agent": agent_name,
+            "version": ver,
+            "status": st,
+            "prompt": req.get("prompt", "")[:200],
+            "created_at": req.get("created_at", ""),
+            "updated_at": summary.get("updated_at", req.get("created_at", "")),
+            "answer_preview": answer[:200],
+            "events_count": events_count,
+            "has_artifact": answer != "",
+        })
+        if len(sessions) >= limit:
+            break
+    return sessions
+
+
 def cleanup_sessions(days: int = 30):
     now = datetime.now(CST)
     count = 0

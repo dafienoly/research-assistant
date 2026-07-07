@@ -136,6 +136,8 @@ def show_help():
   leader:agent-runner --once [--backend claude] [--interval 180] [--watch]
                                 Hermes 自动执行器: 可插拔后端 (V2.15.2)
   leader:loop-once               Leader 循环: 读取 completion 并派发下一轮
+  leader:audit-and-push [--version Vx.y] [--mode full|push-hook] [--force]
+                                审计代码变更并推送至 GitHub (ADR-022)
   leader:lock-status             查看当前任务锁状态
 
 leader:automation-status       后台自动工作流健康状态检查
@@ -189,6 +191,11 @@ Leader 自动派发:
 MCP Server (V3.0):
   research:mcp [--port 8767]      启动 MCP 工具服务器 (HTTP API)
   research:mcp --stdio            启动 MCP 工具服务器 (stdio 模式)
+
+Factor ↔ Alpha 联动 (V3.0):
+  factor:sync [--dry-run] [--category momentum]
+                                因子库 → Alpha Registry 同步
+  factor:list --alpha             统一视图（含 Alpha 状态）
 
 策略报告生成 (V6.5):
   strategy:report [--from-portfolio-result PATH] [--from-strategy-returns CSV]
@@ -732,12 +739,24 @@ print(json.dumps({{"factor": report["factor_name"], "windows": len(report["windo
             print(f"❌ 注册失败: {e}")
 
     elif command == "factor:list":
-        from factor_lab.factor_base import list_factors
-        cat = args[0] if args else None
-        factors = list_factors(cat)
-        print(f"因子总数: {len(factors)}")
-        for f in factors:
-            print(f"  {f['name']:25s}  [{f['category']}]  {f['description']}")
+        # 检查 --alpha 标志
+        use_alpha = "--alpha" in args
+        if use_alpha:
+            from factor_lab.factor_alpha_bridge import cmd_unified_list
+            cat = None
+            for i, a in enumerate(args):
+                if a == "--category" and i + 1 < len(args):
+                    cat = args[i + 1]
+            print(cmd_unified_list(category=cat))
+        else:
+            from factor_lab.factor_base import list_factors
+            # 过滤掉 -- 开头的参数
+            filtered = [a for a in args if not a.startswith("--")]
+            cat = filtered[0] if filtered else None
+            factors = list_factors(cat)
+            print(f"因子总数: {len(factors)}")
+            for f in factors:
+                print(f"  {f['name']:25s}  [{f['category']}]  {f['description']}")
 
     elif command == "factor:evolve":
         import subprocess, os
@@ -1241,6 +1260,10 @@ run_daily_premarket(no_notify=True)
     elif command == "leader:loop-once":
         from factor_lab.leader.agent_runner import loop_once
         loop_once()
+
+    elif command == "leader:audit-and-push":
+        from factor_lab.leader.audit_push import main as audit_main
+        sys.exit(audit_main(args))
 
     elif command == "leader:automation-status":
         from factor_lab.leader.auto_health import health

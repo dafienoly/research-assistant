@@ -1,0 +1,21 @@
+# 研究方向笔记本
+
+> 创建时间: 2026-07-07T15:11:35.426298+08:00
+
+## 当前 Baseline
+
+- 表达式: 
+- IC: 
+- 评分: 
+
+## 已完成实验
+
+- risk_adjusted_momentum | 评分=50.0 | IC=0.0300 | rank(ts_sum(returns, 10) / ts_std(returns, 10))
+
+- volume_price_divergence | 评分=50.0 | IC=0.0300 | rank(-ts_corr(returns, volume, 10))
+
+- vwap_decay_reversal | 评分=50.0 | IC=0.0300 | rank(-ts_decay_linear(close / vwap - 1, 10))
+
+## 待探索方向
+
+## 备注

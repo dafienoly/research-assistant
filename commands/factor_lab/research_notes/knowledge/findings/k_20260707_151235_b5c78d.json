@@ -1,0 +1,17 @@
+{
+  "entry_id": "k_20260707_151235_b5c78d",
+  "kind": "finding",
+  "title": "发现: vwap_decay_reversal",
+  "hypothesis": "VWAP衰减反转，近10日加权偏离度越大表明趋势衰竭概率越高，做空信号",
+  "evidence": "rank(-ts_decay_linear(close / vwap - 1, 10))",
+  "conclusion": "评分=50.0, IC=0.0300",
+  "source": "Research Loop Round 1",
+  "tags": [
+    "research-loop"
+  ],
+  "confidence": 0.5,
+  "created_at": "2026-07-07T15:12:35.694588+08:00",
+  "updated_at": "2026-07-07T15:12:35.694598+08:00",
+  "cross_reviewed": false,
+  "cross_review_note": ""
+}

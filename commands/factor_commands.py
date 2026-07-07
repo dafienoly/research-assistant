@@ -106,12 +106,32 @@ else:
         return True
 
     elif command == "factor:list":
-        from factor_lab.factor_base import list_factors
-        cat = args[0] if args else None
-        factors = list_factors(cat)
-        print(f"因子总数: {len(factors)}")
-        for f in factors:
-            print(f"  {f['name']:25s}  [{f['category']}]  {f['description']}")
+        use_alpha = "--alpha" in args
+        if use_alpha:
+            from factor_lab.factor_alpha_bridge import cmd_unified_list
+            cat = None
+            for i, a in enumerate(args):
+                if a == "--category" and i + 1 < len(args):
+                    cat = args[i + 1]
+            print(cmd_unified_list(category=cat))
+        else:
+            from factor_lab.factor_base import list_factors
+            filtered = [a for a in args if not a.startswith("--")]
+            cat = filtered[0] if filtered else None
+            factors = list_factors(cat)
+            print(f"因子总数: {len(factors)}")
+            for f in factors:
+                print(f"  {f['name']:25s}  [{f['category']}]  {f['description']}")
+        return True
+
+    elif command == "factor:sync":
+        dry_run = "--dry-run" in args
+        cat = None
+        for i, a in enumerate(args):
+            if a == "--category" and i + 1 < len(args):
+                cat = args[i + 1]
+        from factor_lab.factor_alpha_bridge import cmd_sync
+        print(cmd_sync(dry_run=dry_run, category=cat))
         return True
 
     elif command == "factor:evolve":

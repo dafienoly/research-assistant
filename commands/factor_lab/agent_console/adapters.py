@@ -169,7 +169,9 @@ def _run_claude(sid: str, prompt: str):
                         chunk = os.read(master_fd, 4096).decode("utf-8", errors="replace")
                         if chunk:
                             output += chunk
-                            append_event(sid, AgentEvent("answer_delta", sid, data=chunk, status="running"))
+                            clean = _strip_ansi(chunk)
+                            if clean.strip():
+                                append_event(sid, AgentEvent("answer_delta", sid, data=clean, status="running"))
                             append_event(sid, AgentEvent("diagnostic", sid, data="[PTY chunk]"))
                     else:
                         if proc.poll() is not None:
@@ -220,6 +222,19 @@ def _run_claude(sid: str, prompt: str):
 
 
 # ─── Helpers ────────────────────────────────────────────────────
+
+import re
+
+_ANSI_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+
+
+def _strip_ansi(text: str) -> str:
+    """移除 ANSI 转义序列和控制字符，保留可读文本"""
+    # 移除 ANSI ESC 序列
+    text = _ANSI_RE.sub('', text)
+    # 移除低字节控制字符 (0x00-0x1F) 但保留 \n \t \r
+    text = ''.join(c for c in text if ord(c) >= 0x20 or c in '\n\r\t')
+    return text
 
 
 def _split_output(output: str):
