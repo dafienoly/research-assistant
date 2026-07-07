@@ -27,7 +27,7 @@ def health() -> dict:
     # crontab (legacy) — 仍注册但不再依赖
     crontab_registered = False
     try:
-        r = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+        r = subprocess.run(["crontab", "-l"], capture_output=True, text=True, timeout=10)
         crontab_registered = "run_hermes_agent_runner.sh" in r.stdout
     except Exception:
         pass
@@ -41,7 +41,7 @@ def health() -> dict:
     try:
         r = subprocess.run(
             ["tmux", "has-session", "-t", "hermes-daemon"],
-            capture_output=True
+            capture_output=True, timeout=10
         )
         daemon_running = r.returncode == 0
     except Exception:
@@ -60,7 +60,7 @@ def health() -> dict:
     # 3) 检查系统 cron (备用，WSL 下可能不可用)
     try:
         cron_running = subprocess.run(
-            ["pgrep", "cron"], capture_output=True
+            ["pgrep", "cron"], capture_output=True, timeout=10
         ).returncode == 0
     except Exception:
         pass
