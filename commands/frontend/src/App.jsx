@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom'
 import { Layout, Menu, Typography } from 'antd'
 import {
-  DashboardOutlined, RobotOutlined, ForkOutlined, FileTextOutlined, HistoryOutlined
+  DashboardOutlined, RobotOutlined, ForkOutlined, FileTextOutlined, HistoryOutlined, DatabaseOutlined
 } from '@ant-design/icons'
 import Dashboard from './pages/Dashboard'
 import AgentConsole from './pages/AgentConsole'
 import Roadmap from './pages/Roadmap'
 import Reports from './pages/Reports'
 import SessionHistory from './pages/SessionHistory'
+import DataStatus from './pages/DataStatus'
 
 const API = 'http://127.0.0.1:8766'
 export { API }
@@ -17,6 +18,7 @@ const { Sider, Content } = Layout
 
 const MENU = [
   { key: '/', icon: <DashboardOutlined />, label: <NavLink to="/" end>总览</NavLink> },
+  { key: '/data', icon: <DatabaseOutlined />, label: <NavLink to="/data">数据状态</NavLink> },
   { key: '/console', icon: <RobotOutlined />, label: <NavLink to="/console">Agent Console</NavLink> },
   { key: '/roadmap', icon: <ForkOutlined />, label: <NavLink to="/roadmap">路线图</NavLink> },
   { key: '/reports', icon: <FileTextOutlined />, label: <NavLink to="/reports">版本报告</NavLink> },
@@ -42,6 +44,7 @@ export default function App() {
         <Content style={{ padding: 24, overflow: 'auto' }}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/data" element={<DataStatus />} />
             <Route path="/console" element={<AgentConsole />} />
             <Route path="/roadmap" element={<Roadmap />} />
             <Route path="/reports" element={<Reports />} />

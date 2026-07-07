@@ -10,6 +10,7 @@ from factor_lab.api_server.routes_status import router as status_router
 from factor_lab.api_server.routes_roadmap import router as roadmap_router
 from factor_lab.api_server.routes_console import router as console_router
 from factor_lab.api_server.routes_backup import router as backup_router
+from factor_lab.api_server.routes_data import router as data_router
 
 FE_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
@@ -25,6 +26,7 @@ app.include_router(status_router, prefix="/api")
 app.include_router(roadmap_router, prefix="/api")
 app.include_router(console_router, prefix="/api")
 app.include_router(backup_router, prefix="/api")
+app.include_router(data_router, prefix="/api")
 if FE_DIST.exists():
     app.mount("/", StaticFiles(directory=str(FE_DIST), html=True), name="frontend")
 
