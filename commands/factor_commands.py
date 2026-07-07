@@ -79,20 +79,27 @@ else:
         return True
 
     elif command == "factor:mine":
-        from factor_lab.factor_base import mine_top
+        from factor_lab.factor_mining import FactorMiningEngine, MiningConfig
+        from factor_lab.factor_engine import load_stock_kline
+        from pathlib import Path
         start = _arg_value(args, "--start", "2025-01-02")
         end = _arg_value(args, "--end", "2026-06-30")
         top_n = int(_arg_value(args, "--top-n", "5"))
-        results = mine_top(start=start, end=end, top_n=top_n)
-        if not results:
-            print("  ⚠️ 无结果")
+        # 加载 K 线数据（限制数量控制内存）
+        kline_dir = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline")
+        all_symbols = sorted([f.stem for f in kline_dir.glob("*.csv")])
+        symbols = all_symbols[:500]
+        print(f"  加载 {len(symbols)} 只股票/共 {len(all_symbols)} 只 K线数据 ({start} ~ {end})...")
+        df = load_stock_kline(symbols, start_date=start, end_date=end)
+        if df.empty:
+            print("  ⚠️ 无 K线数据")
             return True
-        print(f"\n  Top {top_n}:")
-        for r in results[:top_n]:
-            name = r.get('name', r.get('factor', '?'))
-            ic = r.get('ic', r.get('rank_ic', 0))
-            ir = r.get('ir', 0)
-            print(f"  {name:30s} IC={ic:+.4f}  IR={ir:+.4f}")
+        print(f"  加载完成: {len(df)} 行, {df['symbol'].nunique()} 只股票\n")
+        # 执行因子挖掘
+        config = MiningConfig(top_n=top_n)
+        engine = FactorMiningEngine(config=config)
+        report = engine.mine(df=df)
+        report.print_summary()
         return True
 
     elif command == "factor:mine-register":
@@ -135,13 +142,53 @@ else:
         return True
 
     elif command == "factor:evolve":
-        code = f"""
-import sys; sys.path.insert(0, '{_BASE}')
-from factor_lab.evolution import evolve_factors
-evolve_factors()
+        # 使用真实因子注册表数据生成候选
+        code = f"""import sys, json, os
+sys.path.insert(0, '{_BASE}')
+from factor_lab.factor_base import list_factors
+from factor_lab.evolution import generate_candidates
+
+all_factors = list_factors()
+existing = []
+for f in all_factors[:20]:
+    name = f.get('name','')
+    cat = f.get('category','')
+    desc = f.get('description','')
+    existing.append({{
+        'name': name, 'category': cat, 'description': desc,
+        'mean_ic': 0.0, 'ir': 0.0,
+    }})
+
+import random
+candidates = generate_candidates(existing)
+print(f'基于 {{len(all_factors)}} 个注册因子，生成 {{len(candidates)}} 个新候选:')
+for c in candidates:
+    print(f'  {{c["name"]}}: {{c["expression"]}}')
+
+out_dir = '/mnt/d/HermesReports/factor_lab'
+os.makedirs(out_dir, exist_ok=True)
+path = os.path.join(out_dir, 'evolved_candidates.json')
+old = json.load(open(path)) if os.path.exists(path) else []
+all_c = old + candidates
+seen = {{}}; uniq = []
+for c in all_c:
+    n = c.get('name','')
+    if n not in seen:
+        seen[n] = True; uniq.append(c)
+with open(path, 'w') as f:
+    json.dump(uniq, f, ensure_ascii=False, indent=2)
+print(f'\\n累计进化因子: {{len(uniq)}} 个')
 """
-        result = subprocess.run([venv_python, "-c", code], capture_output=True, text=True, timeout=120, env=os.environ)
+        result = subprocess.run(
+            [venv_python, "-c", code],
+            capture_output=True, text=True, timeout=120, env=os.environ,
+        )
         print(result.stdout)
+        if result.stderr:
+            err_lines = [l for l in result.stderr.split("\n") if "Error" in l or "Traceback" in l]
+            if err_lines:
+                for e in err_lines[:3]:
+                    print(f"  ⚠️ {e}")
         return True
 
     elif command == "factor:validate":

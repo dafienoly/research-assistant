@@ -1,0 +1,3 @@
+rank(ts_av_diff(rsi(close, 14), 3) * ts_zscore(volume / ts_mean(volume, 20), 5)) | rsi_slope_volume_surge | RSI斜率配合成交量激增：RSI加速变化与成交量异常同步出现，捕捉动量衰竭或趋势突破的早期信号。RSI上升斜率变陡+放量=趋势延续，RSI钝化+放量=衰竭反转
+rank(ts_corr(high - low, volume, 10) * zscore(returns)) | range_volume_momentum | 振幅-成交量相关性配合截面收益：振幅扩大+缩量上涨=假突破，振幅收窄+放量=有效突破。通过振幅与量的相关性区分建仓/出货行为
+rank(zscore(close / vwap) * ts_decay_linear(ts_corr(close, volume, 10), 5)) | vwap_corr_decay_reversal | VWAP偏离叠加价量相关性衰减：当价格远离VWAP且价量相关性近期快速衰减（趋势失去成交量支持），反转概率显著上升

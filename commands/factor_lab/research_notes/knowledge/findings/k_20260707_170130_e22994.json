@@ -1,0 +1,17 @@
+{
+  "entry_id": "k_20260707_170130_e22994",
+  "kind": "finding",
+  "title": "发现: vwap_volume_decay",
+  "hypothesis": "VWAP 反转 × 近10日量衰减加权——近期放量对反转信号贡献更大，ts_decay_linear 抑制远期量噪",
+  "evidence": "rank(-ts_delta(vwap, 1) * ts_decay_linear(volume, 10))",
+  "conclusion": "评分=49.7, IC=-0.0222",
+  "source": "Research Loop Round 3",
+  "tags": [
+    "research-loop"
+  ],
+  "confidence": 0.49700000000000005,
+  "created_at": "2026-07-07T17:01:30.580168+08:00",
+  "updated_at": "2026-07-07T17:01:30.580179+08:00",
+  "cross_reviewed": false,
+  "cross_review_note": ""
+}

@@ -1,0 +1,17 @@
+{
+  "entry_id": "k_20260707_165552_177aa7",
+  "kind": "finding",
+  "title": "发现: gen_4",
+  "hypothesis": "",
+  "evidence": "rank(ts_av_diff(close, 20))",
+  "conclusion": "评分=57.2, IC=0.0279",
+  "source": "Research Loop Round 1",
+  "tags": [
+    "research-loop"
+  ],
+  "confidence": 0.5720000000000001,
+  "created_at": "2026-07-07T16:55:52.501594+08:00",
+  "updated_at": "2026-07-07T16:55:52.501602+08:00",
+  "cross_reviewed": false,
+  "cross_review_note": ""
+}

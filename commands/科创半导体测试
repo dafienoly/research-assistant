@@ -1,0 +1,27 @@
+# 研究方向笔记本
+
+> 创建时间: 2026-07-07T16:18:09.091398+08:00
+
+## 当前 Baseline
+
+- 表达式: 
+- IC: 
+- 评分: 
+
+## 已完成实验
+
+- vwap_vol_confirm | 评分=50.0 | IC=0.0300 | rank(ts_delta(vwap / close, 5) * ts_delta(volume, 5) / ts_me
+
+- vwap_vol_filter | 评分=50.0 | IC=0.0300 | rank(ts_delta(vwap / close, 5) * bb_width(close, 20))
+
+- vwap_zscore_mr | 评分=50.0 | IC=0.0300 | rank(ts_zscore(vwap / close, 20))
+
+- bollinger_lower_reversal | 评分=50.0 | IC=0.0300 | rank(clip(boll_lower(close, 20, 2) - close, 0, 999999))
+
+- volume_divergence_reversal | 评分=50.0 | IC=0.0300 | rank(ts_corr(close, ts_delta(volume, 5), 10))
+
+- vwap_reversal_accel | 评分=50.0 | IC=0.0300 | rank(ts_delta(vwap / close, 5))
+
+## 待探索方向
+
+## 备注

@@ -824,35 +824,42 @@ def _load_evolved():
         with open(evolved_path) as f:
             candidates = json.load(f)
     except Exception:
-            result = None  # factor compute error
-    existing_names = {f["name"] for f in REGISTRY}
+        return
+    if not isinstance(candidates, list):
+        return
+    seen = {f["name"] for f in REGISTRY if f.get("name")}
     for c in candidates:
         name = c.get("name", "")
-        if name in existing_names:
-            continue
-        expr_str = c.get("expression", "")
-        # 用表达式解析器编译
-        from factor_lab.expression_parser import ExpressionParser
-        _expr_cache = {}
-        
-        def _make_func(expr=expr_str, _name=name):
-            def dyn_func(df):
-                try:
-                    parser = ExpressionParser()
-                    return parser.eval(expr, df)
-                except Exception:
-                    return pd.Series(0.0, index=df.index)
-            return dyn_func
-        REGISTRY.append({
-            "name": name,
-            "category": "evolved",
-            "func": _make_func(),
-            "params": {},
-            "description": c.get("hypothesis", f"LLM 进化因子: {expr_str}"),
-        })
-        existing_names.add(name)
+        if name and name not in seen:
+            expr = c.get("expression", "")
+            if not expr:
+                continue
+            REGISTRY.append({
+                "name": name,
+                "category": "evolved",
+                "params": {},
+                "description": f"LLM 生成: {expr[:60]}",
+                "expression": expr,
+                "func": _make_dyn_func(expr),
+            })
+            seen.add(name)
 
 
+def _make_dyn_func(expr: str):
+    """创建动态因子评估函数"""
+    from factor_lab.expression_parser import ExpressionParser
+    _cache = {}
+    def dyn_func(df, **kwargs):
+        nonlocal _cache
+        if expr not in _cache:
+            _cache[expr] = ExpressionParser()
+        try:
+            return _cache[expr].eval(expr, df)
+        except Exception:
+            return pd.Series(0.0, index=df.index)
+    return dyn_func
+
+# ═══════════════════════════════════════════════
 # ═══════════════════════════════════════════════
 # 九、波动率/风险因子 (Volatility)
 # ═══════════════════════════════════════════════

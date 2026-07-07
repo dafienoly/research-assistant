@@ -1,5 +1,6 @@
 """Leader 命令处理器 — 从 hermes_cli.py 拆分而来"""
 import sys
+import json
 from pathlib import Path
 
 _BASE = Path(__file__).parent.resolve()
@@ -26,7 +27,6 @@ def handle(command: str, args: list[str]) -> bool:
         from factor_lab.leader.workloop import is_locked, TASKS_DIR
         path = TASKS_DIR / "current_run.lock"
         if path.exists():
-            import json
             data = json.loads(path.read_text())
             print(f"  🔒 运行中: {data.get('run_id')}")
         else:
@@ -72,7 +72,6 @@ def handle(command: str, args: list[str]) -> bool:
 
     elif command == "leader:task-list":
         from factor_lab.leader.workloop import TASKS_DIR
-        import json
         latest = TASKS_DIR / "latest.json"
         if latest.exists():
             data = json.loads(latest.read_text())

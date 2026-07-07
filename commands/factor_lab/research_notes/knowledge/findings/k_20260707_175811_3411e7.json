@@ -1,0 +1,17 @@
+{
+  "entry_id": "k_20260707_175811_3411e7",
+  "kind": "finding",
+  "title": "发现: rsi_slope_vol_decay",
+  "hypothesis": "RSI趋势斜率 × 近端衰减成交量比 — 近期放量配合RSI趋势钝化的趋势衰竭反转信号",
+  "evidence": "rank(ts_av_diff(rsi(close, 14), 5) * ts_decay_linear(volume / ts_mean(volume, 20), 5))",
+  "conclusion": "评分=28.9, IC=-0.0108",
+  "source": "Research Loop Round 2",
+  "tags": [
+    "research-loop"
+  ],
+  "confidence": 0.289,
+  "created_at": "2026-07-07T17:58:11.717333+08:00",
+  "updated_at": "2026-07-07T17:58:11.717353+08:00",
+  "cross_reviewed": false,
+  "cross_review_note": ""
+}

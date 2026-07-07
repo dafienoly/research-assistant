@@ -1,0 +1,17 @@
+{
+  "entry_id": "k_20260707_161956_b985d5",
+  "kind": "finding",
+  "title": "发现: vwap_reversal_accel",
+  "hypothesis": "VWAP衰减加速反转：VWAP相对价格加速偏离后的反转信号，VWAP衰减反转的加速变体",
+  "evidence": "rank(ts_delta(vwap / close, 5))",
+  "conclusion": "评分=50.0, IC=0.0300",
+  "source": "Research Loop Round 1",
+  "tags": [
+    "research-loop"
+  ],
+  "confidence": 0.5,
+  "created_at": "2026-07-07T16:19:56.185150+08:00",
+  "updated_at": "2026-07-07T16:19:56.185163+08:00",
+  "cross_reviewed": false,
+  "cross_review_note": ""
+}

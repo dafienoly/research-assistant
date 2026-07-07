@@ -33,6 +33,16 @@ export default function AgentConsole() {
     setDetail(await r.json())
   }
 
+  // 当选中 running session 时自动刷新详情
+  useEffect(() => {
+    if (!selected) return
+    const t = setInterval(async () => {
+      const r = await fetch(`${API}/api/agent-console/sessions/${selected}`)
+      setDetail(await r.json())
+    }, 3000)
+    return () => clearInterval(t)
+  }, [selected])
+
   useEffect(() => { if (answerRef.current) answerRef.current.scrollTop = answerRef.current.scrollHeight }, [detail?.answer])
 
   const cols = [
@@ -50,7 +60,14 @@ export default function AgentConsole() {
     <Card title={<span style={{ color: '#0F172A', fontWeight: 600 }}>💬 Agent Console — Session 列表</span>}
       extra={<Button size="small" onClick={load}>🔄 刷新</Button>} style={cardStyle}>
       {loading ? <Spin /> : <Table dataSource={sessions} columns={cols} rowKey="id" size="small"
-        pagination={{ pageSize: 10 }} locale={{ emptyText: '暂无 session' }} />}
+        pagination={{ pageSize: 10 }} locale={{ emptyText: '暂无 session' }}
+        onRow={r => ({
+          style: r.status === 'running'
+            ? { borderLeft: '3px solid #22C55E', background: '#F0FDF4' }
+            : r.id === selected
+            ? { background: '#EFF6FF' }
+            : {}
+        })} />}
     </Card>
 
     {detail && <Card title={<span style={{ color: '#0F172A', fontWeight: 600 }}>Session: {detail.session_id?.slice(0,30)}</span>} style={cardStyle}>

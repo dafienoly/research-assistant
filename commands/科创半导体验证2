@@ -1,0 +1,39 @@
+# 研究方向笔记本
+
+> 创建时间: 2026-07-07T16:57:24.370859+08:00
+
+## 当前 Baseline
+
+- 表达式: 
+- IC: 
+- 评分: 
+
+## 已完成实验
+
+- vwap_zscore_volume_reversal | 评分=13.8 | IC=-0.0052 | rank(-ts_delta(vwap, 1) * ts_zscore(volume, 10))
+
+- vwap_decay_smoothed_reversal | 评分=42.9 | IC=-0.0172 | rank(-ts_decay_linear(ts_delta(vwap, 1) * ts_std(volume, 10)
+
+- vwap_close_divergence_reversal | 评分=51.1 | IC=-0.0233 | rank(-ts_delta(vwap, 1) * abs(vwap - close) * ts_std(volume,
+
+- vwap_volume_surge_reversal | 评分=32.8 | IC=-0.0123 | rank(-ts_delta(vwap, 1) * ts_std(volume, 10) * ts_zscore(vol
+
+- vwap_trend_reversal | 评分=45.7 | IC=-0.0193 | rank(-ts_av_diff(vwap, 5) * ts_std(volume, 10))
+
+- vwap_volume_decay | 评分=49.7 | IC=-0.0222 | rank(-ts_delta(vwap, 1) * ts_decay_linear(volume, 10))
+
+- vwap_bollinger_volatility | 评分=0.0 | IC=0.0000 | rank(-ts_delta(vwap, 1) * bb_width(20, 2) * ts_std(volume, 1
+
+- vwap_volume_acceleration | 评分=0.0 | IC=0.0000 | rank(-ts_delta(vwap, 3) * ts_corr(returns, volume, 10) * ts_
+
+- vwap_high_volume_extreme | 评分=48.5 | IC=-0.0214 | rank(-ts_delta(vwap, 1) * ts_rank(volume, 20) * ts_std(volum
+
+- bollinger_volume_trend | 评分=0.0 | IC=0.0000 | rank((close - boll_mid(20, 2)) / ts_std(close, 20) * ts_corr
+
+- vol_confirmed_momentum | 评分=0.0 | IC=0.0000 | rank(ts_corr(returns, volume, 10) * ts_delta(close, 3))
+
+- vwap_volume_reversal | 评分=50.6 | IC=-0.0229 | rank(-ts_delta(vwap, 1) * ts_std(volume, 10))
+
+## 待探索方向
+
+## 备注

@@ -1,11 +1,21 @@
-"""V2.14.1 Architecture Audit — 模块审计"""
-import json, csv
-from pathlib import Path
+"""Anti-Cheat Audit — 4 道闸门检测 LLM Agent 偷工减料行为
 
-REPORT_ROOT = Path("/mnt/d/HermesReports/architecture_audit")
+检测范围:
+  gate1 — 需求→代码追溯矩阵: 计划中的文件/函数是否真实存在
+  gate2 — 虚假实现检测: pass/硬编码/return 常量 等 stub 模式
+  gate3 — 测试覆盖检查: 新代码是否有对应新测试
+  gate4 — 独立需求审计: 第三方 Agent 审查需求 vs 实现
 
-def run_audit(output_dir=None):
-    out = Path(output_dir or REPORT_ROOT / f"audit_{__import__('datetime').datetime.now():%Y%m%d_%H%M%S}")
-    out.mkdir(parents=True, exist_ok=True)
-    (out / "audit_report.json").write_text(json.dumps({"status": "audit_ready", "modules_checked": 12}))
-    return {"output": str(out)}
+用法:
+  from factor_lab.audit.runner import run_all_gates
+  report = run_all_gates(version="Vx.y")
+  print(report.summary_text())
+"""
+
+from .base import AuditFinding, AuditReport, Severity
+from .runner import run_all_gates, cmd_main
+
+__all__ = [
+    "AuditFinding", "AuditReport", "Severity",
+    "run_all_gates", "cmd_main",
+]

@@ -42,7 +42,7 @@ def _load_csv(path: Path, fields: list[str]) -> pd.DataFrame:
     df = pd.read_csv(path, encoding="utf-8-sig", dtype={"symbol": str})
     if df.empty:
         return df
-    df["date"] = pd.to_datetime(df["date"])
+    df["date"] = pd.to_datetime(df["date"], format="mixed")
     for col in fields:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")

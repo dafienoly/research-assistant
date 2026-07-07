@@ -1,0 +1,21 @@
+# 研究方向笔记本
+
+> 创建时间: 2026-07-07T16:54:22.716523+08:00
+
+## 当前 Baseline
+
+- 表达式: 
+- IC: 
+- 评分: 
+
+## 已完成实验
+
+- trend_decay_momentum | 评分=0.0 | IC=0.0000 | rank(ts_av_diff(close, 20)) * rank(ts_decay_linear(returns, 
+
+- price_volume_delta_corr | 评分=0.0 | IC=0.0000 | rank(ts_corr(ts_delta(close, 5), ts_delta(volume, 5), 10))
+
+- gen_4 | 评分=57.2 | IC=0.0279 | rank(ts_av_diff(close, 20))
+
+## 待探索方向
+
+## 备注

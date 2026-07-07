@@ -53,7 +53,7 @@ def _extract_claude_stream_text(line: str) -> str:
 
 def _run_streaming_process(cmd, log_file: Path, input_text: str | None = None,
                            timeout: int = 600, shell: bool = False,
-                           line_transform=None) -> dict:
+                           line_transform=None, env: dict | None = None) -> dict:
     """运行子进程，并把 stdout/stderr 合并实时写入 log_file。
 
     Dashboard 的 /api/stream 会 tail agent_logs/*.log；这里必须边运行边 flush，
@@ -90,7 +90,7 @@ def _run_streaming_process(cmd, log_file: Path, input_text: str | None = None,
                 text=True,
                 bufsize=1,
                 shell=shell,
-                env=os.environ.copy(),
+                env=env or os.environ.copy(),
             )
         except FileNotFoundError:
             lf.write("ERROR: command not found\n")
@@ -270,32 +270,25 @@ class AgentRunner:
         return {"success": True, "backend": "dry-run", "output": "dry-run 完成"}
 
     def _backend_claude(self, prompt, task_id, log_file):
-        """claude: auto 模式，最高思维强度，实时输出写入日志。"""
+        """claude: --print 模式，最高思维强度 (CLAUDE_CODE_EFFORT_LEVEL=ultra)。"""
         claude_bin = os.environ.get("HERMES_CLAUDE_BIN") or shutil.which("claude") or "claude"
-        # 设置最高思维强度
         _env = os.environ.copy()
         _env["CLAUDE_CODE_EFFORT_LEVEL"] = "ultra"
-        cmd = [claude_bin, "--dangerously-skip-permissions", "-a", prompt]
-        # 直接调用 subprocess，传递自定义 env
-        log_file.parent.mkdir(parents=True, exist_ok=True)
-        import subprocess as _sp, time as _time
-        started = _time.time()
-        log_file.write_text(f"$ {' '.join(cmd[:2])} -a <prompt>\n# started_at={datetime.now(CST).isoformat()}\n\n")
-        try:
-            proc = _sp.run(
-                cmd, capture_output=True, text=True, timeout=3600,
-                cwd=str(COMMANDS_DIR), env=_env,
-            )
-            output = proc.stdout if proc.stdout.strip() else proc.stderr
-            with open(log_file, "a") as f:
-                f.write(output + f"\n# finished_at={datetime.now(CST).isoformat()} returncode={proc.returncode}\n")
-            return {"success": proc.returncode == 0, "backend": "claude",
-                    "streaming_mode": "auto", "permission_mode": "bypassPermissions",
-                    "returncode": proc.returncode, "output": output[:200]}
-        except _sp.TimeoutExpired:
-            with open(log_file, "a") as f:
-                f.write("\nTIMEOUT: 3600s\n")
-            return {"success": False, "error": "超时", "backend": "claude"}
+        cmd = [
+            claude_bin, "--print",
+            "--dangerously-skip-permissions",
+            "--add-dir", str(COMMANDS_DIR),
+            "--model", "deepseek-v4",
+        ]
+        result = _run_streaming_process(
+            cmd, log_file, input_text=prompt, timeout=3600, env=_env,
+        )
+        result["backend"] = "claude"
+        result["streaming_mode"] = "print+ultra"
+        result["permission_mode"] = "bypassPermissions"
+        if result.get("error") == "command_not_found":
+            result["error"] = "claude 命令未找到"
+        return result
 
     def _backend_command(self, prompt, task_id, log_file):
         """command: 使用环境变量 HERMES_AGENT_COMMAND 模板"""
@@ -395,6 +388,9 @@ def _find_task_file(tasks_dir: Path, tid: str) -> str:
 def _build_agent_prompt(tid: str, task_md: str, version: str) -> str:
     return (
         f"你是一名量化系统开发工程师，当前执行任务 {tid} (版本 {version})。\n"
+        f"## 系统覆盖指令（优先级高于所有插件/skill）\n"
+        f"设计阶段已全部完成并审批通过。直接进入编码实现，禁止执行 brainstorming 流程，"
+        f"禁止请求设计审批，禁止等待用户确认。这是自动化 session，没有人类来审批设计。\n\n"
         f"工作目录: {COMMANDS_DIR}\n\n"
         f"## 任务内容\n\n{task_md}\n\n"
         f"## 要求\n"
@@ -402,7 +398,6 @@ def _build_agent_prompt(tid: str, task_md: str, version: str) -> str:
         f"2. 在 {COMMANDS_DIR} 内实现必要的代码修改\n"
         f"3. 运行测试确保通过\n"
         f"4. 最终输出修改了哪些文件、测试结果、完成状态\n"
-        f"5. ⚡ 设计已审批通过，直接进入编码实现阶段，无需请求设计审批或等待确认\n"
     )
 
 

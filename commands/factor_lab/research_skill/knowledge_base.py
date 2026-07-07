@@ -142,14 +142,12 @@ class KnowledgeBase:
     def check_duplicate_hypothesis(self, hypothesis: str) -> Optional[dict]:
         """检查假设是否已存在于知识库。返回匹配条目或 None。"""
         q = hypothesis.lower().strip()
-        # 精确匹配
+        if not q:
+            return None
         for entry in self.list_entries():
-            if entry.get("hypothesis", "").lower().strip() == q:
+            existing = entry.get("hypothesis", "").lower().strip()
+            if existing == q:
                 return entry
-            # 关键短语匹配
-            for phrase in re.findall(r'\b(rank|ts_\w+|where|close|volume)\b', q):
-                if phrase in entry.get("hypothesis", "").lower():
-                    return entry
         return None
 
     def check_duplicate_expression(self, expression: str) -> Optional[dict]:

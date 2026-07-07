@@ -1,0 +1,27 @@
+# 研究方向笔记本
+
+> 创建时间: 2026-07-07T17:53:15.472730+08:00
+
+## 当前 Baseline
+
+- 表达式: 
+- IC: 
+- 评分: 
+
+## 已完成实验
+
+- vwap_vol_surge | 评分=9.2 | IC=-0.0035 | rank(ts_av_diff(close / vwap, 3) * ts_zscore(ts_av_diff(volu
+
+- vwap_bb_reversal | 评分=20.2 | IC=-0.0076 | rank(ts_av_diff(close / vwap, 3) * bb_width(close, 20, 2))
+
+- rsi_slope_vol_decay | 评分=28.9 | IC=-0.0108 | rank(ts_av_diff(rsi(close, 14), 5) * ts_decay_linear(volume 
+
+- vwap_corr_decay_reversal | 评分=0.0 | IC=0.0000 | rank(zscore(close / vwap) * ts_decay_linear(ts_corr(close, v
+
+- range_volume_momentum | 评分=0.0 | IC=0.0000 | rank(ts_corr(high - low, volume, 10) * zscore(returns))
+
+- rsi_slope_volume_surge | 评分=24.2 | IC=-0.0091 | rank(ts_av_diff(rsi(close, 14), 3) * ts_zscore(volume / ts_m
+
+## 待探索方向
+
+## 备注

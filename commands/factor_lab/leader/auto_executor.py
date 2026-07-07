@@ -197,10 +197,9 @@ def auto_run_once():
     except Exception:
         pass
 
-    # 5. Execute agent-runner
+    # 5. Execute agent-runner (后台进程，实时流日志到 session)
     agent_log_dir = TASKS_DIR / "agent_logs"
     agent_log_dir.mkdir(parents=True, exist_ok=True)
-    # 写 status.json 供 dashboard 读取进度
     _run_status_path = agent_log_dir / "status.json"
     try:
         _run_status_path.write_text(json.dumps({
@@ -211,19 +210,78 @@ def auto_run_once():
         pass
     agent_ok = False
     agent_error = ""
+    _agent_proc = None
+    _tail_thread = None
     try:
-        result = subprocess.run(
+        # 启动 agent-runner 后台进程
+        _agent_proc = subprocess.Popen(
             [VENV, CLI, "leader:agent-runner", "--once", "--backend", backend],
-            capture_output=True, text=True, timeout=3600)
-        agent_ok = result.returncode == 0 and "Status: completed" in result.stdout
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, cwd=str(Path(CLI).parent))
+        # 后台线程：tail agent 日志 + 推送到 session
+        if _sid:
+            import threading as _th, time as _time, re as _re2
+            _ansi_re_tail = _re2.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+            def _tail_log():
+                _last_size = 0
+                _max_wait = 600
+                _waited = 0
+                while _waited < _max_wait:
+                    _time.sleep(1)
+                    _waited += 1
+                    try:
+                        _log_dirs = sorted(agent_log_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+                        for _ld in _log_dirs[:3]:
+                            if not _ld.is_dir():
+                                continue
+                            for _lf in sorted(_ld.glob("*.log"), key=lambda p: p.stat().st_mtime, reverse=True):
+                                _sz = _lf.stat().st_size
+                                if _sz > _last_size:
+                                    _raw = _lf.read_text(encoding="utf-8", errors="replace")[_last_size:_last_size+4096]
+                                    _last_size = _sz
+                                    # 清洗 ANSI + 控制字符
+                                    _clean = _ansi_re_tail.sub('', _raw)
+                                    _clean = ''.join(c for c in _clean if ord(c) >= 0x20 or c in '\n\r\t')
+                                    # 过滤诊断行
+                                    _filtered = []
+                                    for _line in _clean.split('\n'):
+                                        _s = _line.strip()
+                                        if _s.startswith('$ ') or _s.startswith('# heartbeat') or _s.startswith('# started') or _s.startswith('# finished'):
+                                            continue
+                                        if _s:
+                                            _filtered.append(_line)
+                                    if _filtered:
+                                        try:
+                                            from factor_lab.agent_console.sessions import append_event as _ae
+                                            from factor_lab.agent_console.schemas import AgentEvent as _Ae
+                                            _ae(_sid, _Ae("answer_delta", _sid, data='\n'.join(_filtered), status="running"))
+                                        except Exception:
+                                            pass
+                                break
+                            break
+                    except Exception:
+                        pass
+                    if _agent_proc and _agent_proc.poll() is not None:
+                        _time.sleep(1)
+                        break
+            _tail_thread = _th.Thread(target=_tail_log, daemon=True)
+            _tail_thread.start()
+        # 等待 agent-runner 完成
+        _stdout, _ = _agent_proc.communicate(timeout=3600)
+        agent_ok = _agent_proc.returncode == 0 and "Status: completed" in _stdout
         if not agent_ok:
-            agent_error = f"rc={result.returncode}, stdout_snip={result.stdout[:300]}, stderr_snip={result.stderr[:300]}"
+            agent_error = f"rc={_agent_proc.returncode}, stdout_snip={_stdout[:300]}"
     except subprocess.TimeoutExpired:
         agent_ok = False
         agent_error = "timeout=3600 expired"
+        if _agent_proc:
+            _agent_proc.kill()
     except Exception as e:
         agent_ok = False
         agent_error = f"{type(e).__name__}: {e}"
+    finally:
+        if _agent_proc and _agent_proc.poll() is None:
+            _agent_proc.kill()
 
     # 6. Run tests
     test_ok = False
@@ -239,8 +297,8 @@ def auto_run_once():
         test_ok = False
 
     # 7. Build human-readable summary
+    commit = ""
     if agent_ok and test_ok:
-        commit = ""
         report_path = str(agent_log_dir)
         try:
             r = subprocess.run(["git", "rev-parse", "HEAD"],

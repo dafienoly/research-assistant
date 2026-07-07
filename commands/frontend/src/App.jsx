@@ -21,7 +21,7 @@ const MENU = [
   { key: '/data', icon: <DatabaseOutlined />, label: <NavLink to="/data">数据状态</NavLink> },
   { key: '/console', icon: <RobotOutlined />, label: <NavLink to="/console">Agent Console</NavLink> },
   { key: '/roadmap', icon: <ForkOutlined />, label: <NavLink to="/roadmap">路线图</NavLink> },
-  { key: '/reports', icon: <FileTextOutlined />, label: <NavLink to="/reports">版本报告</NavLink> },
+  { key: '/reports', icon: <FileTextOutlined />, label: <NavLink to="/reports">报告中心</NavLink> },
   { key: '/history', icon: <HistoryOutlined />, label: <NavLink to="/history">Session 历史</NavLink> },
 ]
 

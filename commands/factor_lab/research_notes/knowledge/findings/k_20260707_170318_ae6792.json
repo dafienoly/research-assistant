@@ -1,0 +1,17 @@
+{
+  "entry_id": "k_20260707_170318_ae6792",
+  "kind": "finding",
+  "title": "发现: vwap_close_divergence_reversal",
+  "hypothesis": "VWAP与收盘价的绝对偏差越大，表明日内成交均价与最终定价分歧越大，此时的VWAP转向信号置信度更高，分歧放大幅度可提升反转预测力",
+  "evidence": "rank(-ts_delta(vwap, 1) * abs(vwap - close) * ts_std(volume, 10))",
+  "conclusion": "评分=51.1, IC=-0.0233",
+  "source": "Research Loop Round 4",
+  "tags": [
+    "research-loop"
+  ],
+  "confidence": 0.511,
+  "created_at": "2026-07-07T17:03:18.348321+08:00",
+  "updated_at": "2026-07-07T17:03:18.348331+08:00",
+  "cross_reviewed": false,
+  "cross_review_note": ""
+}

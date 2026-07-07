@@ -106,26 +106,29 @@ def test_claude_backend_uses_auto_mode_and_ultra_effort(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_CLAUDE_BIN", "/opt/claude")
     captured = {"cmd": None, "env": None, "timeout": None, "returncode": 0, "stdout": "ok"}
 
-    def fake_run(cmd, capture_output=True, text=True, timeout=0, cwd=None, env=None):
+    def fake_stream(cmd, log_file, input_text=None, timeout=0, shell=False, line_transform=None, env=None):
         captured["cmd"] = cmd
-        captured["env"] = env
         captured["timeout"] = timeout
-        return __import__("types").SimpleNamespace(returncode=0, stdout="ok", stderr="")
+        captured["line_transform"] = line_transform
+        captured["env"] = env
+        log_file.write_text("streamed")
+        return {"success": True, "returncode": 0, "output": "ok"}
 
-    monkeypatch.setattr("subprocess.run", fake_run)
+    monkeypatch.setattr(agent_runner, "_run_streaming_process", fake_stream)
     runner = AgentRunner(backend="claude")
     runner.log_dir = tmp_path
-    result = runner._backend_claude("test prompt", "T001", tmp_path / "T001.log")
+    result = runner._backend_claude("prompt", "T001", tmp_path / "T001.log")
 
     cmd = captured["cmd"]
-    assert cmd[0] == "/opt/claude", f"Expected claude binary, got {cmd[0]}"
+    assert cmd[0] == "/opt/claude"
+    assert "--print" in cmd
     assert "--dangerously-skip-permissions" in cmd
-    assert cmd[cmd.index("-a") + 1] == "test prompt"
-    assert captured["env"].get("CLAUDE_CODE_EFFORT_LEVEL") == "ultra"
+    assert "--add-dir" in cmd
+    assert "--model" in cmd and "deepseek-v4" in cmd
     assert captured["timeout"] == 3600
-    assert result["streaming_mode"] == "auto"
-    assert result["backend"] == "claude"
-    assert result["success"] is True
+    assert captured["env"].get("CLAUDE_CODE_EFFORT_LEVEL") == "ultra"
+    assert result["streaming_mode"] == "print+ultra"
+    assert result["permission_mode"] == "bypassPermissions"
 
 
 def test_find_task_file_prefers_exact_clean_task(tmp_path):

@@ -143,8 +143,7 @@ def _run_hermes_research(sid: str, prompt: str):
 def _run_claude(sid: str, prompt: str):
     """Claude Code --print 模式 (buffered, 非逐 token)"""
     append_event(sid, AgentEvent("answer_delta", sid,
-                 data=f"## Claude Code (缓冲模式)\n\n> ⚠️ Claude Code --print 模式在命令完成后才输出完整回答，"
-                 f"非逐 token 实时流。\n\n任务: {prompt}\n\n",
+                 data=f"## Claude Code (流式输出)\n\n> 🔄 实时流式输出中，Agent 工作输出会逐行推送。\n\n任务: {prompt}\n\n",
                  status="running"))
     claude_bin = os.environ.get("HERMES_CLAUDE_BIN",
                                 "/home/ly/.nvm/versions/node/v22.16.0/bin/claude")

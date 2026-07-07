@@ -115,16 +115,19 @@ def fetch_kline(codes: list[str], start_date: str, end_date: str) -> list[dict]:
         list of dict: [{code, unixtime, timeString, open, high, low, close, volume, amount}]
     """
     if codes:
+        from dive_prediction.proxy_bypass import no_proxy_for as _npf
         import jqdatasdk as _jq
         _JQ_AUTHED = False
         try:
-            _JQ_AUTHED = bool(_jq.get_account_info())
+            with _npf("joinquant"):
+                _JQ_AUTHED = bool(_jq.get_account_info())
         except Exception:
             pass
         if not _JQ_AUTHED:
             try:
-                _jq.auth('13500226163', 'Ly19940930!')
-                _JQ_AUTHED = True
+                with _npf("joinquant"):
+                    _jq.auth('13500226163', 'Ly19940930!')
+                    _JQ_AUTHED = True
             except Exception:
                 pass
 
@@ -135,10 +138,9 @@ def fetch_kline(codes: list[str], start_date: str, end_date: str) -> list[dict]:
                     sec = f"{code}.XSHE" if code.startswith(("00", "30", "15")) else f"{code}.XSHG"
                     if code.startswith(("51", "56")):
                         sec = f"{code}.XSHG"  # Shanghai-listed ETFs
-                    # 分批拉取（聚宽大范围查询可能超时）
                     sd = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}"
                     ed = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:]}"
-                    # 每次最多拉60天，循环拼接
+                    # 分批拉取（每次最多60天，绕过聚宽境外IP限制）
                     all_rows = []
                     import pandas as _pd
                     from datetime import datetime as _dt, timedelta as _td
@@ -146,10 +148,11 @@ def fetch_kline(codes: list[str], start_date: str, end_date: str) -> list[dict]:
                     end_dt = _dt.strptime(ed, "%Y-%m-%d")
                     while cur < end_dt:
                         chunk_end = min(cur + _td(days=60), end_dt)
-                        df = _jq.get_price(sec, start_date=cur.strftime("%Y-%m-%d"),
-                                            end_date=chunk_end.strftime("%Y-%m-%d"),
-                                            frequency='daily',
-                                            fields=['open', 'close', 'high', 'low', 'volume', 'money'])
+                        with _npf("joinquant"):
+                            df = _jq.get_price(sec, start_date=cur.strftime("%Y-%m-%d"),
+                                                end_date=chunk_end.strftime("%Y-%m-%d"),
+                                                frequency='daily',
+                                                fields=['open', 'close', 'high', 'low', 'volume', 'money'])
                         for dt, row in df.iterrows():
                             all_rows.append({
                                 "code": code,

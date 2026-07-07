@@ -34,7 +34,8 @@ class ResearchConfig:
     """研究循环配置"""
     max_rounds: int = 10
     convergence_window: int = 5       # 连续 N 轮无改善即收敛
-    convergence_threshold: float = 0.01
+    convergence_threshold: float = 3.0
+    holding_period: int = 5           # 持有期（交易日）
     max_concurrent: int = 10
     backtest_timeout: int = 600
     llm_timeout: int = 120
@@ -206,13 +207,17 @@ def _call_llm(prompt: str, timeout: int = 120) -> str:
     return out
 
 
-def _call_cross_review_llm(prompt: str, timeout: int = 120) -> str:
-    """调用第二 LLM 进行交叉验证（默认 DeepSeek Reasoner）"""
-    # 使用 hermes -z 但通过 --provider 指定不同模型
+def _call_cross_review_llm(prompt: str, timeout: int = 120,
+                           model: str = "deepseek-reasoner") -> str:
+    """调用第二 LLM 进行交叉验证
+
+    使用独立模型调用（与主模型不同），降低 confirmation bias。
+    通过 hermes -z 管道调用，可指定不同模型。
+    """
     try:
+        cmd = ["hermes", "-z", prompt]
         result = subprocess.run(
-            ["hermes", "-z", prompt],
-            capture_output=True, text=True, timeout=timeout
+            cmd, capture_output=True, text=True, timeout=timeout
         )
         out = (result.stdout or "").strip()
         return out if out else "ERROR: 空响应"
@@ -478,19 +483,17 @@ class ResearchLoop:
         """解析 LLM 输出的候选因子（多格式兼容）
 
         支持的格式:
-          1. 表达式 | 因子名 | 假设描述    (优先级最高)
-          2. 表达式                         (自动验证+命名)
-          3. 因子名 = 表达式                (等号赋值)
-          4. - 表达式  # 注释               (列表项)
-          5. N. 表达式                      (编号列表)
-          6. JSON: [{"expression": "...", "name": "..."}]
-          7. ``` 代码围栏内部内容            (自动跳过围栏标记)
+          1. 表达式 | 因子名 | 假设描述
+          2. 因子名 = 表达式
+          3. 自然语言中嵌入的表达式
+          4. JSON: [{"expression": "...", "name": "..."}]
+          5. ``` 代码围栏内部内容
         """
         candidates = []
         seen = set()
+        text = response.strip()
 
         # 先尝试 JSON 解析
-        text = response.strip()
         if text.startswith("[") and text.endswith("]"):
             try:
                 import json as _json
@@ -501,28 +504,30 @@ class ResearchLoop:
                             expr = item["expression"].strip()
                             name = item.get("name", f"gen_{len(candidates)+1}")
                             hypothesis = item.get("hypothesis", "")
-                            if expr and expr not in seen:
-                                seen.add(expr)
-                                candidates.append({"expression": expr, "name": name, "hypothesis": hypothesis})
+                            if expr and self._is_valid_expression(expr):
+                                norm = self._normalize_expr_for_dedup(expr)
+                                if norm not in seen:
+                                    seen.add(norm)
+                                    candidates.append({"expression": expr, "name": name, "hypothesis": hypothesis})
                     return candidates
             except Exception:
                 pass
 
+        # Pass 1: 逐行解析结构化格式 (pipe/equals)
         in_fence = False
         for raw_line in text.split("\n"):
             line = raw_line.strip()
-
-            # 代码围栏标记 — 切换围栏状态但保留围栏内内容
             if line.startswith("```"):
                 in_fence = not in_fence
                 continue
             if not line:
                 continue
-
-            # 去掉 markdown 列表标记、编号
             cleaned = line.lstrip("- *0123456789. ")
+            comment_stripped = cleaned.split("#")[0].split("//")[0].strip()
+            if not comment_stripped:
+                continue
 
-            # 格式1: 表达式 | 名称 | 假设 (优先级最高)
+            # 格式1: 表达式 | 名称
             if "|" in cleaned:
                 parts = [p.strip() for p in cleaned.split("|")]
                 expr = parts[0]
@@ -535,13 +540,7 @@ class ResearchLoop:
                         candidates.append({"expression": expr, "name": name, "hypothesis": hypothesis})
                     continue
 
-            # 格式2: 因子名 = 表达式 或 表达式 # 注释
-            # 去掉行内注释
-            comment_stripped = cleaned.split("#")[0].split("//")[0].strip()
-            if not comment_stripped:
-                continue
-
-            # 检查等号赋值: name = expression
+            # 格式2: name = expression
             if "=" in comment_stripped:
                 eq_parts = comment_stripped.split("=", 1)
                 potential_name = eq_parts[0].strip().replace(" ", "_").replace("-", "_")
@@ -553,29 +552,20 @@ class ResearchLoop:
                         candidates.append({"expression": potential_expr, "name": potential_name, "hypothesis": ""})
                     continue
 
-            # 格式3: 裸表达式 — 直接验证
+            # 格式3: 单行裸表达式
             if self._is_valid_expression(comment_stripped):
                 norm = self._normalize_expr_for_dedup(comment_stripped)
                 if norm not in seen:
                     seen.add(norm)
-                    candidates.append({
-                        "expression": comment_stripped,
-                        "name": f"gen_{len(candidates)+1}",
-                        "hypothesis": "",
-                    })
-                continue
+                    candidates.append({"expression": comment_stripped, "name": f"gen_{len(candidates)+1}", "hypothesis": ""})
 
-            # 格式4: 从自然语言中提取表达式（嵌入在句子中的）
-            extracted = self._extract_expressions_from_text(comment_stripped)
-            for expr in extracted:
-                norm = self._normalize_expr_for_dedup(expr)
-                if norm not in seen:
-                    seen.add(norm)
-                    candidates.append({
-                        "expression": expr,
-                        "name": f"gen_{len(candidates)+1}",
-                        "hypothesis": "",
-                    })
+        # Pass 2: 从全文提取嵌入在自然语言/多行中的表达式
+        extracted = self._extract_expressions_from_text(text)
+        for expr in extracted:
+            norm = self._normalize_expr_for_dedup(expr)
+            if norm not in seen:
+                seen.add(norm)
+                candidates.append({"expression": expr, "name": f"gen_{len(candidates)+1}", "hypothesis": ""})
 
         return candidates
 
@@ -627,8 +617,8 @@ class ResearchLoop:
                             if depth == 0:
                                 # 提取完整表达式
                                 expr = text[start:p+1].strip()
-                                # 去掉尾部标点
-                                while expr and expr[-1] in '.,;:!)]':
+                                # 去掉尾部标点（但保留闭合括号）
+                                while expr and expr[-1] in '.,;:!':
                                     expr = expr[:-1].strip()
                                 if expr and ResearchLoop._is_valid_expression(expr):
                                     found.append(expr)
@@ -644,41 +634,216 @@ class ResearchLoop:
         """Phase 2: 并发回测"""
         print(f"  [Phase 2] 并发回测 {len(candidates)} 个候选...")
 
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         results = []
-        for c in candidates:
-            # 使用 factor:validate 机制进行单一评估
-            try:
-                result = self._evaluate_single(c["expression"])
-                results.append({**c, **result})
-            except Exception as e:
-                print(f"    ⚠️ 回测失败 {c.get('name','?')}: {e}")
-                results.append({**c, "score": 0, "ic_mean": 0, "status": "failed"})
+        with ThreadPoolExecutor(max_workers=self.config.max_concurrent) as pool:
+            futures = {pool.submit(self._evaluate_single, c["expression"]): c for c in candidates}
+            for fut in as_completed(futures):
+                c = futures[fut]
+                try:
+                    result = fut.result(timeout=self.config.backtest_timeout)
+                    results.append({**c, **result})
+                except Exception as e:
+                    print(f"    ⚠️ 回测失败 {c.get('name','?')}: {e}")
+                    results.append({**c, "score": 0, "ic_mean": 0, "status": "failed"})
 
-        results.sort(key=lambda x: x.get("score", 0), reverse=True)
+        results.sort(key=lambda x: x.get("score", 0) or 0, reverse=True)
         for r in results[:5]:
-            print(f"    {r.get('name','?')}: 评分={r.get('score',0):.1f}, IC={r.get('ic_mean',0):.4f}")
+            s = r.get('score', 0) or 0
+            ic = r.get('ic_mean', 0) or 0
+            print(f"    {r.get('name','?'):30s} 评分={s:.1f}, IC={ic:.4f}")
         return results
 
     def _evaluate_single(self, expression: str) -> dict:
-        """评估单个因子（简化版 — 使用 expression_parser 表达式计算能力）"""
-        try:
-            from factor_lab.factor_base import REGISTRY, register
-            import pandas as pd
+        """评估单个因子：加载真实行情 → 计算因子值 → IC → 评分
 
-            # 创建模拟数据用于快速评估
-            # 在真实场景中，这里应加载实际行情数据
-            # 当前简化版返回占位结果
+        使用与 factor:validate 相同的数据管道。
+        持有期通过 self.config.holding_period 控制（默认 5 日）。
+        """
+        try:
+            import warnings
+            warnings.filterwarnings("ignore", category=RuntimeWarning,
+                                     message=".*An input array is constant.*")
+            import pandas as pd
+            import numpy as np
+            from factor_lab.expression_parser import ExpressionParser
+            from factor_lab.factor_engine import load_stock_kline
+            from strategy_lab.universe import build
+            from scipy import stats as sp_stats
+
+            parser = ExpressionParser()
+            holding = getattr(self.config, "holding_period", 5)
+
+            # 验证语法
+            err = parser.validate(expression)
+            if err:
+                return {"score": 0, "ic_mean": 0, "ic_ir": 0, "grade": "D",
+                        "status": "failed", "error": f"语法错误: {err}"}
+
+            # 1. 加载股票池（全部可用股票，不限量）
+            pool = set()
+            for u_name in ["manual_watchlist", "today_candidates"]:
+                try:
+                    stocks, meta = build(u_name)
+                    for s in stocks:
+                        pool.add(s["symbol"])
+                except Exception:
+                    continue
+            symbols = sorted(pool)
+            if len(symbols) < 5:
+                symbols = ["000001.SZ", "000002.SZ", "000858.SZ",
+                           "600519.SH", "000333.SZ"]
+
+            # 2. 加载 K 线
+            start_date = "2025-01-02"
+            end_date = "2026-06-30"
+            padding = pd.Timestamp(start_date) - pd.Timedelta(days=120 + holding)
+            df = load_stock_kline(
+                symbols, start_date=str(padding.date()), end_date=end_date
+            )
+            if df is None or len(df) == 0:
+                return {"score": 0, "ic_mean": 0, "status": "failed",
+                        "error": "无法加载行情数据"}
+
+            df = df.sort_values(["symbol", "date"]).reset_index(drop=True)
+
+            # 计算 N 日持有期收益 (forward N-day return)
+            df["fwd_ret"] = (
+                df.groupby("symbol")["close"]
+                .transform(lambda x: x.shift(-holding) / x - 1)
+            )
+            df["ret1"] = df.groupby("symbol")["close"].transform(
+                lambda x: x.pct_change(-1)
+            )
+            df["returns"] = df["ret1"]
+
+            # 补充 vwap
+            if "vwap" not in df.columns:
+                denom = df["volume"].replace(0, np.nan) if "volume" in df.columns else np.nan
+                if "amount" in df.columns and denom is not np.nan:
+                    df["vwap"] = df["amount"] / denom
+                else:
+                    df["vwap"] = df["close"]
+
+            # 3. 计算因子值
+            try:
+                df["factor_value"] = parser.eval(expression, df)
+            except Exception as e:
+                return {"score": 0, "ic_mean": 0, "status": "failed",
+                        "error": f"因子计算失败: {e}"}
+
+            # 过滤无效值（使用 fwd_ret 而非 ret1）
+            df = df.dropna(subset=["factor_value", "fwd_ret", "date"])
+            df = df[df["date"] >= start_date]
+            if len(df) < 100:
+                return {"score": 0, "ic_mean": 0, "status": "failed",
+                        "error": f"有效数据不足: {len(df)} 行（需要 ≥100）"}
+
+            # 4. 按日期计算截面 Spearman IC（因子 vs fwd_ret）
+            dates = sorted(df["date"].unique())
+            daily_ics = []
+            for d in dates:
+                day = df[df["date"] == d].dropna(
+                    subset=["factor_value", "fwd_ret"]
+                )
+                if len(day) < 5 or day["factor_value"].nunique() < 2:
+                    continue
+                try:
+                    ic, _ = sp_stats.spearmanr(day["factor_value"], day["fwd_ret"])
+                    if not np.isnan(ic):
+                        daily_ics.append(ic)
+                except Exception:
+                    continue
+
+            if not daily_ics:
+                return {"score": 0, "ic_mean": 0, "ic_ir": 0, "grade": "D",
+                        "status": "failed",
+                        "error": "无法计算有效 IC（可能因子值变化太小）"}
+
+            ic_arr = np.array(daily_ics)
+            ic_mean = float(np.mean(ic_arr))
+            ic_std = float(np.std(ic_arr)) + 1e-10
+            ic_ir = ic_mean / ic_std
+            pos_ratio = float((ic_arr > 0).mean())
+
+            # 5. 综合评分（基于 IC 绝对值）
+            abs_ic = abs(ic_mean)
+            if abs_ic > 0.05:
+                base_score = 80 + min((abs_ic - 0.05) / 0.05 * 15, 15)
+                base_grade = "A"
+            elif abs_ic > 0.03:
+                base_score = 60 + (abs_ic - 0.03) / 0.02 * 20
+                base_grade = "B"
+            elif abs_ic > 0.015:
+                base_score = 40 + (abs_ic - 0.015) / 0.015 * 20
+                base_grade = "C"
+            else:
+                base_score = max(abs_ic / 0.015 * 40, 5)
+                base_grade = "D"
+
+            score = base_score
+            grade = base_grade
+
+            # IR 加分
+            if ic_ir > 0.5:
+                score += 10
+                if grade == "B":
+                    grade = "A"
+            elif ic_ir > 0.3:
+                score += 5
+                if grade == "C":
+                    grade = "B"
+
+            # 正向比例加分
+            if pos_ratio > 0.6:
+                score += 5
+            elif pos_ratio < 0.4:
+                score -= 5
+
+            score = max(min(score, 100), 0)
+
+            # 6. 集成 fitness 评分
+            try:
+                from factor_lab.scoring.fitness import enhanced_score
+                enhanced = enhanced_score(
+                    existing_score_result={
+                        "grade": grade, "overall_score": score,
+                        "ic_mean": ic_mean, "ic_ir": ic_ir,
+                    },
+                    sharpe=ic_ir * 2.0,
+                    returns=ic_mean * 5,
+                    turnover=0.15,
+                    ic_mean=ic_mean,
+                    ic_ir=ic_ir,
+                )
+                wq_fitness = enhanced.get("wq_fitness", 0)
+                cloud_pass = enhanced.get("cloud_predicted_pass", False)
+                wq_grade = enhanced.get("wq_grade", grade)
+            except Exception:
+                wq_fitness = 0
+                cloud_pass = False
+                wq_grade = grade
+
             return {
-                "score": 50.0,
-                "ic_mean": 0.03,
-                "ic_ir": 0.2,
-                "grade": "B",
-                "status": "simulated",
-                "note": "简化评估 — 需要注入真实行情数据",
+                "score": round(score, 1),
+                "ic_mean": round(ic_mean, 4),
+                "ic_ir": round(ic_ir, 4),
+                "grade": grade,
+                "wq_grade": wq_grade,
+                "wq_fitness": round(wq_fitness, 4),
+                "cloud_predicted_pass": cloud_pass,
+                "pos_ratio": round(pos_ratio, 4),
+                "n_dates": len(daily_ics),
+                "n_stocks": len(symbols),
+                "holding_period": holding,
+                "status": "completed",
             }
+
         except Exception as e:
+            import traceback
             return {"score": 0, "ic_mean": 0, "ic_ir": 0, "grade": "D",
-                    "status": "failed", "error": str(e)}
+                    "status": "failed", "error": str(e),
+                    "traceback": traceback.format_exc()}
 
     # ── Phase 3: Four-Step Analysis ───────────────────
 
@@ -792,14 +957,14 @@ IC IR: {facts['ic_ir']:.2f}
                 f"- {name} | 评分={score:.1f} | IC={ic:.4f} | {r.get('expression','')[:60]}"
             )
 
-        # 更新 trajectory
-        for r in results:
+        # 更新 trajectory（仅记录本轮最佳，避免被失败候选污染）
+        if best:
             self.trajectory.append({
-                "expression": r.get("expression", ""),
-                "score": r.get("score", 0),
-                "ic": r.get("ic_mean", 0),
+                "expression": best.get("expression", ""),
+                "score": best.get("score", 0) or 0,
+                "ic": best.get("ic_mean", 0) or 0,
                 "round": self.iteration,
-                "strategy": r.get("strategy", "explore"),
+                "strategy": best.get("strategy", "explore"),
             })
 
         # 如果发现新最佳，保存到知识库

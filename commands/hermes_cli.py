@@ -138,6 +138,8 @@ def show_help():
   leader:loop-once               Leader 循环: 读取 completion 并派发下一轮
   leader:audit-and-push [--version Vx.y] [--mode full|push-hook] [--force]
                                 审计代码变更并推送至 GitHub (ADR-022)
+  leader:anti-cheat-audit [--version Vx.y] [--skip gate2 gate3]
+                                反偷工减料审计: 检测 stub/硬编码/缺测试 (4闸门)
   leader:lock-status             查看当前任务锁状态
 
 leader:automation-status       后台自动工作流健康状态检查
@@ -1264,6 +1266,10 @@ run_daily_premarket(no_notify=True)
     elif command == "leader:audit-and-push":
         from factor_lab.leader.audit_push import main as audit_main
         sys.exit(audit_main(args))
+
+    elif command == "leader:anti-cheat-audit":
+        from factor_lab.audit.runner import cmd_main
+        sys.exit(cmd_main(args))
 
     elif command == "leader:automation-status":
         from factor_lab.leader.auto_health import health

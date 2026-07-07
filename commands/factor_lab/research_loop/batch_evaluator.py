@@ -28,37 +28,41 @@ class FactorResult:
     timestamp: str = ""
 
 
-def _evaluate_single(expression: str, params: dict) -> Optional[FactorResult]:
+def _evaluate_single(expression: str, params: dict = None) -> Optional[FactorResult]:
     """评估单个因子
 
-    在真实场景中，这里调用 factor:validate 机制进行完整回测。
-    当前提供占位评估，通过 expression_parser 做基础语法检查。
+    与 research_loop._evaluate_single 使用相同管道，
+    加载真实行情数据计算 IC/评分。
     """
-    from factor_lab.expression_parser import ExpressionParser
+    try:
+        import sys as _sys
+        _sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+        from factor_lab.research_loop import ResearchLoop, ResearchConfig
 
-    parser = ExpressionParser()
-    err = parser.validate(expression)
-    if err:
+        # 轻量 loop 实例用于评估
+        loop = ResearchLoop(config=ResearchConfig(max_rounds=1))
+        result = loop._evaluate_single(expression)
+        if result.get("status") == "completed":
+            return FactorResult(
+                expression=expression,
+                name=params.get("name", "") if params else "",
+                fitness=result.get("wq_fitness", abs(result.get("ic_mean", 0)) * 0.5),
+                sharpe=result.get("ic_ir", 0) * 2.0,
+                ic=result.get("ic_mean", 0),
+                ic_ir=result.get("ic_ir", 0),
+                score=result.get("score", 0),
+                grade=result.get("grade", "?"),
+                status="completed",
+            )
         return FactorResult(
             expression=expression,
-            status="failed", error=f"语法错误: {err}",
+            status="failed", error=result.get("error", "unknown"),
         )
-
-    # 占位 IC 估算（基于表达式长度和算子复杂度做简单打分）
-    # 真实场景应替换为 factor:validate 全流程
-    ic_est = _estimate_ic(expression)
-
-    return FactorResult(
-        expression=expression,
-        name=params.get("name", ""),
-        fitness=abs(ic_est) * 0.5,
-        sharpe=abs(ic_est) * 3.0,
-        ic=ic_est,
-        ic_ir=abs(ic_est) * 10.0,
-        score=min(abs(ic_est) * 2000, 80),
-        grade="B" if abs(ic_est) > 0.02 else "C",
-        status="completed",
-    )
+    except Exception as e:
+        return FactorResult(
+            expression=expression,
+            status="failed", error=str(e),
+        )
 
 
 def _estimate_ic(expression: str) -> float:

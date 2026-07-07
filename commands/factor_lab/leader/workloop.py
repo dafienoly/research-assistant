@@ -40,7 +40,21 @@ def release_lock(status: str = "completed"):
 
 
 def is_locked() -> bool:
-    return LOCK_FILE.exists() and json.loads(LOCK_FILE.read_text()).get("status") == "running"
+    """检查是否锁定，超过 LOCK_MAX_AGE 的 stale 锁自动释放"""
+    if not LOCK_FILE.exists():
+        return False
+    try:
+        lock_data = json.loads(LOCK_FILE.read_text())
+        if lock_data.get("status") == "running":
+            age = time.time() - LOCK_FILE.stat().st_mtime
+            if age > LOCK_MAX_AGE:
+                print(f"  ⚠️ is_locked: 锁超时 ({age:.0f}s > {LOCK_MAX_AGE}s)，自动释放")
+                release_lock("timeout")
+                return False
+            return True
+        return False
+    except Exception:
+        return False
 
 
 # ─── Completion ─────────────────────────────────────────────────

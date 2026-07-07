@@ -37,45 +37,80 @@ DATA_START = "2025-03-29"  # 聚宽试用数据起始日
 
 
 def _jq_auth():
+    from dive_prediction.proxy_bypass import no_proxy_for as _npf
     import jqdatasdk as jq
-    try:
-        jq.get_account_info()
-    except Exception:
-        jq.auth(JQ_ACCOUNT, JQ_PWD)
+    with _npf("joinquant"):
+        try:
+            jq.get_account_info()
+        except Exception:
+            jq.auth(JQ_ACCOUNT, JQ_PWD)
     return jq
 
 
 def pull_stock_kline():
     """拉龙头个股日K线 → data/market/daily_kline/"""
+    from dive_prediction.proxy_bypass import no_proxy_for
     import jqdatasdk as jq
     jq = _jq_auth()
     kline_dir = PATHS["daily_kline"]
     kline_dir.mkdir(parents=True, exist_ok=True)
+    from datetime import datetime as _dt, timedelta as _td
 
     for code, name in CODES["etf"] + CODES["stocks"]:
         path = kline_dir / f"{code}_daily_kline.csv"
         sec = f"{code}.XSHE" if code.startswith(("00", "30", "15")) else f"{code}.XSHG"
+        all_rows = []
         try:
-            df = jq.get_price(sec, start_date=DATA_START, end_date=DATA_END, frequency='daily',
-                              fields=['open', 'close', 'high', 'low', 'volume', 'money'])
-            if df.empty:
+            # 分批拉取，每次10天
+            cur = _dt.strptime(DATA_START, "%Y-%m-%d")
+            end = _dt.strptime(DATA_END, "%Y-%m-%d")
+            while cur < end:
+                chunk_end = min(cur + _td(days=10), end)
+                with no_proxy_for("joinquant"):
+                    df = jq.get_price(sec, start_date=cur.strftime("%Y-%m-%d"),
+                                      end_date=chunk_end.strftime("%Y-%m-%d"),
+                                      frequency='daily',
+                                      fields=['open', 'close', 'high', 'low', 'volume', 'money'])
+                for dt, row in df.iterrows():
+                    all_rows.append({
+                        "code": code, "date": dt.strftime("%Y-%m-%d"),
+                        "open": round(row["open"], 4), "high": round(row["high"], 4),
+                        "low": round(row["low"], 4), "close": round(row["close"], 4),
+                        "volume": int(row["volume"]), "amount": round(row["money"], 2),
+                    })
+                cur = chunk_end + _td(days=1)
+            if not all_rows:
                 print(f"  ⚠️ {name}({code}): 无数据")
                 continue
+            # 去重写入
+            seen = set()
+            unique = []
+            for r in all_rows:
+                k = (r["code"], r["date"])
+                if k not in seen:
+                    seen.add(k)
+                    unique.append(r)
+            # 删掉旧文件，写新数据
+            if path.exists():
+                path.unlink()
+            import csv as _csv
             with open(path, "w", encoding="utf-8-sig", newline="") as f:
-                w = csv.writer(f)
-                w.writerow(["code", "timeString", "open", "high", "low", "close", "volume", "amount"])
-                for dt, row in df.iterrows():
-                    w.writerow([code, dt.strftime("%Y-%m-%d"),
-                                round(row["open"], 4), round(row["high"], 4),
-                                round(row["low"], 4), round(row["close"], 4),
-                                int(row["volume"]), round(row["money"], 2)])
-            print(f"  ✅ {name}({code}): {len(df)} 条 → {path.name}")
+                w = _csv.DictWriter(f, fieldnames=["code", "timeString", "open", "high", "low", "close", "volume", "amount"])
+                w.writeheader()
+                for r in sorted(unique, key=lambda x: x["date"]):
+                    w.writerow({
+                        "code": r["code"], "timeString": r["date"],
+                        "open": r["open"], "high": r["high"], "low": r["low"],
+                        "close": r["close"], "volume": r["volume"], "amount": r["amount"],
+                    })
+            print(f"  ✅ {name}({code}): {len(unique)} 条")
         except Exception as e:
             print(f"  ❌ {name}({code}): {e}")
 
 
 def pull_fund_flow():
     """拉资金流向 → data/fundamentals/fund_flow_timeseries.csv（追加）"""
+    from dive_prediction.proxy_bypass import no_proxy_for
     import jqdatasdk as jq
     jq = _jq_auth()
     fund_path = PATHS["fundamentals"] / "fund_flow_timeseries.csv"
@@ -120,14 +155,17 @@ def pull_fund_flow():
 
 def pull_index():
     """拉板块指数历史 → data/market/daily_kline/index_931743.csv"""
+    from dive_prediction.proxy_bypass import no_proxy_for
     import jqdatasdk as jq
     jq = _jq_auth()
     index_path = PATHS["daily_kline"] / f"index_{INDEX_CODE}.csv"
     try:
-        df = jq.get_price(f"{INDEX_CODE}.XSHG", start_date=DATA_START, end_date=DATA_END,
-                          frequency='daily', fields=['open', 'close', 'high', 'low', 'volume', 'money'])
-        df.to_csv(index_path)
-        print(f"  ✅ 板块指数 {INDEX_CODE}: {len(df)} 条")
+        with no_proxy_for("joinquant"):
+            # 中证指数在聚宽用 .ZICN 后缀
+            df = jq.get_price(f"{INDEX_CODE}.ZICN", start_date=DATA_START, end_date=DATA_END,
+                              frequency='daily', fields=['open', 'close', 'high', 'low', 'volume', 'money'])
+            df.to_csv(index_path)
+            print(f"  ✅ 板块指数 {INDEX_CODE}: {len(df)} 条")
     except Exception as e:
         print(f"  ⚠️ 板块指数: {e}")
 

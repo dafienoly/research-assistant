@@ -36,7 +36,12 @@ BYPASS_DOMAINS = {
         "baostock.com",
         "www.baostock.com",
     ],
-    "akshare": [  # akshare 还可能连其他站
+    "joinquant": [
+        "joinquant.com",
+        "dataapi.joinquant.com",
+        "www.joinquant.com",
+    ],
+    "akshare": [
         "emweb.securities.eastmoney.com",
     ],
 }
