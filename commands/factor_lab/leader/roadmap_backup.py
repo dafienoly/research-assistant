@@ -79,6 +79,7 @@ def auto_backup_on_advance(version: str, status: str):
                 age = (datetime.now(CST) - datetime.strptime(ts_str, "%Y%m%d_%H%M%S")).total_seconds()
                 if age < 86400:  # 24小时内
                     shutil.rmtree(old, ignore_errors=True)
-            except:
-                pass
+            except Exception as e:
+                import logging
+                logging.warning("roadmap_backup: failed to clean old backup at %s: %s", BACKUP_DIR, e)
     return backup
