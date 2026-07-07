@@ -186,6 +186,10 @@ Leader 自动派发:
   research:loop [--notebook PATH] [--rounds 5] [--convergence 5]
                                 启动 6 阶段自动因子研究循环
 
+MCP Server (V3.0):
+  research:mcp [--port 8767]      启动 MCP 工具服务器 (HTTP API)
+  research:mcp --stdio            启动 MCP 工具服务器 (stdio 模式)
+
 策略报告生成 (V6.5):
   strategy:report [--from-portfolio-result PATH] [--from-strategy-returns CSV]
                                 生成策略报告
@@ -902,7 +906,7 @@ import sys; sys.path.insert(0, '/home/ly/.hermes/research-assistant/commands')
 import pandas as pd
 from factor_lab.validate_strategies import run_strategy_validation
 run_strategy_validation()
-import os; os.environ['WECHAT_WEBHOOK_URL'] = os.popen('source ~/.bashrc && echo $WECHAT_WEBHOOK_URL').read().strip()
+import subprocess as _sp, os; _r = _sp.run(['bash','-c','source ~/.bashrc && echo $WECHAT_WEBHOOK_URL'], capture_output=True, text=True, timeout=10); os.environ['WECHAT_WEBHOOK_URL'] = _r.stdout.strip()
 from factor_lab.notify import notify_goal_done
 notify_goal_done('factor:strategies V1.7', '策略验证完成', 'completed')
 """
@@ -1159,6 +1163,21 @@ run_daily_premarket(no_notify=True)
             convergence = 5
         from factor_lab.research_loop import cmd_research_loop
         print(cmd_research_loop(notebook=notebook, rounds=rounds, convergence=convergence))
+
+    elif command == "research:mcp":
+        port_str = _arg_value(args, "--port", "8767")
+        try:
+            port = int(port_str)
+        except ValueError:
+            port = 8767
+        use_stdio = "--stdio" in args
+        from factor_lab.mcp_server import main as mcp_main
+        sys.argv = ["mcp_server"]
+        if use_stdio:
+            sys.argv.append("--stdio")
+        else:
+            sys.argv.extend(["--port", str(port)])
+        mcp_main()
 
     # ── V6.5 Strategy Report ─────────────────────────────────────
     elif command == "strategy:report":
