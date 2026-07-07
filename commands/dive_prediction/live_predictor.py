@@ -1,7 +1,7 @@
 """ETF 跳水实时预测 + 推送
 
 基于 data_collector 回测验证的信号权重，产出实时跳水概率。
-数据源优先级: akshare → live_snapshot.csv → mx:data
+数据从 config.PATHS 标准路径读取。
 """
 import os, json, csv, sys
 for k in list(os.environ):
@@ -16,9 +16,10 @@ from datetime import datetime, timezone, timedelta
 CST = timezone(timedelta(hours=8))
 _BASE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_BASE.parent))
-from config import VENV_PYTHON
+from config import PATHS, VENV_PYTHON
+from dive_prediction.proxy_bypass import call_no_proxy
 
-DATA_DIR = _BASE / "data"
+DATA_DIR = PATHS["daily_kline"]
 PROJECT_ROOT = Path.home() / ".hermes" / "research-assistant"
 SNAPSHOT = PROJECT_ROOT / "data" / "market" / "live_snapshot.csv"
 
@@ -107,7 +108,7 @@ def fetch_realtime_price() -> dict | None:
     """获取ETF当前实时行情"""
     import akshare as ak
     try:
-        df = ak.fund_etf_spot_em()
+        df = call_no_proxy(ak.fund_etf_spot_em)
         row = df[df["代码"] == ETF_CODE]
         if row.empty:
             return None

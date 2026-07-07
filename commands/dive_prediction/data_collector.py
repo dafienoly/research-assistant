@@ -1,18 +1,18 @@
 """ETF 跳水预测系统 — 数据采集模块
 
 从 akshare 拉取 ETF 和龙头个股的历史/实时数据。
-环境要求: unset HTTP_PROXY HTTPS_PROXY 等代理变量
+数据统一存到 config.PATHS["daily_kline"]，不自己维护副本。
 """
-import os
-# 清除代理 — akshare 直连东方财富
-for k in list(os.environ):
-    if 'proxy' in k.lower():
-        os.environ.pop(k, None)
+import os, json, csv, sys
+from pathlib import Path
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import numpy as np
-from pathlib import Path
-from datetime import datetime, timedelta, timezone
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config import PATHS, VENV_PYTHON
+from dive_prediction.proxy_bypass import call_no_proxy, no_proxy_for
 
 CST = timezone(timedelta(hours=8))
 
@@ -29,11 +29,12 @@ LEADER_STOCKS = [
     ("688120", "华海清科"),
 ]
 
-DATA_DIR = Path(__file__).resolve().parent / "data"
+# 数据统一存储路径（与 DataHub 共享）
+KLINE_DIR = PATHS["daily_kline"]
 
 
 def ensure_dir():
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    KLINE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # ═══════════════════════════════════════════════════
@@ -44,16 +45,16 @@ def fetch_etf_hist(days: int = 250) -> pd.DataFrame:
     """拉取 ETF 历史日K线"""
     import akshare as ak
     end = datetime.now(CST)
-    start = end - timedelta(days=days + 20)  # 多拉一些保证够
-    df = ak.fund_etf_hist_em(
-        symbol=ETF_CODE,
-        period="daily",
+    start = end - timedelta(days=days + 20)
+    df = call_no_proxy(
+        ak.fund_etf_hist_em,
+        symbol=ETF_CODE, period="daily",
         start_date=start.strftime("%Y%m%d"),
         end_date=end.strftime("%Y%m%d"),
         adjust="qfq",
     )
     df = df.sort_values("日期")
-    df.to_csv(DATA_DIR / f"{ETF_CODE}_hist.csv", index=False)
+    df.to_csv(KLINE_DIR / f"{ETF_CODE}_hist.csv", index=False)
     print(f"  ETF历史: {len(df)} 条 ({df['日期'].iloc[0]} ~ {df['日期'].iloc[-1]})")
     return df
 
@@ -74,7 +75,7 @@ def fetch_leader_hist(days: int = 250) -> dict:
                 adjust="qfq",
             )
             df = df.sort_values("日期")
-            df.to_csv(DATA_DIR / f"{code}_hist.csv", index=False)
+            df.to_csv(KLINE_DIR / f"{code}_hist.csv", index=False)
             results[code] = df
             print(f"  {name}({code}): {len(df)} 条")
         except Exception as e:
@@ -236,7 +237,7 @@ def main():
         print("\n--- 拉取龙头历史 ---")
         fetch_leader_hist(days=args.days)
     else:
-        csv_path = DATA_DIR / f"{ETF_CODE}_hist.csv"
+        csv_path = KLINE_DIR / f"{ETF_CODE}_hist.csv"
         if csv_path.exists():
             df_etf = pd.read_csv(csv_path)
             print(f"\n--- 读取本地数据: {len(df_etf)} 条 ---")
