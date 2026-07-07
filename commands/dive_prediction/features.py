@@ -111,11 +111,15 @@ def compute_full_features(df_etf: pd.DataFrame, leader_dfs: dict) -> pd.DataFram
             df["leader_up_ratio"] = (df[ret_cols] > 0).sum(axis=1) / len(ret_cols)
 
     # ── 时间特征 ──
-    df["day_of_week"] = df["date"].dt.dayofweek
-    df["is_monday"] = (df["day_of_week"] == 0).astype(int)
-    df["is_friday"] = (df["day_of_week"] == 4).astype(int)
-    df["month_start"] = (df["date"].dt.day <= 5).astype(int)
-    df["month_end"] = (df["date"].dt.day >= 25).astype(int)
+    date_col = df.get("date") if "date" in df.columns else (df.get("日期") if "日期" in df.columns else None)
+    if date_col is not None and hasattr(pd.to_datetime(date_col, errors="coerce"), 'dt'):
+        dates = pd.to_datetime(date_col, errors="coerce")
+        df["date"] = dates  # ensure datetime type
+        df["day_of_week"] = dates.dt.dayofweek
+        df["is_monday"] = (dates.dt.dayofweek == 0).astype(int)
+        df["is_friday"] = (dates.dt.dayofweek == 4).astype(int)
+        df["month_start"] = (dates.dt.day <= 5).astype(int)
+        df["month_end"] = (dates.dt.day >= 25).astype(int)
 
     # ── 跳水标签 (Priority 4: 降低阈值) ──
     df["intraday_drop"] = (high - close) / high * 100

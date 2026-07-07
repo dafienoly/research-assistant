@@ -10,8 +10,8 @@ def score_news_headlines(headlines: list[str]) -> dict:
     返回: {positive, negative, neutral, net_score, detail}
     """
     positive_keywords = [
-        "突破", "涨价", "增长", "利好", "超预期", "新高", "供不应求",
-        "加码", "扩产", "投资", "合作", "订单", "爆发", "机遇",
+        "突破", "涨价", "增长", "大涨", "利好", "超预期", "新高", "供不应求",
+        "加码", "扩产", "投资", "合作", "订单", "爆发", "机遇", "涨超",
     ]
     negative_keywords = [
         "跌", "下跌", "利空", "制裁", "限制", "下滑", "萎缩",
