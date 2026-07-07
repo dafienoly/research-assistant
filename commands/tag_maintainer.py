@@ -295,8 +295,8 @@ def cmd_update_fundamentals():
                     "source": "baostock",
                     "updated_at": now_str(),
                 })
-        except:
-            pass
+        except Exception:
+            import logging; logging.warning('tag_maintainer: suppressed error')
         if (i + 1) % 10 == 0:
             print(f"\r  进度: {i+1}/{len(priority)} 已获:{len(results)}", end="", flush=True)
 

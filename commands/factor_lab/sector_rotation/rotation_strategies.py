@@ -277,15 +277,19 @@ def create_strategy(
         ValueError: 不支持的策略类型
     """
     strategy_type = config.strategy_type
-    if strategy_type.value == "momentum":
+    if isinstance(strategy_type, str):
+        strategy_value = strategy_type
+    else:
+        strategy_value = strategy_type.value
+    if strategy_value == "momentum":
         return MomentumRotation()
-    elif strategy_type.value == "mean_reversion":
+    elif strategy_value == "mean_reversion":
         return MeanReversionRotation()
-    elif strategy_type.value == "composite":
+    elif strategy_value == "composite":
         return CompositeRotation()
     else:
         raise ValueError(
-            f"不支持的策略类型 '{strategy_type}', "
+            f"不支持的策略类型 '{strategy_value}', "
             f"可选: momentum / mean_reversion / composite"
         )
 

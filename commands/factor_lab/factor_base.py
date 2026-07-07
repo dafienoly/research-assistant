@@ -823,8 +823,8 @@ def _load_evolved():
     try:
         with open(evolved_path) as f:
             candidates = json.load(f)
-    except:
-        return
+    except Exception:
+            result = None  # factor compute error
     existing_names = {f["name"] for f in REGISTRY}
     for c in candidates:
         name = c.get("name", "")

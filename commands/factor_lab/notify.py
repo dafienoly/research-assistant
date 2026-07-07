@@ -33,8 +33,8 @@ def notify_goal_done(goal_name: str, summary: str = "", status: str = "completed
                 capture_output=True, text=True, timeout=5
             )
             webhook = r.stdout.strip()
-        except:
-            pass
+        except Exception:
+            import logging; logging.warning('notify: webhook failed')
 
     if not webhook:
         print("⚠️ WECHAT_WEBHOOK_URL 未配置, 跳过企业微信通知")

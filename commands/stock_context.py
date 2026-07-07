@@ -32,8 +32,8 @@ def _bs_fetch_all(symbol: str, fetch_kline: bool = True) -> dict:
                 if r and len(r) > 1:
                     result["name"] = r[1]
                 break
-        except:
-            pass
+        except Exception:
+            pass  # name lookup error (non-critical)
 
         # K 线刷新（仅当 fetch_kline=True 时执行）
         # K 线刷新（仅当 fetch_kline=True 时执行）
@@ -100,8 +100,8 @@ def _bs_fetch_all(symbol: str, fetch_kline: bool = True) -> dict:
                         "net_profit": r[6], "eps": r[7], "revenue": r[8] if len(r) > 8 else "",
                     }
                 break
-        except:
-            pass
+        except Exception:
+            pass  # name lookup error (non-critical)
 
         # 资产负债表 2025Q4
         try:
@@ -116,8 +116,8 @@ def _bs_fetch_all(symbol: str, fetch_kline: bool = True) -> dict:
                         "debt_ratio": r[5] if len(r) > 5 else "",
                     }
                 break
-        except:
-            pass
+        except Exception:
+            pass  # name lookup error (non-critical)
 
         # 行业分类
         try:
@@ -127,8 +127,8 @@ def _bs_fetch_all(symbol: str, fetch_kline: bool = True) -> dict:
                 if r and len(r) >= 4:
                     result["tags"]["行业"] = r[3]
                 break
-        except:
-            pass
+        except Exception:
+            pass  # name lookup error (non-critical)
 
     finally:
         bs.logout()
@@ -232,8 +232,8 @@ def build_context(symbol: str) -> dict:
             s.connect(("114.94.20.73", 10030))
             s.close()
             bf = _bs_fetch_all(symbol, fetch_kline=False)
-        except:
-            pass
+        except Exception:
+            pass  # name lookup error (non-critical)
 
     # K 线已由 _bs_fetch_all 合并到缓存，重新读取
     kf = KLINE / f"{symbol}.csv"

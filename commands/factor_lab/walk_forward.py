@@ -436,8 +436,8 @@ def compute_overfitting_diagnostics(window_results: list) -> dict:
             stability_corr = float(np.corrcoef(train_cums, val_cums)[0, 1])
             if np.isnan(stability_corr):
                 stability_corr = 0
-        except:
-            stability_corr = 0
+        except Exception:
+            stability_corr = 0  # walk_forward non-critical error
     else:
         stability_corr = 0
 

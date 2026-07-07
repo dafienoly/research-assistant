@@ -1,0 +1,15 @@
+{
+  "entry_id": "k_20260707_120159_8528be",
+  "kind": "finding",
+  "title": "CLI测试",
+  "hypothesis": "clih",
+  "evidence": "",
+  "conclusion": "clic",
+  "source": "",
+  "tags": [],
+  "confidence": 0.5,
+  "created_at": "2026-07-07T12:01:59.492924+08:00",
+  "updated_at": "2026-07-07T12:01:59.492934+08:00",
+  "cross_reviewed": false,
+  "cross_review_note": ""
+}
