@@ -94,9 +94,9 @@ def sync_version(version: str, summary: str = "", dry_run: bool = False) -> dict
 
 def _ensure_git_repo() -> None:
     if not (REPO_ROOT / ".git").exists():
-        subprocess.run(["git", "init", "-b", "main"], cwd=REPO_ROOT, check=True)
-        subprocess.run(["git", "config", "core.autocrlf", "false"], cwd=REPO_ROOT, check=True)
-        subprocess.run(["git", "config", "core.filemode", "false"], cwd=REPO_ROOT, check=True)
+        subprocess.run(["git", "init", "-b", "main"], cwd=REPO_ROOT, check=True, timeout=30)
+        subprocess.run(["git", "config", "core.autocrlf", "false"], cwd=REPO_ROOT, check=True, timeout=30)
+        subprocess.run(["git", "config", "core.filemode", "false"], cwd=REPO_ROOT, check=True, timeout=30)
 
 
 def _ensure_remote() -> None:
