@@ -198,6 +198,15 @@ def auto_run_once():
     # 5. Execute agent-runner
     agent_log_dir = TASKS_DIR / "agent_logs"
     agent_log_dir.mkdir(parents=True, exist_ok=True)
+    # 写 status.json 供 dashboard 读取进度
+    _run_status_path = agent_log_dir / "status.json"
+    try:
+        _run_status_path.write_text(json.dumps({
+            "stage": "agent", "backend": backend, "version": current, "name": cv.name,
+            "status": "running", "started_at": datetime.now(CST).isoformat(),
+        }))
+    except Exception:
+        pass
     agent_ok = False
     agent_error = ""
     try:

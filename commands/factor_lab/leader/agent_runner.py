@@ -10,7 +10,7 @@ from factor_lab.leader.workloop import (
 CST = timezone(timedelta(hours=8))
 REPO_ROOT = Path("/home/ly/.hermes/research-assistant")
 COMMANDS_DIR = REPO_ROOT / "commands"
-BACKEND_PRIORITY = ["claude", "command", "dry-run", "codex"]
+BACKEND_PRIORITY = ["claude", "command", "dry-run", "codex", "research"]
 DEFAULT_BACKEND = "claude"
 
 
@@ -110,6 +110,7 @@ def _run_streaming_process(cmd, log_file: Path, input_text: str | None = None,
         reader.start()
         stream_closed = False
         timed_out = False
+        last_heartbeat = time.time()
         while True:
             try:
                 item = q.get(timeout=0.2)
@@ -121,6 +122,7 @@ def _run_streaming_process(cmd, log_file: Path, input_text: str | None = None,
                         output_parts.append(rendered)
                         lf.write(rendered)
                         lf.flush()
+                        last_heartbeat = time.time()  # 有输出就不写心跳
             except queue.Empty:
                 pass
 
@@ -132,6 +134,13 @@ def _run_streaming_process(cmd, log_file: Path, input_text: str | None = None,
                     proc.kill()
                 except Exception:
                     pass
+
+            # 静默 >30s 时写心跳到 log，让 dashboard /api/stream 有反馈
+            if not timed_out and time.time() - last_heartbeat > 30:
+                elapsed = int(time.time() - started)
+                lf.write(f"# heartbeat: running {elapsed}s / timeout={timeout}s (pid={proc.pid})\n")
+                lf.flush()
+                last_heartbeat = time.time()
 
             if stream_closed and proc.poll() is not None:
                 break
@@ -251,6 +260,8 @@ class AgentRunner:
             return self._backend_command(prompt, task_id, log_file)
         elif self.backend == "codex":
             return self._backend_codex(prompt, task_id, log_file)
+        elif self.backend == "research":
+            return self._backend_research(prompt, task_id, log_file)
         return {"success": False, "error": f"未知 backend: {self.backend}"}
 
     def _backend_dry_run(self, prompt, task_id, log_file):
@@ -303,6 +314,56 @@ class AgentRunner:
         log_file.write_text(f"WARNING: Codex 后端已调用 - {task_id}\n\n{prompt}\n")
         return {"success": True, "backend": "codex", "output": "codex 备用后端执行"}
 
+    def _backend_research(self, prompt, task_id, log_file):
+        """research: 使用 Research Skill Runtime 执行投研任务
+
+        从 prompt 中提取 skill_id 和参数，通过 SkillRuntime 执行。
+        """
+        log_file.write_text(f"# Research Skill Runtime: {task_id}\n\n{prompt}\n\n")
+        try:
+            # 从 prompt 中解析 skill_id
+            import re as _re
+            skill_match = _re.search(r"research:run-skill\s+--skill-id\s+(\S+)", prompt)
+            skill_id = skill_match.group(1) if skill_match else ""
+
+            # 从 prompt 提取参数
+            params = {}
+            param_match = _re.search(r"--params\s+(\S+)", prompt)
+            if param_match:
+                for pair in param_match.group(1).split(","):
+                    if "=" in pair:
+                        k, v = pair.split("=", 1)
+                        params[k.strip()] = v.strip()
+
+            if not skill_id:
+                # 尝试从 T001 任务描述中获取
+                skill_match = _re.search(r"skill[:_-](\S+)", prompt)
+                if skill_match:
+                    skill_id = skill_match.group(1)
+
+            if skill_id:
+                from factor_lab.research_skill import SkillRegistry, SkillRuntime
+                registry = SkillRegistry()
+                registry.seed_defaults()
+                runtime = SkillRuntime(registry=registry)
+                result = runtime.run(skill_id, params)
+                log_file.write(f"# Result: {result.status}\n")
+                log_file.write(f"# Duration: {result.duration_ms}ms\n")
+                if result.error:
+                    log_file.write(f"# Error: {result.error}\n")
+                import json as _json
+                log_file.write(_json.dumps(result.data, indent=2, ensure_ascii=False))
+                return {"success": result.status == "completed", "output": result.data,
+                        "result": result, "backend": "research"}
+            else:
+                log_file.write("# No skill_id found, dry-run mode\n")
+                return {"success": True, "backend": "research", "output": "dry-run (no skill matched)"}
+        except Exception as e:
+            log_file.write(f"# Research backend error: {e}\n")
+            import traceback as _tb
+            log_file.write(_tb.format_exc())
+            return {"success": False, "backend": "research", "error": str(e)}
+
     def watch(self):
         """轮询模式"""
         print(f"  👁️  agent-runner watch 模式 (interval={self.interval}s, backend={self.backend})")
@@ -330,7 +391,7 @@ def _find_task_file(tasks_dir: Path, tid: str) -> str:
 
 def _build_agent_prompt(tid: str, task_md: str, version: str) -> str:
     return (
-        f"你是 Hermes Agent，当前执行任务 {tid} (版本 {version})。\n"
+        f"你是一名量化系统开发工程师，当前执行任务 {tid} (版本 {version})。\n"
         f"工作目录: {COMMANDS_DIR}\n\n"
         f"## 任务内容\n\n{task_md}\n\n"
         f"## 要求\n"
@@ -368,4 +429,4 @@ def loop_once():
 
 
 def safe_stages() -> list:
-    return ["research", "dry-run", "dry_run", "acceptance", "test", "V2", "V3", "auto"]
+    return ["research", "dry-run", "dry_run", "acceptance", "test", "V2", "V3", "V4", "V5", "V6", "auto"]
