@@ -1,2 +1,7 @@
-symbol,date,sentiment_score,sentiment_label,positive_count,negative_count,neutral_count
+﻿symbol,date,sentiment_score,sentiment_label,positive_count,negative_count,neutral_count
 000300,20260705,0.65,positive,15,3,22
+000063,20260707,0.5,positive,3,1,0
+000333,20260707,0.45,positive,8,3,0
+000400,20260707,-0.06,neutral,8,9,0
+000533,20260707,0.0,neutral,1,1,0
+000620,20260707,0.47,positive,11,4,0

@@ -1,5 +1,5 @@
 {
-  "check_time": "2026-07-07T11:39:36+08:00",
+  "check_time": "2026-07-07T12:25:35+08:00",
   "overall_status": "stale",
   "files": [
     {
@@ -7,7 +7,7 @@
       "status": "ok",
       "last_updated": "2026-07-07T11:37:51+08:00",
       "max_age_seconds": 86400,
-      "actual_age_seconds": 105,
+      "actual_age_seconds": 2864,
       "note": ""
     },
     {
@@ -15,15 +15,15 @@
       "status": "stale",
       "last_updated": "2026-07-07T11:18:40+08:00",
       "max_age_seconds": 60,
-      "actual_age_seconds": 1255,
-      "note": "延迟 1255s > 阈值 60s"
+      "actual_age_seconds": 4015,
+      "note": "延迟 4015s > 阈值 60s"
     },
     {
       "path": "fundamentals/financial_snapshot.csv",
       "status": "ok",
-      "last_updated": "2026-07-03T17:11:26+08:00",
+      "last_updated": "2026-07-07T12:01:50+08:00",
       "max_age_seconds": 604800,
-      "actual_age_seconds": 325689,
+      "actual_age_seconds": 1425,
       "note": ""
     },
     {
@@ -31,7 +31,7 @@
       "status": "ok",
       "last_updated": "2026-07-07T11:14:31+08:00",
       "max_age_seconds": 64800,
-      "actual_age_seconds": 1505,
+      "actual_age_seconds": 4264,
       "note": ""
     },
     {
@@ -39,8 +39,8 @@
       "status": "stale",
       "last_updated": "2026-07-03T14:32:13+08:00",
       "max_age_seconds": 60,
-      "actual_age_seconds": 335242,
-      "note": "延迟 335242s > 阈值 60s"
+      "actual_age_seconds": 338002,
+      "note": "延迟 338002s > 阈值 60s"
     }
   ],
   "blocking": true

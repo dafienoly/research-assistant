@@ -158,7 +158,13 @@ def _mx_data_query(question: str) -> dict:
 
 
 def _parse_fund_flow_from_mx(result: dict, code: str) -> list[dict]:
-    """从 mx:data 主力资金流向的返回中解析时序数据"""
+    """从 mx:data 主力资金流向的返回中解析时序数据
+
+    API 返回格式 (已验证):
+      - headName = 日期列表 (标准格式, 非转置)
+      - nameMap = {数字编码: 指标中文名}
+      - rawTable[数字编码] = 各日期的值数组 (与 headName 对齐)
+    """
     records = []
     try:
         data = result.get("data", {})
@@ -173,65 +179,80 @@ def _parse_fund_flow_from_mx(result: dict, code: str) -> list[dict]:
     except Exception:
         return records
 
+    # 字段映射: 中文关键词 → 目标字段
+    FIELD_MAP = [
+        ("主力净流入", "net_main_force"),
+        ("超大单净流入", "net_super_large"),
+        ("大单净流入", "net_large"),
+        ("中单净流入", "net_medium"),
+        ("小单净流入", "net_small"),
+        ("净流入天数", "days_inflow"),
+        ("净流出天数", "days_outflow"),
+    ]
+
     for table in dtos:
         try:
-            secu_code = ""
+            # 只处理 A 股 (排除港股)
+            entity_name = table.get("entityName", "") or ""
+            if "(00763.HK)" in entity_name or ".HK)" in entity_name:
+                continue
+
+            secu_code = code
             if table.get("entityTagDTO"):
-                secu_code = table["entityTagDTO"].get("secuCode", "")
+                secu_code = table["entityTagDTO"].get("secuCode", "") or secu_code
             elif table.get("entityTagDTOList"):
-                secu_code = table["entityTagDTOList"][0].get("secuCode", "")
-            if not secu_code:
-                secu_code = code
+                secu_code = table["entityTagDTOList"][0].get("secuCode", "") or secu_code
 
             raw = table.get("table") or table.get("rawTable") or {}
             name_map = table.get("nameMap") or {}
             head_name = raw.get("headName", [])
 
-            if not head_name:
+            if not head_name or not isinstance(head_name, list):
                 continue
 
-            # 判断格式: headName 是日期还是指标
-            date_count = sum(1 for h in head_name if re.match(r"\d{4}-\d{2}-\d{2}", str(h)))
-            is_transposed = date_count < 3  # headName 是指标名, nameMap keys 是日期
+            # 检查是否为标准日期格式
+            if not re.match(r"\d{4}-\d{2}-\d{2}", str(head_name[0])):
+                continue
 
-            if is_transposed:
-                # 转置格式: nameMap keys = 日期
-                for date_key, date_val in name_map.items():
-                    if not re.match(r"\d{4}-\d{2}-\d{2}", str(date_val)):
-                        continue
-                    vals = raw.get(date_key, [])
-                    if not isinstance(vals, list):
-                        continue
-                    # 从 headName 找字段索引
-                    flow_record = {"symbol": secu_code, "date": str(date_val).replace("-", "")}
-                    for idx, h in enumerate(head_name):
-                        v = vals[idx] if idx < len(vals) else ""
-                        if "主力净流入" in str(h) or "主力" in str(h) and "净流入" in str(h):
-                            flow_record["net_main_force"] = _parse_amount(v)
-                        elif "超大单" in str(h):
-                            flow_record["net_super_large"] = _parse_amount(v)
-                        elif "大单" in str(h) and "净流入" in str(h):
-                            flow_record["net_large"] = _parse_amount(v)
-                        elif "中单" in str(h):
-                            flow_record["net_medium"] = _parse_amount(v)
-                        elif "小单" in str(h):
-                            flow_record["net_small"] = _parse_amount(v)
-                    if "net_main_force" in flow_record:
-                        records.append(flow_record)
-            else:
-                # 标准格式: headName = 日期
-                field_map = {"f62": "net_main_force", "f66": "net_super_large",
-                             "f72": "net_large", "f78": "net_medium", "f84": "net_small"}
-                for date_str in head_name:
-                    flow_record = {"symbol": secu_code, "date": str(date_str).replace("-", "")}
-                    for key, field in field_map.items():
-                        raw_key = key
-                        vals = raw.get(raw_key, [])
-                        idx = head_name.index(date_str) if date_str in head_name else -1
-                        if idx >= 0 and idx < len(vals):
-                            flow_record[field] = _parse_amount(vals[idx])
-                    if "net_main_force" in flow_record:
-                        records.append(flow_record)
+            # 建立编码→字段的映射
+            code_to_field = {}
+            for raw_key, indicator_name in name_map.items():
+                if raw_key == "headNameSub":
+                    continue
+                for keyword, field in FIELD_MAP:
+                    if keyword in str(indicator_name):
+                        code_to_field[raw_key] = field
+                        break
+
+            if "net_main_force" not in code_to_field.values():
+                continue  # 这个 table 没有资金流向数据
+
+            # 按日期提取数据
+            for idx, date_str in enumerate(head_name):
+                if not re.match(r"\d{4}-\d{2}-\d{2}", str(date_str)):
+                    continue
+                # 净化日期: 去除 "(日)" 等后缀
+                clean_date = re.sub(r"\(.*?\)", "", str(date_str)).strip()
+                rec = {
+                    "symbol": secu_code,
+                    "date": clean_date.replace("-", ""),
+                    "net_main_force": 0.0,
+                    "net_super_large": 0.0,
+                    "net_large": 0.0,
+                    "net_medium": 0.0,
+                    "net_small": 0.0,
+                    "days_inflow": 0,
+                    "days_outflow": 0,
+                }
+                for raw_key, field in code_to_field.items():
+                    vals = raw.get(raw_key, [])
+                    if isinstance(vals, list) and idx < len(vals):
+                        parsed = _parse_amount(vals[idx])
+                        if field in ("days_inflow", "days_outflow"):
+                            rec[field] = int(parsed)
+                        else:
+                            rec[field] = parsed
+                records.append(rec)
 
         except Exception:
             continue
@@ -282,7 +303,7 @@ def refresh_fund_flow_timeseries(batch_size: int = 20) -> dict:
         print(f"  [{i+1}/{min(batch_size, len(codes))}] {code} ...", end=" ")
         sys.stdout.flush()
 
-        result = _mx_data_query(f"{code} 主力资金净流入 超大单 大单 中单 小单 每日 近5日")
+        result = _mx_data_query(f"{code} 主力资金净流入 每日 2026-07-01 至 2026-07-07")
         if "error" in result:
             print(f"❌ {result['error']}")
             errors += 1
