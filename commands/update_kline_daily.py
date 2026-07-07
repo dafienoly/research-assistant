@@ -87,8 +87,8 @@ def update_via_baostock(today: str) -> int:
                     "volume": row[6], "amount": row[7] if len(row) > 7 else ""
                 }):
                     updated += 1
-        except:
-            pass
+        except Exception:
+            import logging; logging.warning('update_kline_daily: suppressed error')
 
         if (i+1) % 1000 == 0 or i >= len(stocks) - 10:
             print(f"\r  Baostock进度: {min(i+10, len(stocks))}/{len(stocks)} 更新:{updated}", end="")

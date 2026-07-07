@@ -113,8 +113,8 @@ def register_candidate(candidate: dict) -> bool:
     def dyn_factor(df, _expr=expr):
         try:
             return df.eval(_expr)
-        except:
-            return pd.Series(0, index=df.index)
+        except Exception:
+                    pass  # non-critical evolution step
     
     REGISTRY.append({
         "name": name,

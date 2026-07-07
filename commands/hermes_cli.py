@@ -175,6 +175,17 @@ Leader 自动派发:
                                 查看执行历史
   research:init-registry        初始化注册表并填充内置 Skills
 
+知识库管理 (V3.0):
+  research:knowledge-list [--kind rule|finding|failure]
+                                列出知识条目
+  research:knowledge-add --kind <type> --title <title> --hypothesis <hypothesis> --conclusion <conclusion>
+                                添加知识条目
+  research:knowledge-search --query <text> [--kind rule|finding|failure]
+                                搜索知识库
+  research:knowledge-stats       知识库统计
+  research:loop [--notebook PATH] [--rounds 5] [--convergence 5]
+                                启动 6 阶段自动因子研究循环
+
 策略报告生成 (V6.5):
   strategy:report [--from-portfolio-result PATH] [--from-strategy-returns CSV]
                                 生成策略报告
@@ -202,6 +213,7 @@ Leader 自动派发:
 数据质量类:
   data:freshness-check             检查数据新鲜度
   data:gap-report                  报告数据缺口
+  data:hub-rebuild [target]        补齐因子引擎时序数据 (fundamentals|fund-flow|sentiment|all)
 
 盘中监测类:
   intraday:prepare                 初始化盘中状态
@@ -1087,6 +1099,59 @@ run_daily_premarket(no_notify=True)
             print(f"   - [{s['skill_id']}] {s['name']}")
         print()
 
+    # ── V3.0 Knowledge Base ─────────────────────────────────────
+    elif command == "research:knowledge-list":
+        kind = _arg_value(args, "--kind", "")
+        from factor_lab.research_skill.knowledge_base import cmd_knowledge_list
+        print(cmd_knowledge_list(kind))
+
+    elif command == "research:knowledge-add":
+        kind = _arg_value(args, "--kind", "")
+        title = _arg_value(args, "--title", "")
+        hypothesis = _arg_value(args, "--hypothesis", "")
+        conclusion = _arg_value(args, "--conclusion", "")
+        evidence = _arg_value(args, "--evidence", "")
+        tags = _arg_value(args, "--tags", "")
+        source = _arg_value(args, "--source", "")
+        conf_str = _arg_value(args, "--confidence", "0.5")
+        try:
+            confidence = float(conf_str)
+        except ValueError:
+            confidence = 0.5
+        if not title or not hypothesis or not conclusion:
+            print("用法: research:knowledge-add --kind <type> --title <title> --hypothesis <hypothesis> --conclusion <conclusion>")
+            return
+        from factor_lab.research_skill.knowledge_base import cmd_knowledge_add
+        print(cmd_knowledge_add(kind, title, hypothesis, conclusion, evidence, tags, source, confidence))
+
+    elif command == "research:knowledge-search":
+        query = _arg_value(args, "--query", "")
+        kind = _arg_value(args, "--kind", "")
+        if not query:
+            print("用法: research:knowledge-search --query <text> [--kind rule|finding|failure]")
+            return
+        from factor_lab.research_skill.knowledge_base import cmd_knowledge_search
+        print(cmd_knowledge_search(query, kind))
+
+    elif command == "research:knowledge-stats":
+        from factor_lab.research_skill.knowledge_base import cmd_knowledge_stats
+        print(cmd_knowledge_stats())
+
+    elif command == "research:loop":
+        notebook = _arg_value(args, "--notebook", "")
+        rounds_str = _arg_value(args, "--rounds", "5")
+        convergence_str = _arg_value(args, "--convergence", "5")
+        try:
+            rounds = int(rounds_str)
+        except ValueError:
+            rounds = 5
+        try:
+            convergence = int(convergence_str)
+        except ValueError:
+            convergence = 5
+        from factor_lab.research_loop import cmd_research_loop
+        print(cmd_research_loop(notebook=notebook, rounds=rounds, convergence=convergence))
+
     # ── V6.5 Strategy Report ─────────────────────────────────────
     elif command == "strategy:report":
         _handle_strategy_report(args)
@@ -1286,6 +1351,33 @@ run_daily_premarket(no_notify=True)
         for g in report["gaps"]:
             icon = {'blocking': '🚫', 'partial': '⚠️', 'minor': 'ℹ️'}.get(g.get('impact', ''), '❓')
             print(f"  {icon} [{g['category']}] {g['failure_reason']}")
+
+    elif command.startswith("data:hub-rebuild"):
+        target = args[0] if args else "all"
+        from data_hub_rebuilder import rebuild_fundamentals_timeseries, refresh_fund_flow_timeseries, rebuild_news_sentiment_timeseries
+        targets = {
+            "fundamentals": ("📊 基本面时序", rebuild_fundamentals_timeseries),
+            "fund-flow": ("💰 资金流向时序", lambda: refresh_fund_flow_timeseries(batch_size=20)),
+            "sentiment": ("📰 新闻情感时序", lambda: rebuild_news_sentiment_timeseries(top_n=20)),
+        }
+        if target not in ("all", *targets.keys()):
+            print(f"未知目标: {target}, 可选: all, {', '.join(targets.keys())}")
+            return
+        results = {}
+        if target == "all":
+            for name, (label, func) in targets.items():
+                print(f"\n{'='*50}\n{label}\n{'='*50}")
+                try: results[name] = func()
+                except Exception as e: results[name] = {"status": "error", "error": str(e)}
+        else:
+            label, func = targets[target]
+            print(f"\n{'='*50}\n{label}\n{'='*50}")
+            try: results[target] = func()
+            except Exception as e: results[target] = {"status": "error", "error": str(e)}
+        print(f"\n{'='*50}\n📋 汇总\n{'='*50}")
+        for name, r in results.items():
+            icon = "✅" if r.get("status") == "ok" else "⚠️"
+            print(f"  {icon} {name}: {r.get('status', 'unknown')}")
 
     # === 盘中监测类 ===
     elif command == "intraday:prepare":
