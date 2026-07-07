@@ -7,10 +7,11 @@ from factor_lab.leader.roadmap_cursor import get_cursor, advance, set_blocked
 from factor_lab.leader.backend_policy import select_backend, need_code_change
 from factor_lab.leader.task_intake import build_task_package
 from factor_lab.leader.workloop import write_completion, release_lock, is_locked, TASKS_DIR
+from config import VENV_PYTHON, BASE
 
 CST = timezone(timedelta(hours=8))
-VENV = "/home/ly/.hermes/research-assistant/.venv_quant/bin/python3"
-CLI = "/home/ly/.hermes/research-assistant/commands/hermes_cli.py"
+VENV = VENV_PYTHON
+CLI = str(BASE / "commands" / "hermes_cli.py")
 
 
 def _read_latest():

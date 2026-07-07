@@ -1,13 +1,15 @@
 """Agent Console Adapters — Hermes / Claude 引擎"""
 import subprocess, json, os, threading, time, pty, select
+import sys
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+from config import VENV_PYTHON
 from factor_lab.agent_console.schemas import AgentEvent
 from factor_lab.agent_console.sessions import append_event, update_status, SESSIONS_DIR
 
 CST = timezone(timedelta(hours=8))
-VENV = "/home/ly/.hermes/research-assistant/.venv_quant/bin/python3"
-CLI = "/home/ly/.hermes/research-assistant/commands/hermes_cli.py"
+VENV = VENV_PYTHON
+CLI = str(Path(VENV_PYTHON).resolve().parent.parent.parent / "commands" / "hermes_cli.py")
 COMMANDS = "/home/ly/.hermes/research-assistant/commands"
 
 
