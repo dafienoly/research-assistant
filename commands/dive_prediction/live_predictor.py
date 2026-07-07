@@ -23,6 +23,30 @@ DATA_DIR = PATHS["daily_kline"]
 PROJECT_ROOT = Path.home() / ".hermes" / "research-assistant"
 SNAPSHOT = PROJECT_ROOT / "data" / "market" / "live_snapshot.csv"
 
+# XGBoost 模型集成
+_ML_PROB_CACHE = None
+
+
+def _ml_prob(df: pd.DataFrame) -> float | None:
+    """用 XGBoost 模型预测（如果有模型的话）"""
+    try:
+        from dive_prediction.ml_trainer import predict_proba
+        import json as _json
+        from pathlib import Path as _Path
+        feat_path = _Path(__file__).resolve().parent / "models" / "feature_list.json"
+        if not feat_path.exists():
+            return None
+        features = _json.loads(feat_path.read_text())
+        # 用最新一行特征
+        if not all(c in df.columns for c in features):
+            return None
+        last = df[features].tail(1).ffill().bfill()
+        if last.empty:
+            return None
+        return predict_proba(last)
+    except Exception:
+        return None
+
 ETF_CODE = "159516"
 ETF_NAME = "半导体设备ETF"
 
@@ -178,10 +202,19 @@ def predict(code: str = ETF_CODE) -> dict:
     realtime = fetch_realtime_price() if market_open else None
     intraday = check_intraday_dive(realtime) if realtime else {"signals": [], "intraday_risk": 0, "detail": "盘中尚未开盘"}
 
-    # 3. 综合概率
+    # 3. 综合概率（规则 + ML）
     base_prob = pred["prob"]
     intra_boost = intraday["intraday_risk"] * 5  # 盘中信号最多加50%
-    total_prob = min(base_prob + intra_boost, 98)
+    ml_prob = _ml_prob(hist) if hist is not None else None
+    if ml_prob is not None:
+        # ML 模型与规则引擎加权平均（ML 权重 40%，规则 60%）
+        ml_weighted = ml_prob * 0.4
+        rule_weighted = min(base_prob + intra_boost, 98) * 0.6
+        total_prob = min(ml_weighted + rule_weighted, 98)
+        ml_label = f"  🤖  ML概率: {ml_prob:.0f}%"
+    else:
+        total_prob = min(base_prob + intra_boost, 98)
+        ml_label = ""
 
     # 4. 风险等级
     if total_prob >= 70:
@@ -202,6 +235,8 @@ def predict(code: str = ETF_CODE) -> dict:
         summary += f"\n  📈  实时价: {realtime['price']:.3f}  涨幅: {realtime['change_pct']:+.1f}%"
         summary += f"\n  💰  成交: {realtime['amount']:.0f}亿"
     summary += f"\n  🚨  综合跳水概率: {total_prob:.0f}%  等级: {level}"
+    if ml_label:
+        summary += ml_label
 
     if pred["signals"]:
         summary += f"\n  ⚡  昨日信号: {pred['detail']}"

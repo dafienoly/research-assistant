@@ -1,0 +1,15 @@
+[
+  "ret1",
+  "ret5",
+  "ret10",
+  "ret20",
+  "amplitude_raw",
+  "amp_ma5",
+  "vol_ratio",
+  "amount_ma5",
+  "prev_ret5",
+  "prev_amplitude",
+  "consec_up",
+  "high_low_ratio",
+  "open_close_ratio"
+]
