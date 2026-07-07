@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
-from factor_lab.agent_console.sessions import create_session, get_session, stream_events, SESSIONS_DIR
+from factor_lab.agent_console.sessions import create_session, get_session, stream_events, SESSIONS_DIR, write_lifecycle
 from factor_lab.agent_console.adapters import start_session
 from factor_lab.agent_console.adapters import get_adapters
 
@@ -28,6 +28,7 @@ async def create_session_api(body: CreateSessionBody):
         return JSONResponse({"error": "prompt required"}, status_code=400)
     import threading as _t
     sid = create_session(body.agent, body.prompt)
+    write_lifecycle(sid, body.agent, body.prompt)
     _t.Thread(target=start_session, args=(sid, body.agent, body.prompt), daemon=True).start()
     return {"session_id": sid, "status": "running"}
 

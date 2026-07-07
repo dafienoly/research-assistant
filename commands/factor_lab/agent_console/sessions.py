@@ -1,5 +1,5 @@
-"""Agent Console Sessions — 会话管理 (V3: 版本关联 + 备份恢复)"""
-import json, os, uuid, subprocess, shutil
+"""Agent Console Sessions — 会话管理 (V3: 版本关联 + 备份恢复 + 生命周期)"""
+import json, os, uuid, subprocess, shutil, atexit
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from factor_lab.agent_console.schemas import AgentEvent, SessionState
@@ -169,3 +169,44 @@ def stream_events(sid: str, start_line: int = 0):
             yield event.to_sse()
         except Exception:
             continue
+
+
+# ─── Daemon thread lifecycle ───────────────────────────────────
+
+def write_lifecycle(sid: str, agent: str, prompt: str, status: str = "running"):
+    """标记 daemon session 的生命周期状态，进程退出后可检测 orphaned。"""
+    import os as _os
+    sdir = SESSIONS_DIR / sid
+    sdir.mkdir(parents=True, exist_ok=True)
+    (sdir / "lifecycle.json").write_text(json.dumps({
+        "pid": _os.getpid(),
+        "status": status,
+        "agent": agent,
+        "prompt": prompt[:200],
+        "created_at": datetime.now(CST).isoformat(),
+    }, indent=2))
+
+
+@atexit.register
+def _mark_orphaned_sessions():
+    """进程退出前将所有 running daemon session 标记为 orphaned。"""
+    if not SESSIONS_DIR.exists():
+        return
+    orphaned = 0
+    for d in sorted(SESSIONS_DIR.iterdir()):
+        if not d.is_dir():
+            continue
+        lf = d / "lifecycle.json"
+        if not lf.exists():
+            continue
+        try:
+            state = json.loads(lf.read_text())
+            if state.get("status") == "running":
+                state["status"] = "orphaned"
+                state["orphaned_at"] = datetime.now(CST).isoformat()
+                lf.write_text(json.dumps(state, indent=2))
+                orphaned += 1
+        except Exception:
+            continue
+    if orphaned:
+        print(f"[sessions] marked {orphaned} session(s) as orphaned on shutdown")
