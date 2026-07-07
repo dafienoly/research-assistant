@@ -189,6 +189,8 @@ def auto_run_once():
             # 根据后端选择相应的 adapter
             _agent_adapter = "claude_code" if backend in ("claude", "command") else "hermes_demo"
             _sid = _cs(_agent_adapter, f"版本 {current}: {cv.name}", version=current)
+            from factor_lab.agent_console.sessions import write_lifecycle as _wl
+            _wl(_sid, _agent_adapter, f"Auto execute {current}: {cv.name}")
             _t.Thread(target=_start_agent, args=(_sid, _agent_adapter,
                        f"Auto execute {current}: {cv.name if cv else ''}"), daemon=True).start()
             _created_session = True

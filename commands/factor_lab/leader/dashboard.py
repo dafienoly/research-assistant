@@ -741,9 +741,11 @@ class _DashboardHandler(BaseHTTPRequestHandler):
                 self._send(400, body, "application/json; charset=utf-8")
                 return
             from factor_lab.agent_console.sessions import create_session
+            from factor_lab.agent_console.sessions import write_lifecycle as _write_lc
             from factor_lab.agent_console.adapters import start_session
             import threading as _t
             sid = create_session(agent, prompt)
+            _write_lc(sid, agent, prompt)
             _t.Thread(target=start_session, args=(sid, agent, prompt), daemon=True).start()
             body = json.dumps({"session_id": sid, "status": "running"}).encode()
             self._send(201, body, "application/json; charset=utf-8")
@@ -817,9 +819,11 @@ class _DashboardHandler(BaseHTTPRequestHandler):
                 self._send(400, body, "application/json; charset=utf-8")
                 return
             from factor_lab.agent_console.sessions import create_session
+            from factor_lab.agent_console.sessions import write_lifecycle as _write_lc
             from factor_lab.agent_console.adapters import start_session
             import threading as _t
             sid = create_session(agent, prompt)
+            _write_lc(sid, agent, prompt)
             _t.Thread(target=start_session, args=(sid, agent, prompt), daemon=True).start()
             body = json.dumps({"session_id": sid, "status": "running"}).encode()
             self._send(201, body, "application/json; charset=utf-8")
