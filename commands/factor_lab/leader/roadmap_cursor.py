@@ -20,6 +20,7 @@ DEFAULT = {
     "updated_at": "",
     "auto_allowed_until": "V8.9",
     "live_trading_allowed": False,
+    "next_version": "V3.0",
 }
 
 def _load():
@@ -32,7 +33,15 @@ def _save(data):
     CURSOR_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False))
 
 def get_cursor():
-    return _load()
+    c = _load()
+    # 自动计算 next_version ← 基于 current_version
+    from factor_lab.leader.roadmap import next_version, is_backlog
+    nv = next_version(c.get("current_version", ""))
+    if nv and not is_backlog(nv.version):
+        c["next_version"] = nv.version
+    else:
+        c["next_version"] = ""
+    return c
 
 def advance(version, status="completed", commit="", run_id=""):
     c = _load()
@@ -40,9 +49,13 @@ def advance(version, status="completed", commit="", run_id=""):
         if version not in c["completed_versions"]:
             c["completed_versions"].append(version)
             c["completed_versions"] = list(dict.fromkeys(c["completed_versions"]))
+        from factor_lab.leader.roadmap import next_version, is_backlog
         nv = next_version(version)
         if nv and not is_backlog(nv.version):
             c["current_version"] = nv.version
+            c["next_version"] = nv.version
+        else:
+            c["next_version"] = ""
         c["status"] = "running"
     elif status == "failed":
         if version not in c["failed_versions"]:
