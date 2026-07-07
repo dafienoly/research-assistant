@@ -28,6 +28,9 @@ def date_id() -> str:
 # === 路径 ===
 BASE = Path.home() / ".hermes" / "research-assistant"
 
+# VENV Python 路径（统一入口，所有模块共用）
+VENV_PYTHON = str(BASE / ".venv_quant" / "bin" / "python3")
+
 PATHS = {
     # 工作目录
     "data": BASE / "data",

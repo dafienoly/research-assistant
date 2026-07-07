@@ -2,10 +2,14 @@
 """Local runner for Hermes research checks."""
 
 import subprocess
+import sys
 from pathlib import Path
 
-ROOT = Path('/home/ly/.hermes/research-assistant/commands')
-PY = Path('/home/ly/.hermes/research-assistant/.venv_quant/bin/python3')
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config import VENV_PYTHON
+
+ROOT = Path(VENV_PYTHON).resolve().parent.parent.parent / "commands"
+PY = Path(VENV_PYTHON)
 
 
 def run(cmd):
