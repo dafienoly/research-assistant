@@ -167,5 +167,80 @@ def main():
         print(f"  信息: {result['msg']}")
 
 
+# ═══════════════════════════════════════════════════
+# LSTM 时序模型
+# ═══════════════════════════════════════════════════
+
+def train_lstm(force: bool = False) -> dict:
+    """训练 LSTM 时序模型（基于 XGBoost 的13个特征做序列预测）"""
+    _ensure_dir()
+    csv_path = PATHS["daily_kline"] / f"{ETF_CODE}_hist.csv"
+    if not csv_path.exists():
+        csv_path = PATHS["daily_kline"] / f"{ETF_CODE}_daily_kline.csv"
+    if not csv_path.exists():
+        return {"status": "error", "msg": f"数据文件不存在"}
+
+    df = pd.read_csv(csv_path)
+    result = prepare_training_data(df)
+    if result[0] is None:
+        return {"status": "error", "msg": "数据不足"}
+    X_train, X_val, y_train, y_val, features = result
+
+    lstm_path = MODEL_DIR / "lstm_dive.pkl"
+    if lstm_path.exists() and not force:
+        return {"status": "skipped", "msg": "LSTM 模型已存在"}
+
+    try:
+        # 简单 LSTM: 用序列长度 5 天的特征预测第6天
+        seq_len = 5
+        n_features = len(features)
+        X_seq, y_seq = [], []
+        for i in range(seq_len, len(X_train)):
+            X_seq.append(X_train[i-seq_len:i])
+            y_seq.append(y_train[i])
+        X_seq, y_seq = np.array(X_seq), np.array(y_seq)
+
+        if len(X_seq) < 10:
+            return {"status": "error", "msg": f"序列样本不足: {len(X_seq)}"}
+
+        import tensorflow as tf
+        model = tf.keras.Sequential([
+            tf.keras.layers.LSTM(32, input_shape=(seq_len, n_features), return_sequences=True),
+            tf.keras.layers.Dropout(0.2),
+            tf.keras.layers.LSTM(16),
+            tf.keras.layers.Dropout(0.2),
+            tf.keras.layers.Dense(1, activation='sigmoid'),
+        ])
+        model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+        # 验证集也做序列化
+        X_val_seq = np.array([X_val[max(0, i-seq_len+1):i+1] for i in range(len(X_val))])
+        # padding if needed
+        if X_val_seq.shape[1] < seq_len:
+            pad = np.zeros((X_val_seq.shape[0], seq_len - X_val_seq.shape[1], n_features))
+            X_val_seq = np.concatenate([pad, X_val_seq], axis=1)
+
+        history = model.fit(X_seq, y_seq, epochs=20, batch_size=4,
+                            validation_data=(X_val_seq, y_val),
+                            verbose=0)
+        val_acc = history.history['val_accuracy'][-1] if history.history.get('val_accuracy') else 0
+
+        # 保存
+        model.save(str(lstm_path))
+
+        return {
+            "status": "trained",
+            "n_seq": len(X_seq),
+            "n_val": len(y_val),
+            "val_acc": round(float(val_acc), 4),
+            "seq_len": seq_len,
+            "features": len(features),
+        }
+    except ImportError:
+        return {"status": "error", "msg": "tensorflow 未安装，执行 pip install tensorflow"}
+    except Exception as e:
+        return {"status": "error", "msg": f"LSTM 训练失败: {e}"}
+
+
 if __name__ == "__main__":
     main()

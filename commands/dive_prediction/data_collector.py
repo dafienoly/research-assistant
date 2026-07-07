@@ -167,6 +167,22 @@ def compute_features(df: pd.DataFrame) -> pd.DataFrame:
     df["high_low_ratio"] = (close - low) / (high - low + 0.001)
     df["open_close_ratio"] = (close - df["open"]) / (high - low + 0.001)
 
+    # ── 时间特征 ──
+    if "日期" in df.columns:
+        dates = pd.to_datetime(df["日期"])
+    elif "timeString" in df.columns:
+        dates = pd.to_datetime(df["timeString"])
+    else:
+        dates = df.index if isinstance(df.index, pd.DatetimeIndex) else pd.RangeIndex(len(df))
+    if hasattr(dates, 'dt'):
+        df["day_of_week"] = dates.dt.dayofweek  # 0=Mon
+        df["is_monday"] = (dates.dt.dayofweek == 0).astype(int)
+        df["is_friday"] = (dates.dt.dayofweek == 4).astype(int)
+        df["month_start"] = (dates.dt.day <= 5).astype(int)  # 月初5天
+        df["month_end"] = (dates.dt.day >= 25).astype(int)   # 月末5天
+        df["pre_holiday"] = 0  # 节假日特征（简化：周末前）
+        df["post_holiday"] = 0
+
     return df
 
 

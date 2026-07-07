@@ -188,6 +188,53 @@ def check_intraday_dive(realtime: dict) -> dict:
     return {"signals": signals, "intraday_risk": min(risk, 10), "detail": "; ".join(signals) if signals else "盘中无明显跳水信号"}
 
 
+# ── 事件驱动检查 ────────────────────────────────────
+
+def check_event_driven(realtime: dict | None = None) -> dict:
+    """检查是否需要触发事件驱动预警（龙头异动/大盘急跌等）"""
+    events = []
+    risk_boost = 0
+
+    # 1. 大盘急跌（通过 live_snapshot.csv 检查）
+    import csv as _csv
+    snap_path = SNAPSHOT
+    if snap_path.exists():
+        try:
+            down_count = 0
+            total = 0
+            with open(snap_path, encoding="utf-8-sig") as f:
+                reader = _csv.DictReader(f)
+                for row in reader:
+                    try:
+                        chg = float(row.get("change_pct", 0))
+                        if chg < -5:
+                            down_count += 1
+                        total += 1
+                    except (ValueError, TypeError):
+                        pass
+            if total > 100:  # 有足够样本
+                pct_down = down_count / total * 100
+                if pct_down > 15:
+                    events.append(f"全市场{down_count}只跌超5%({pct_down:.0f}%)")
+                    risk_boost += 2
+                elif pct_down > 8:
+                    events.append(f"市场普跌({pct_down:.0f}%个股跌超5%)")
+                    risk_boost += 1
+        except Exception:
+            pass
+
+    # 2. ETF 自身盘中加速下跌
+    if realtime:
+        if realtime.get("change_pct", 0) < -2:
+            events.append(f"ETF已跌{realtime['change_pct']:.1f}%")
+            risk_boost += 2
+        if realtime.get("low", 0) < realtime.get("open", 0) * 0.97:
+            events.append("盘中跌破开盘3%")
+            risk_boost += 3
+
+    return {"events": events, "risk_boost": risk_boost, "detail": "; ".join(events) if events else ""}
+
+
 def predict(code: str = ETF_CODE) -> dict:
     """综合预测: 昨日信号 + 今日盘中"""
     now = datetime.now(CST)
@@ -202,18 +249,22 @@ def predict(code: str = ETF_CODE) -> dict:
     realtime = fetch_realtime_price() if market_open else None
     intraday = check_intraday_dive(realtime) if realtime else {"signals": [], "intraday_risk": 0, "detail": "盘中尚未开盘"}
 
-    # 3. 综合概率（规则 + ML）
+    # 2b. 事件驱动检查
+    event_driven = check_event_driven(realtime) if market_open else {"events": [], "risk_boost": 0, "detail": ""}
+
+    # 3. 综合概率（规则 + ML + 事件）
     base_prob = pred["prob"]
+    event_boost = event_driven.get("risk_boost", 0) * 3  # 事件驱动最多加15%
     intra_boost = intraday["intraday_risk"] * 5  # 盘中信号最多加50%
     ml_prob = _ml_prob(hist) if hist is not None else None
     if ml_prob is not None:
         # ML 模型与规则引擎加权平均（ML 权重 40%，规则 60%）
         ml_weighted = ml_prob * 0.4
-        rule_weighted = min(base_prob + intra_boost, 98) * 0.6
+        rule_weighted = min(base_prob + intra_boost + event_boost, 98) * 0.6
         total_prob = min(ml_weighted + rule_weighted, 98)
         ml_label = f"  🤖  ML概率: {ml_prob:.0f}%"
     else:
-        total_prob = min(base_prob + intra_boost, 98)
+        total_prob = min(base_prob + intra_boost + event_boost, 98)
         ml_label = ""
 
     # 4. 风险等级
