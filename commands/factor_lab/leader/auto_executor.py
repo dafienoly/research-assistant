@@ -168,7 +168,7 @@ def auto_run_once():
 
     # 4. 创建 Agent Console session — 只有当真正要执行时才创建
     #    检查此版本是否已有 session（防重复创建）
-    _created_session = False
+    _sid = None
     try:
         from factor_lab.agent_console.sessions import create_session as _cs
         from factor_lab.agent_console.sessions import SESSIONS_DIR as _SDIR
@@ -180,6 +180,7 @@ def auto_run_once():
                 _r = json.loads(_f.read_text())
                 if _r.get("version") == current:
                     _has_session = True
+                    _sid = _f.parent.name  # 记录已存在的 session ID
                     break
             except Exception:
                 continue
@@ -193,7 +194,6 @@ def auto_run_once():
             _wl(_sid, _agent_adapter, f"Auto execute {current}: {cv.name}")
             _t.Thread(target=_start_agent, args=(_sid, _agent_adapter,
                        f"Auto execute {current}: {cv.name if cv else ''}"), daemon=True).start()
-            _created_session = True
     except Exception:
         pass
 
@@ -249,10 +249,50 @@ def auto_run_once():
             commit = r.stdout.strip()
         except Exception:
             pass
-        advance(current, "completed", commit=commit)
-        nv = next_version(current)
-        next_q = f"continue with {nv.version}" if nv else "roadmap complete"
-        write_completion("completed", current, cv.name,
+
+        # 7a. 审计门禁 (ADR-022): advance 前审计，失败则标记 partial
+        audit_ok = True
+        try:
+            import subprocess as _sp
+            _ar = _sp.run(
+                [VENV, CLI, "leader:audit-and-push", "--version", current, "--mode", "full"],
+                capture_output=True, text=True, timeout=300,
+                cwd="/home/ly/.hermes/research-assistant/commands"
+            )
+            if _ar.returncode != 0:
+                audit_ok = False
+                # 审计未通过：不 advance，标记 partial
+                write_completion("partial", current, cv.name,
+                                  report_dir=report_path,
+                                  summary={"passed": 0, "failed": 1,
+                                           "note": f"审计未通过 — {_ar.stdout[:500]}"},
+                                  remaining_tasks=[current],
+                                  next_question="audit failed, fix before continuing")
+                _status = "partial"
+                # 写入 Agent Console session
+                try:
+                    from factor_lab.agent_console.sessions import append_event, update_status
+                    from factor_lab.agent_console.schemas import AgentEvent
+                    _md = f"## ❌ 版本 {current} 审计未通过\n\n审计报告:\n```\n{_ar.stdout[:1000]}\n```\n"
+                    if _created_session:
+                        append_event(_sid, AgentEvent("answer_delta", _sid, data=_md, status="partial"))
+                        append_event(_sid, AgentEvent("done", _sid, data="", status="partial"))
+                        update_status(_sid, "partial")
+                except Exception:
+                    pass
+                _post_cleanup()
+                return {"status": "partial", "version": current, "reason": "audit_failed",
+                        "audit_output": _ar.stdout[:300]}
+        except subprocess.TimeoutExpired:
+            audit_ok = True  # 超时放行，不阻塞推进
+        except Exception:
+            audit_ok = True
+
+        if audit_ok:
+            advance(current, "completed", commit=commit)
+            nv = next_version(current)
+            next_q = f"continue with {nv.version}" if nv else "roadmap complete"
+            write_completion("completed", current, cv.name,
                           report_dir=report_path,
                           summary={"passed": 1, "failed": 0,
                                    "note": f"Version {current} completed"},
@@ -266,8 +306,71 @@ def auto_run_once():
             capture_completion(current, cv.name)
         except Exception:
             pass
-        # 向 Agent Console session 写入 markdown 格式结果
-        if _created_session:
+        # 版本完成后自动更新 GitNexus 知识图谱
+        try:
+            subprocess.run(
+                ["bash", "/home/ly/.hermes/research-assistant/commands/scripts/gitnexus_refresh.sh",
+                 "--index-only"],
+                capture_output=True, timeout=300,
+                cwd="/home/ly/.hermes/research-assistant"
+            )
+        except Exception:
+            pass
+        # 注入 agent 工作日志到 session（让 Claude Code 真实输出可见）
+        if _sid:
+            try:
+                from factor_lab.agent_console.sessions import append_event, update_status
+                from factor_lab.agent_console.schemas import AgentEvent
+                import re as _re
+                _ansi_re = _re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                # 查找 agent 日志文件
+                _log_dir = TASKS_DIR / "agent_logs"
+                if _log_dir.exists():
+                    _log_dirs = sorted(_log_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+                    for _ld in _log_dirs[:3]:
+                        if not _ld.is_dir():
+                            continue
+                        for _lf in sorted(_ld.glob("*.log"), key=lambda p: p.stat().st_mtime):
+                            _raw = _lf.read_text(encoding="utf-8", errors="replace")
+                            _clean = _ansi_re.sub('', _raw)
+                            if len(_clean.strip()) > 50:
+                                # 跳过脑暴 preamble：找到第一个实现相关的行
+                                _lines = _clean.split('\n')
+                                _skip_until = 0
+                                for i, line in enumerate(_lines):
+                                    stripped = line.strip()
+                                    # 跳过 command 行、shebang、空行、脑暴内容
+                                    if stripped.startswith('$ ') or stripped.startswith('#') or not stripped:
+                                        _skip_until = i + 1
+                                    elif any(kw in stripped for kw in [
+                                        'Base directory', 'Brainstorming', 'HARD-GATE',
+                                        'Do NOT invoke', 'Anti-Pattern', 'Checklist',
+                                        'Process Flow', '## The Process',
+                                    ]):
+                                        _skip_until = i + 1
+                                    else:
+                                        break  # 找到正文开始
+                                _body_lines = _lines[_skip_until:]
+                                # 跳过尾部空行和 # finished_at
+                                while _body_lines and not _body_lines[-1].strip():
+                                    _body_lines.pop()
+                                if _body_lines and _body_lines[-1].strip().startswith('# finished_at'):
+                                    _body_lines.pop()
+                                # 清洗嵌套 ```，避免破坏外层围栏
+                                _body_text = '\n'.join(_body_lines)
+                                _nested_fence = _re.compile(r'^```', _re.MULTILINE)
+                                _body_text = _nested_fence.sub('`\\`', _body_text)
+                                _body_text = _body_text[:5000].strip()
+                                if len(_body_text) > 50:
+                                    _header = f"\n\n## 🤖 Claude Code 工作输出 ({_lf.name})\n\n```\n"
+                                    _footer = "\n```\n"
+                                    append_event(_sid, AgentEvent("answer_delta", _sid, data=_header + _body_text + _footer, status="running"))
+                                break
+                        break
+            except Exception:
+                pass
+        # 向 Agent Console session 写入完成总结
+        if _sid:
             try:
                 from factor_lab.agent_console.sessions import append_event, update_status
                 from factor_lab.agent_console.schemas import AgentEvent
@@ -278,7 +381,7 @@ def auto_run_once():
             except Exception:
                 pass
     else:
-        if _created_session:
+        if _sid:
             try:
                 from factor_lab.agent_console.sessions import append_event, update_status
                 from factor_lab.agent_console.schemas import AgentEvent

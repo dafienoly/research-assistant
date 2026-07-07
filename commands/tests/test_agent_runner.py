@@ -101,34 +101,31 @@ def test_runner_does_not_require_codex():
     assert runner.backend != "codex"
 
 
-def test_claude_backend_uses_stream_json_and_bypass(monkeypatch, tmp_path):
-    captured = {}
+def test_claude_backend_uses_auto_mode_and_ultra_effort(tmp_path, monkeypatch):
+    """验证 _backend_claude 使用 auto 模式 (-a) + ultra 思维强度"""
     monkeypatch.setenv("HERMES_CLAUDE_BIN", "/opt/claude")
+    captured = {"cmd": None, "env": None, "timeout": None, "returncode": 0, "stdout": "ok"}
 
-    def fake_stream(cmd, log_file, input_text=None, timeout=0, shell=False, line_transform=None):
+    def fake_run(cmd, capture_output=True, text=True, timeout=0, cwd=None, env=None):
         captured["cmd"] = cmd
+        captured["env"] = env
         captured["timeout"] = timeout
-        captured["line_transform"] = line_transform
-        log_file.write_text("streamed")
-        return {"success": True, "returncode": 0, "output": "ok"}
+        return __import__("types").SimpleNamespace(returncode=0, stdout="ok", stderr="")
 
-    monkeypatch.setattr(agent_runner, "_run_streaming_process", fake_stream)
+    monkeypatch.setattr("subprocess.run", fake_run)
     runner = AgentRunner(backend="claude")
     runner.log_dir = tmp_path
-    result = runner._backend_claude("prompt", "T001", tmp_path / "T001.log")
+    result = runner._backend_claude("test prompt", "T001", tmp_path / "T001.log")
 
     cmd = captured["cmd"]
-    assert cmd[0] == "/opt/claude"
-    assert "--output-format" in cmd
-    assert "stream-json" in cmd
-    assert "--include-partial-messages" in cmd
-    assert "--verbose" in cmd
-    assert "--permission-mode" in cmd
-    assert "bypassPermissions" in cmd
+    assert cmd[0] == "/opt/claude", f"Expected claude binary, got {cmd[0]}"
     assert "--dangerously-skip-permissions" in cmd
+    assert cmd[cmd.index("-a") + 1] == "test prompt"
+    assert captured["env"].get("CLAUDE_CODE_EFFORT_LEVEL") == "ultra"
     assert captured["timeout"] == 3600
-    assert callable(captured["line_transform"])
-    assert result["streaming_mode"] == "stream-json"
+    assert result["streaming_mode"] == "auto"
+    assert result["backend"] == "claude"
+    assert result["success"] is True
 
 
 def test_find_task_file_prefers_exact_clean_task(tmp_path):
