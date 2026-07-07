@@ -104,16 +104,72 @@ def fetch_stock_prices(codes: list[str]) -> list[dict]:
 
 
 def fetch_kline(codes: list[str], start_date: str, end_date: str) -> list[dict]:
-    """获取股票日K线
+    """获取股票日K线（先试聚宽，失败回退 RSScast MCP）
 
     Args:
-        codes: 股票代码列表
+        codes: 股票/ETF代码列表
         start_date: YYYYMMDD
         end_date: YYYYMMDD
 
     Returns:
         list of dict: [{code, unixtime, timeString, open, high, low, close, volume, amount}]
     """
+    if codes:
+        import jqdatasdk as _jq
+        _JQ_AUTHED = False
+        try:
+            _JQ_AUTHED = bool(_jq.get_account_info())
+        except Exception:
+            pass
+        if not _JQ_AUTHED:
+            try:
+                _jq.auth('13500226163', 'Ly19940930!')
+                _JQ_AUTHED = True
+            except Exception:
+                pass
+
+        if _JQ_AUTHED:
+            result = []
+            for code in codes:
+                try:
+                    sec = f"{code}.XSHE" if code.startswith(("00", "30", "15")) else f"{code}.XSHG"
+                    if code.startswith(("51", "56")):
+                        sec = f"{code}.XSHG"  # Shanghai-listed ETFs
+                    # 分批拉取（聚宽大范围查询可能超时）
+                    sd = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}"
+                    ed = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:]}"
+                    # 每次最多拉60天，循环拼接
+                    all_rows = []
+                    import pandas as _pd
+                    from datetime import datetime as _dt, timedelta as _td
+                    cur = _dt.strptime(sd, "%Y-%m-%d")
+                    end_dt = _dt.strptime(ed, "%Y-%m-%d")
+                    while cur < end_dt:
+                        chunk_end = min(cur + _td(days=60), end_dt)
+                        df = _jq.get_price(sec, start_date=cur.strftime("%Y-%m-%d"),
+                                            end_date=chunk_end.strftime("%Y-%m-%d"),
+                                            frequency='daily',
+                                            fields=['open', 'close', 'high', 'low', 'volume', 'money'])
+                        for dt, row in df.iterrows():
+                            all_rows.append({
+                                "code": code,
+                                "timeString": dt.strftime("%Y-%m-%d"),
+                                "unixtime": int(dt.timestamp()),
+                                "open": float(row['open']),
+                                "high": float(row['high']),
+                                "low": float(row['low']),
+                                "close": float(row['close']),
+                                "volume": int(row['volume']),
+                                "amount": float(row['money']),
+                            })
+                        cur = chunk_end + _td(days=1)
+                    result.extend(all_rows)
+                except Exception as e:
+                    print(f"  ⚠️ JQData {code}: {e}")
+            if result:
+                return result
+
+    # Fallback: RSScast MCP
     result = mcp_call("tools/call", {
         "name": "StockKLineQuery",
         "arguments": {
