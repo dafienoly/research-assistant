@@ -1,5 +1,5 @@
 """Hermes-Leader 自动工作循环"""
-import os, json, sys
+import os, json, sys, time
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
@@ -10,15 +10,21 @@ TASKS_DIR = Path("/home/ly/.hermes/research-assistant/agent_tasks")
 # ─── Lock ───────────────────────────────────────────────────────
 
 LOCK_FILE = TASKS_DIR / "current_run.lock"
+LOCK_MAX_AGE = 3600  # 锁超过 1h 自动释放（防止意外残留）
 
 
 def acquire_lock(run_id: str) -> bool:
-    """获取任务锁，防止重复执行"""
+    """获取任务锁，防止重复执行。锁超过 LOCK_MAX_AGE 秒自动释放。"""
     if LOCK_FILE.exists():
         lock_data = json.loads(LOCK_FILE.read_text())
         if lock_data.get("status") in ("running",):
-            print(f"  ⚠️ 已有运行中任务: {lock_data.get('run_id')}")
-            return False
+            age = time.time() - LOCK_FILE.stat().st_mtime
+            if age > LOCK_MAX_AGE:
+                print(f"  ⚠️ 锁超时 ({age:.0f}s > {LOCK_MAX_AGE}s)，强制释放旧锁: {lock_data.get('run_id')}")
+                release_lock("timeout")
+            else:
+                print(f"  ⚠️ 已有运行中任务: {lock_data.get('run_id')}")
+                return False
     LOCK_FILE.write_text(json.dumps({"run_id": run_id, "status": "running",
                                       "acquired_at": datetime.now(CST).isoformat()}, indent=2))
     return True
