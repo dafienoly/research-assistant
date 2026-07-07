@@ -350,6 +350,14 @@ def main():
     command = sys.argv[1]
     args = sys.argv[2:]
 
+    # === 分解命令: factor 和 leader 由独立模块处理 ===
+    from factor_commands import handle as _hfc
+    if _hfc(command, args):
+        return
+    from leader_commands import handle as _hlc
+    if _hlc(command, args):
+        return
+
     # === 市场类 ===
     if command == "market:update-daily":
         from market_fetcher import cmd_update_daily
