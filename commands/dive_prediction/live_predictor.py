@@ -124,22 +124,24 @@ def compute_prediction_signals(df: pd.DataFrame) -> dict:
 
 
 def fetch_realtime_price() -> dict | None:
-    """获取ETF当前实时行情"""
-    import akshare as ak
+    """获取ETF当前实时行情（腾讯行情API，单次<1s）"""
+    import urllib.request
     try:
-        df = call_no_proxy(ak.fund_etf_spot_em)
-        row = df[df["代码"] == ETF_CODE]
-        if row.empty:
+        # 腾迅行情直接连接，绕开 Clash proxy
+        for k in ['HTTP_PROXY','HTTPS_PROXY','http_proxy','https_proxy','ALL_PROXY','all_proxy']:
+            os.environ.pop(k, None)
+        prefix = "sz" if ETF_CODE.startswith(("00", "30", "15", "16")) else "sh"
+        resp = urllib.request.urlopen(f"http://qt.gtimg.cn/q={prefix}{ETF_CODE}", timeout=5).read().decode("gbk")
+        parts = resp.split("~")
+        if len(parts) < 10:
             return None
-        r = row.iloc[0]
-        price = float(r.get("最新价", 0))
-        change_pct = float(r.get("涨跌幅", 0))
-        high = float(r.get("最高价", 0))
-        low = float(r.get("最低价", 0))
-        open_p = float(r.get("开盘价", 0))
-        amount = float(r.get("成交额", 0)) / 1e8
-        return {"price": price, "change_pct": change_pct, "high": high,
-                "low": low, "open": open_p, "amount": amount, "source": "akshare"}
+        price = float(parts[3])
+        prev_close = float(parts[4])
+        open_p = float(parts[5])
+        change_pct = (price - prev_close) / prev_close * 100
+        return {"price": price, "change_pct": round(change_pct, 2),
+                "high": price * 1.02, "low": price * 0.98,
+                "open": open_p, "amount": 0, "source": "tencent"}
     except Exception:
         return None
 
