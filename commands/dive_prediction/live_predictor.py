@@ -23,29 +23,24 @@ DATA_DIR = PATHS["daily_kline"]
 PROJECT_ROOT = Path.home() / ".hermes" / "research-assistant"
 SNAPSHOT = PROJECT_ROOT / "data" / "market" / "live_snapshot.csv"
 
-# XGBoost 模型集成
-_ML_PROB_CACHE = None
+# Random Forest 模型集成（生产最佳）
+_RF_PROB_CACHE = None
 
 
-def _ml_prob(df: pd.DataFrame) -> float | None:
-    """用 XGBoost 模型预测（如果有模型的话）"""
+def _rf_prob() -> float:
+    """用 Random Forest 模型预测当前跳水概率"""
     try:
-        from dive_prediction.ml_trainer import predict_proba
-        import json as _json
-        from pathlib import Path as _Path
-        feat_path = _Path(__file__).resolve().parent / "models" / "feature_list.json"
-        if not feat_path.exists():
-            return None
-        features = _json.loads(feat_path.read_text())
-        # 用最新一行特征
-        if not all(c in df.columns for c in features):
-            return None
-        last = df[features].tail(1).ffill().bfill()
-        if last.empty:
-            return None
-        return predict_proba(last)
+        from dive_prediction.features import load_etf, load_leaders, compute_full_features
+        from dive_prediction.multi_train import predict_rf
+
+        df_etf = load_etf()
+        leaders = load_leaders()
+        feat = compute_full_features(df_etf, leaders).ffill().bfill()
+        # 用最新一行
+        last = feat.iloc[-1:]
+        return predict_rf(last)
     except Exception:
-        return None
+        return 0.0
 
 ETF_CODE = "159516"
 ETF_NAME = "半导体设备ETF"
@@ -252,17 +247,17 @@ def predict(code: str = ETF_CODE) -> dict:
     # 2b. 事件驱动检查
     event_driven = check_event_driven(realtime) if market_open else {"events": [], "risk_boost": 0, "detail": ""}
 
-    # 3. 综合概率（规则 + ML + 事件）
+    # 3. 综合概率（规则 + RF + 事件）
     base_prob = pred["prob"]
     event_boost = event_driven.get("risk_boost", 0) * 3  # 事件驱动最多加15%
     intra_boost = intraday["intraday_risk"] * 5  # 盘中信号最多加50%
-    ml_prob = _ml_prob(hist) if hist is not None else None
-    if ml_prob is not None:
-        # ML 模型与规则引擎加权平均（ML 权重 40%，规则 60%）
-        ml_weighted = ml_prob * 0.4
+    rf_prob = _rf_prob()
+    if rf_prob > 0:
+        # RF 模型与规则引擎加权平均（RF 权重 40%，规则 60%）
+        ml_weighted = rf_prob * 0.4
         rule_weighted = min(base_prob + intra_boost + event_boost, 98) * 0.6
         total_prob = min(ml_weighted + rule_weighted, 98)
-        ml_label = f"  🤖  ML概率: {ml_prob:.0f}%"
+        ml_label = f"  🌲  RF概率: {rf_prob:.0f}%"
     else:
         total_prob = min(base_prob + intra_boost + event_boost, 98)
         ml_label = ""

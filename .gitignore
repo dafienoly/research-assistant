@@ -10,3 +10,7 @@ performance/signals/
 VERSION_TRACK
 scripts/qmt_windows/qmt_bridge.env
 scripts/qmt_windows/runtime/
+
+# Virtual environments
+.venv_tf/
+.venv_quant/

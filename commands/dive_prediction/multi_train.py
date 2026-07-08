@@ -151,6 +151,61 @@ def evaluate_with_balancing(X, y, method="xgboost"):
     }
 
 
+MODEL_DIR = Path(__file__).resolve().parent / "models"
+
+
+def train_production_model(force: bool = False) -> dict:
+    """训练生产用 Random Forest 模型（全量数据），保存到 models/"""
+    from sklearn.ensemble import RandomForestClassifier
+    import joblib
+
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    path = MODEL_DIR / "rf_dive.joblib"
+    if path.exists() and not force:
+        return {"status": "skipped", "path": str(path)}
+
+    dfs = load_all_instruments()
+    X, y, features = compute_multi_features(dfs)
+    X, y = clean_nan(X, y)
+
+    if len(X) < 100:
+        return {"status": "error", "msg": f"数据不足: {len(X)}"}
+
+    model = RandomForestClassifier(
+        n_estimators=200, max_depth=6,
+        class_weight="balanced", random_state=42,
+    )
+    model.fit(X, y)
+
+    joblib.dump({"model": model, "features": features}, path)
+    return {
+        "status": "trained",
+        "samples": len(X),
+        "dives": int(y.sum()),
+        "features": len(features),
+        "path": str(path),
+    }
+
+
+def predict_rf(feature_row: pd.Series | pd.DataFrame) -> float:
+    """用生产 RF 模型预测单行概率"""
+    import joblib
+    path = MODEL_DIR / "rf_dive.joblib"
+    if not path.exists():
+        return 0.0
+    data = joblib.load(path)
+    model = data["model"]
+    features = data["features"]
+
+    # 对齐特征
+    row = feature_row if isinstance(feature_row, pd.DataFrame) else feature_row.to_frame().T
+    X = row[[c for c in features if c in row.columns]].fillna(0).values
+    if X.shape[1] != len(features):
+        return 0.0
+    prob = model.predict_proba(X)
+    return prob[0, 1] if prob.shape[1] > 1 else 0.0
+
+
 def main():
     print("加载多标的数据...")
     dfs = load_all_instruments()
