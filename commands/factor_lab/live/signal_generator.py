@@ -44,6 +44,57 @@ class Ret5Ma20GateSignalGenerator:
 
     def __init__(self, symbol_data_df: pd.DataFrame = None):
         self.df = symbol_data_df
+        self._name_cache: dict[str, str] = {}
+
+    def _get_stock_name(self, symbol: str) -> str:
+        """根据6位代码返回股票名称（首次调用时通过 akshare 缓存全市场映射）"""
+        if symbol in self._name_cache:
+            return self._name_cache[symbol]
+        try:
+            import pandas as pd
+            from pathlib import Path
+            # 1) 优先使用 stock_industry.csv（行业标签表有完整代码-名称）
+            tags_path = Path(__file__).parent.parent.parent / "data" / "tags" / "stock_industry.csv"
+            if not self._name_cache and tags_path.exists():
+                df = pd.read_csv(tags_path, dtype={"code": str, "name": str})
+                for _, r in df.iterrows():
+                    c = str(r.get("code", "")).strip()
+                    n = str(r.get("name", "")).strip()
+                    if c and n and n != "nan":
+                        self._name_cache[c] = n
+                if symbol in self._name_cache:
+                    return self._name_cache[symbol]
+            # 2) 通过 akshare 获取全量 A 股代码-名称（缓存到文件）
+            cache_path = Path(__file__).parent.parent.parent / "data" / "tags" / "stock_names_cache.csv"
+            if cache_path.exists():
+                df = pd.read_csv(cache_path, dtype={"code": str, "name": str})
+                for _, r in df.iterrows():
+                    c = str(r.get("code", "")).strip()
+                    n = str(r.get("name", "")).strip()
+                    if c and n and n != "nan":
+                        self._name_cache[c] = n
+                if symbol in self._name_cache:
+                    return self._name_cache[symbol]
+            # 3) 远程拉取
+            try:
+                import akshare as ak
+                df = ak.stock_info_a_code_name()
+                df.columns = [c.lower() for c in df.columns]
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                df.to_csv(cache_path, index=False, encoding="utf-8-sig")
+                for _, r in df.iterrows():
+                    c = str(r.get("code", "")).strip()
+                    n = str(r.get("name", "")).strip()
+                    if c and n and n != "nan":
+                        self._name_cache[c] = n
+            except Exception:
+                pass
+            if symbol in self._name_cache:
+                return self._name_cache[symbol]
+        except Exception:
+            pass
+        self._name_cache[symbol] = symbol
+        return symbol
 
     # ── 数据加载 ──────────────────────────────────────────
 
@@ -190,6 +241,7 @@ class Ret5Ma20GateSignalGenerator:
         def _to_candidate(row, rank):
             return {
                 "symbol": str(row["symbol"]),
+                "name": self._get_stock_name(str(row["symbol"])),
                 "close": round(float(row["close"]), 2) if pd.notna(row["close"]) else None,
                 "ret5": round(float(row["ret5"]), 6) if pd.notna(row["ret5"]) else None,
                 "ma20": round(float(row["ma20"]), 2) if pd.notna(row["ma20"]) else None,
@@ -204,6 +256,15 @@ class Ret5Ma20GateSignalGenerator:
 
         target_candidates = all_candidates[:top_n]
         watch_candidates = all_candidates[top_n: top_n + watch_n]
+
+        # ── 尾盘规则: 14:30 后禁新仓 ─────────────────
+        if self._is_late_session():
+            for c in target_candidates:
+                c["blocked"] = True
+                c["block_reason"] = "late_session"
+            for c in watch_candidates:
+                c["blocked"] = True
+                c["block_reason"] = "late_session"
 
         # ── 处理 current_positions ────────────────
         remove_candidates = []
@@ -375,6 +436,24 @@ class Ret5Ma20GateSignalGenerator:
             "warnings": warnings,
             "n_warnings": len(warnings),
         }
+
+    # ── 尾盘规则 ─────────────────────────────────────────
+
+    @staticmethod
+    def _is_late_session() -> bool:
+        """检查当前是否在尾盘时段 (14:30 后)
+
+        A 股交易时间为 9:30-11:30, 13:00-15:00。
+        14:30 后禁新仓: 距收盘不足 30 分钟, 避免隔夜风险。
+
+        Returns:
+            True 如果当前时间 >= 14:30 CST
+        """
+        now = datetime.now(CST)
+        cutoff = now.replace(hour=14, minute=30, second=0, microsecond=0)
+        return now >= cutoff
+
+    # ── 内部工具 ─────────────────────────────────────────
 
     @staticmethod
     def _empty_result(

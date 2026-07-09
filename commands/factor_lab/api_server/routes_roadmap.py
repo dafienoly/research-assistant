@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from factor_lab.leader.roadmap import get_roadmap, get_version, ALPHA_FACTORY_ROADMAP, is_backlog
 from factor_lab.leader.roadmap_cursor import get_cursor, advance, set_blocked
+from factor_lab.api_server.response import api_success, api_error
 
 router = APIRouter()
 
@@ -90,7 +91,7 @@ async def get_roadmap_api():
             "series": _get_series(item.version),
         }
         items.append(d)
-    return {"items": items, "progress": _compute_progress(items)}
+    return api_success(data={"items": items, "progress": _compute_progress(items)})
 
 
 @router.get("/roadmap/versions")
@@ -108,7 +109,7 @@ async def get_versions():
             "backlog": is_backlog(v),
         })
     progress = _compute_progress(items)
-    return {"versions": items, "cursor": cursor, "progress": progress}
+    return api_success(data={"versions": items, "cursor": cursor, "progress": progress})
 
 
 class MarkVersion(BaseModel):
@@ -130,4 +131,4 @@ async def mark_version(body: MarkVersion):
         from factor_lab.leader.roadmap_cursor import CURSOR_FILE
         import json
         CURSOR_FILE.write_text(json.dumps(c, indent=2))
-    return {"status": "ok"}
+    return api_success(data={"status": "ok"})

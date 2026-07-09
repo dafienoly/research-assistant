@@ -11,7 +11,16 @@ KLINE = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline")
 
 # 基本面
 FUND_CSV = Path("/home/ly/.hermes/research-assistant/data/fundamentals/fundamentals_timeseries.csv")
-FUND_FIELDS = ["roe", "net_margin", "gross_margin", "debt_ratio", "eps", "net_profit", "revenue"]
+FUND_FIELDS = [
+    # 原有
+    "roe", "net_margin", "gross_margin", "debt_ratio", "eps", "net_profit", "revenue",
+    # V3.2.2 新增 — 估值/成长/综合质量
+    "pe_ttm", "pb_lf", "ps_ttm", "pcf_ttm",
+    "roe_ttm", "roa_ttm",
+    "revenue_growth_q", "profit_growth_q", "profit_surprise",
+    "current_ratio", "asset_turnover",
+    "dividend_yield", "free_cash_flow_yield",
+]
 
 # 资金流向
 FLOW_CSV = Path("/home/ly/.hermes/research-assistant/data/fundamentals/fund_flow_timeseries.csv")
@@ -19,11 +28,11 @@ FLOW_FIELDS = ["net_main_force", "net_super_large", "net_large", "net_medium", "
 
 # 北向资金
 NORTH_CSV = Path("/home/ly/.hermes/research-assistant/data/north_flow_timeseries.csv")
-NORTH_FIELDS = ["nb_net_flow", "nb_holding", "nb_total"]
+NORTH_FIELDS = ["nb_net_flow", "nb_total_buy", "nb_total_sell", "nb_holding_value", "nb_holding_ratio"]
 
 # 两融
 MARGIN_CSV = Path("/home/ly/.hermes/research-assistant/data/margin_timeseries.csv")
-MARGIN_FIELDS = ["margin_buy", "margin_repay", "margin_balance", "sec_lending"]
+MARGIN_FIELDS = ["margin_buy", "margin_repay", "margin_balance", "margin_ratio", "sec_lending_volume", "sec_lending_balance"]
 
 # 综合事件
 EVENT_CSV = Path("/home/ly/.hermes/research-assistant/data/event_timeseries.csv")
@@ -35,14 +44,22 @@ SENTIMENT_FIELDS = ["sentiment_score", "positive_count", "negative_count", "neut
 
 
 def _load_csv(path: Path, fields: list[str]) -> pd.DataFrame:
-    """加载通用 CSV: 检查存在→读取→日期解析→数值化"""
+    """加载通用 CSV: 检查存在→读取→符号补齐→日期规范化→数值化"""
     if not path.exists():
         print(f"  ⚠️ {path.name} 不存在，跳过")
         return pd.DataFrame()
     df = pd.read_csv(path, encoding="utf-8-sig", dtype={"symbol": str})
     if df.empty:
         return df
-    df["date"] = pd.to_datetime(df["date"], format="mixed")
+    df["symbol"] = df["symbol"].str.strip().str.zfill(6)
+    # 日期列兼容多种格式:
+    #   整数类型(20260705) → 先转 str, 再用 %Y%m%d 解析
+    #   字符串类型(2026-07-03 / 20260707 12:42) → mixed 解析 + normalize
+    if df["date"].dtype in ("int64", "Int64", "float64", "Float64"):
+        df["date"] = pd.to_datetime(df["date"].astype(str), format="%Y%m%d", errors="coerce")
+    else:
+        df["date"] = pd.to_datetime(df["date"], format="mixed", errors="coerce")
+    df["date"] = df["date"].dt.normalize()  # 去掉时间分量
     for col in fields:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -80,7 +97,25 @@ def load_fundamentals() -> pd.DataFrame:
         if col in fund.columns:
             fund[col] = pd.to_numeric(fund[col], errors="coerce")
     fund = fund.sort_values(["symbol", "pub_date"]).reset_index(drop=True)
-    fund = fund.dropna(subset=FUND_FIELDS, how="all")
+    # 只对实际存在的列做 dropna（有些 V3.2.2 新增字段可能尚未拉取）
+    existing_fund_fields = [c for c in FUND_FIELDS if c in fund.columns]
+    if existing_fund_fields:
+        fund = fund.dropna(subset=existing_fund_fields, how="all")
+
+    # 检查 V3.2.2 新增字段是否缺失
+    extra_fields = [
+        "pe_ttm", "pb_lf", "ps_ttm", "pcf_ttm",
+        "roe_ttm", "roa_ttm",
+        "revenue_growth_q", "profit_growth_q", "profit_surprise",
+        "current_ratio", "asset_turnover",
+        "dividend_yield", "free_cash_flow_yield",
+    ]
+    missing = [col for col in extra_fields if col not in fund.columns]
+    if missing:
+        print(f"  ⚠️ 基本面CSV缺少 {len(missing)}/{len(extra_fields)} 个新增字段: {missing}")
+        print(f"    → 这些字段对应的因子将不可用, 请更新数据源后重新拉取")
+    else:
+        print(f"  ✅ 基本面CSV包含全部 {len(extra_fields)} 个V3.2.2新增字段")
     return fund
 
 
@@ -89,24 +124,28 @@ def merge_fundamentals(kline_df: pd.DataFrame, fund_df: pd.DataFrame) -> pd.Data
         return kline_df
     df = kline_df.copy()
     df["date"] = pd.to_datetime(df["date"])
+    # 只合并在 fund_df 中实际存在的列（V3.2.2 新增字段可能尚未拉取）
+    existing_ff = [c for c in FUND_FIELDS if c in fund_df.columns]
+    if not existing_ff:
+        return kline_df
     result_rows = []
     for sym, grp in df.groupby("symbol"):
         sym_fund = fund_df[fund_df["symbol"] == sym].sort_values("pub_date")
         grp = grp.sort_values("date")
         if sym_fund.empty:
-            for col in FUND_FIELDS:
+            for col in existing_ff:
                 grp[col] = np.nan
             result_rows.append(grp)
             continue
         merged = pd.merge_asof(
             grp.sort_values("date"),
-            sym_fund[["pub_date"] + FUND_FIELDS].sort_values("pub_date"),
+            sym_fund[["pub_date"] + existing_ff].sort_values("pub_date"),
             left_on="date", right_on="pub_date",
             direction="backward",
         )
         result_rows.append(merged)
     result = pd.concat(result_rows, ignore_index=True)
-    for col in FUND_FIELDS:
+    for col in existing_ff:
         if col in result.columns:
             result[col] = result.groupby("symbol")[col].ffill()
     return result
@@ -217,9 +256,65 @@ def load_stock_kline(symbols: list, start_date: str = "2025-01-01",
     return all_df
 
 
+def _load_industry_map() -> dict:
+    """加载 symbol→行业 映射
+    
+    优先级: 
+    1. /mnt/d/HermesData/industry_map.csv
+    2. tags/ 目录下的标签文件
+    3. baostock 股票基本信息
+    """
+    # 优先级1: 缓存
+    cache = Path("/mnt/d/HermesData/industry_map.csv")
+    if cache.exists():
+        try:
+            mapping_df = pd.read_csv(cache)
+            if "symbol" in mapping_df.columns and "industry" in mapping_df.columns:
+                print(f"  🏭 行业映射加载: {len(mapping_df)} 条 (from {cache})")
+                return dict(zip(mapping_df["symbol"], mapping_df["industry"]))
+        except Exception:
+            pass
+
+    # 优先级2: stock_industry.csv (由 IndustryMapper 维护)
+    ind_csv = Path("/home/ly/.hermes/research-assistant/data/tags/stock_industry.csv")
+    if ind_csv.exists():
+        try:
+            mapping_df = pd.read_csv(ind_csv, encoding="utf-8-sig")
+            if "code" in mapping_df.columns and "industry" in mapping_df.columns:
+                result = dict(zip(mapping_df["code"], mapping_df["industry"]))
+                print(f"  🏭 行业映射加载: {len(result)} 条 (from {ind_csv})")
+                return result
+        except Exception:
+            pass
+
+    # 优先级3: 通过 IndustryMapper
+    try:
+        from factor_lab.alpha.industry_mapper import IndustryMapper
+        mapper = IndustryMapper()
+        result = mapper.get_industry_map()
+        if result:
+            print(f"  🏭 行业映射加载: {len(result)} 条 (from IndustryMapper)")
+            return result
+    except Exception:
+        pass
+
+    print("  ⚠️ 行业映射不可用, 所有股票归入 'unknown'")
+    return {}
+
+
 def compute_all(kline_df: pd.DataFrame) -> pd.DataFrame:
     """批量计算所有因子"""
     from factor_lab.factor_base import REGISTRY, _load_evolved
+
+    # ─── 自动合并行业分类 ─────────────────────────────
+    if "industry" not in kline_df.columns:
+        industry_map = _load_industry_map()
+        if industry_map:
+            kline_df["industry"] = kline_df["symbol"].map(industry_map).fillna("unknown")
+        else:
+            kline_df["industry"] = "unknown"
+        n_industries = kline_df["industry"].nunique()
+        print(f"  🏭 行业分类已合并: {n_industries} 个行业, {kline_df['industry'].isna().sum()} 缺失")
     _load_evolved()
     results = {}
     for f in REGISTRY:
@@ -231,9 +326,26 @@ def compute_all(kline_df: pd.DataFrame) -> pd.DataFrame:
         except Exception:
             results[f["name"]] = pd.Series(np.nan, index=kline_df.index)
 
-    temp_df = kline_df.copy()
-    for col, s in results.items():
-        temp_df[col] = s.values
+    # 用 pd.concat 一次性合并所有因子列（避免 DataFrame fragmentation）
+    factor_cols = pd.DataFrame(results, index=kline_df.index)
+
+    # 补全推导列（供表达式解析器使用）
+    derived = {}
+    if "ret1" not in kline_df.columns and "close" in kline_df.columns:
+        derived["ret1"] = kline_df.groupby("symbol")["close"].transform(
+            lambda x: x.pct_change(1)
+        ).fillna(0)
+    if "returns" not in kline_df.columns and "ret1" in derived:
+        derived["returns"] = derived["ret1"]
+    if "vwap" not in kline_df.columns:
+        denom = kline_df["volume"].replace(0, np.nan) if "volume" in kline_df.columns else np.nan
+        if "amount" in kline_df.columns and denom is not np.nan:
+            derived["vwap"] = kline_df["amount"] / denom
+        else:
+            derived["vwap"] = kline_df["close"]
+    derived_cols = pd.DataFrame(derived, index=kline_df.index) if derived else pd.DataFrame()
+
+    temp_df = pd.concat([kline_df, factor_cols, derived_cols], axis=1)
 
     for f in REGISTRY:
         if f["category"] != "evolved":
@@ -241,8 +353,9 @@ def compute_all(kline_df: pd.DataFrame) -> pd.DataFrame:
         try:
             s = f["func"](temp_df)
             results[f["name"]] = s
-        except Exception:
-            results[f["name"]] = pd.Series(0.0, index=kline_df.index)
+        except Exception as e:
+            print(f"  ⚠️ 进化因子计算失败 {f['name']}: {e}")
+            results[f["name"]] = pd.Series(np.nan, index=kline_df.index)
 
     out = kline_df[["date", "symbol", "close"]].copy()
     if "ret1" in kline_df.columns:

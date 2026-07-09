@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **research-assistant** (11066 symbols, 21334 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **research-assistant** (12718 symbols, 24309 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -41,3 +41,83 @@ This project is indexed by GitNexus as **research-assistant** (11066 symbols, 21
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+## Auto-Audit (Hermes Plugin)
+
+A Hermes plugin (`anti-cheat-auto-audit`) automatically runs the anti-cheat
+audit after every `write_file` / `patch` on `.py` files in this project.
+
+### 自动触发
+- **Triggered by:** any `.py` file write in this project (3-second debounce
+  batches multi-file changes into one audit)
+- **Runs:** `leader:anti-cheat-audit --skip gate4 --enable-gate5` as background
+  subprocess (Gates 1-3 + Gate 5 LLM review)
+- **FAIL auto-notify:** When the audit finds problems, the plugin injects
+  a ⚠️  notice into the next LLM user message via the `pre_llm_call` hook.
+  The agent sees the findings and can proactively fix them — no manual
+  check needed.
+- **pre-push hook** still acts as final gate — this plugin is additive.
+
+### Gate 5 — LLM 审查 + 映射验证 (A+C)
+
+Gate 5 能检测"没有按需求执行"的问题，但依赖 agent 产出映射表：
+
+**你必须做：** 当实现多步需求时，在最后一步写入一个 traceability mapping 文件：
+```
+agent_tasks/traceability/latest_mapping.json
+```
+
+格式：
+```json
+{
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "从腾讯 API 获取实时价格",
+      "code_locations": [
+        {"file": "commands/factor_lab/market/tencent.py",
+         "function": "fetch_realtime_price",
+         "line": 42}
+      ],
+      "expected_keywords": ["qt.gtimg.cn", "requests.get"],
+      "behavior": "HTTP GET → Tencent stock API → parse JSON"
+    }
+  ]
+}
+```
+
+Gate 5 会：
+1. **C — 映射验证**: 检查每个 `code_location` 的文件/函数是否存在、关键词是否出现
+2. **A — LLM 审查**: 把需求描述 + git diff 发给 LLM，判断代码是否真实实现需求
+
+不写 mapping 文件的话，Gate 5 仍然会跑 LLM 自由审查（只看 diff + plan），
+但效果不如有 mapping 时好。
+
+## Frontend Self-Verify Gate（前端强制自验证）
+
+**触发条件：** 任何前端代码修改（新建/修改页面、组件、路由、API 数据消费层）
+
+**必须做：**
+
+1. **加载 skill** — 工作前先 `skill_view(name='frontend-self-verify')` 获取完整的 6 步验证流程
+2. **启动 dev server** — `npm run dev -- --host 0.0.0.0`，确认 `curl http://localhost:5173` 返回 200
+3. **逐个路由验证** — 对每个受影响页面（新增/修改/相邻页面）：
+   - 导航到页面 → 检查 `#root.children` > 0（非白屏）
+   - 检查 `browser_console()` — 过滤 antd 弃用警告后无致命 JS 错误
+   - 检查数据渲染 — 表格行数 > 0，无"加载中"/"暂无数据"死态
+   - 检查交互元素 — 点击/切换后无新错误
+   - 对照需求关键词 — 用 `browser_console(expression=...)` 检查关键文本是否存在
+4. **生成结构化验证报告** — 每检查一个路由一行，明确标注 ✅ PASS / ⚠️ WARN / ❌ FAIL
+5. **FAIL 阻塞** — 任何 ❌ 不得宣称完成，必须先修复
+
+**禁止宣称完成而不提供浏览器证据。** "应该没问题""代码看起来正常"等措辞在 AGENTS.md 层级被禁止。必须给出类似这样的报告：
+
+```
+## Frontend Self-Verify 报告
+| 路由 | 白屏 | JS错误 | 数据渲染 | 交互 | 需求对照 | 结论 |
+|------|------|--------|----------|------|----------|------|
+| /data | ✅ | ✅ | ✅ | ✅ | ✅ | PASS |
+| /new-report | ✅ | ✅ | ⚠️ 行数0 | N/A | ❌ 缺关键词 | FAIL |
+```
+
+相关参考文件：`quality/frontend-self-verify/SKILL.md`, `references/agent-workflow-examples.md`

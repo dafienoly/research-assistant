@@ -1,7 +1,7 @@
 #!/bin/bash
 # Hermes Auto Version Loop — 独立包装脚本，由 hermes-daemon.sh 启动
 # 每 180 秒执行一次 auto_run_once，记录日志到 $HOME/.hermes/hermes-auto-loop.log
-set -e
+# 注意：不用 set -e，单个 tick 失败不能杀死循环
 
 VENV=/home/ly/.hermes/research-assistant/.venv_quant/bin/python3
 CLI=/home/ly/.hermes/research-assistant/commands/hermes_cli.py

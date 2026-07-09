@@ -18,7 +18,7 @@ DEFAULT = {
     "last_run_id": "",
     "last_commit": "",
     "updated_at": "",
-    "auto_allowed_until": "V8.9",
+    "auto_allowed_until": "V9.4",
     "live_trading_allowed": False,
     "next_version": "V3.0",
 }
@@ -55,7 +55,14 @@ def advance(version, status="completed", commit="", run_id=""):
             c["current_version"] = nv.version
             c["next_version"] = nv.version
         else:
-            c["next_version"] = ""
+            # 跳过 backlog 版本，查找下一个可用的
+            while nv and (is_backlog(nv.version) or nv.version in c.get("completed_versions", [])):
+                nv = next_version(nv.version)
+            if nv:
+                c["current_version"] = nv.version
+                c["next_version"] = nv.version
+            else:
+                c["next_version"] = ""
         c["status"] = "running"
     elif status == "failed":
         if version not in c["failed_versions"]:

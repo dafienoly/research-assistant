@@ -10,6 +10,7 @@ from datetime import datetime
 
 from config import (
     INCOMING, PATHS, now_cst, now_str, ts_id, date_id,
+    CODEX_DATA,
     file_sha256, file_rows, safe_write_json, ensure_dirs,
 )
 
@@ -53,18 +54,19 @@ class PackagePublisher:
         if self.final_dir.exists():
             shutil.rmtree(self.final_dir)
 
-    def add_file(self, rel_path: str, source_name: str = None):
+    def add_file(self, rel_path: str, source_name: str = None, target_rel_path: str = None):
         """添加一个文件到 package
 
-        rel_path: 相对于 data/ 的路径，如 "events/preopen_events.csv"
+        rel_path: 相对于 data/ 的源文件路径，如 "events/preopen_events.csv"
         source_name: 数据源名称，用于 source_summary
+        target_rel_path: 发布时的目标路径（可选，不指定则与 rel_path 相同）
         """
         src = PATHS.get("data", Path()) / rel_path
         if not src.exists():
             raise FileNotFoundError(f"源文件不存在: {src}")
 
-        # 保持目录结构
-        dest = self.payload_dir / rel_path
+        dest_rel = target_rel_path or rel_path
+        dest = self.payload_dir / dest_rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dest)
 
@@ -144,18 +146,59 @@ class PackagePublisher:
         return packages
 
 
+def _sync_to_codex_root(package_id: str):
+    """将发布的文件同步到 Codex datahub 根级别"""
+    pkg_dir = INCOMING / package_id
+    payload_dir = pkg_dir / "payload"
+    if not payload_dir.exists():
+        return
+    for f in payload_dir.rglob("*"):
+        if f.is_file() and f.suffix in (".csv", ".json", ".jsonl"):
+            rel = f.relative_to(payload_dir)
+            dest = CODEX_DATA / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(f, dest)
+
+
 # === CLI 命令 ===
 def cmd_publish_preopen():
-    """hermes package:publish-preopen"""
+    """hermes package:publish-preopen — 发布事件 + 公告 + 基本面数据"""
     pp = PackagePublisher("preopen_events")
     try:
-        # 添加盘前事件文件
-        for f in ["events/preopen_events.csv", "audit/data_freshness_report.json"]:
+        # 事件类
+        for f in ["events/preopen_events.csv", "events/policy_events.csv"]:
             p = PATHS.get("data", Path()) / f
             if p.exists():
                 pp.add_file(f)
+
+        # 公告（本地名 → Codex 期望名）
+        ann_src = "fundamentals/announcements_extracted.csv"
+        ann_dst = "events/announcements.csv"
+        p = PATHS.get("data", Path()) / ann_src
+        if p.exists():
+            pp.add_file(ann_src, target_rel_path=ann_dst)
+
+        # 基本面
+        for f in ["fundamentals/financial_snapshot.csv"]:
+            p = PATHS.get("data", Path()) / f
+            if p.exists():
+                pp.add_file(f)
+
+        # 业绩预告（本地名 → Codex 期望名）
+        fc_src = "fundamentals/forecast_report.csv"
+        fc_dst = "fundamentals/earnings_forecast.csv"
+        p = PATHS.get("data", Path()) / fc_src
+        if p.exists():
+            pp.add_file(fc_src, target_rel_path=fc_dst)
+
+        # 审计报告
+        p = PATHS.get("audit", Path()) / "data_freshness_report.json"
+        if p.exists():
+            pp.add_file("audit/data_freshness_report.json")
+
         pp.set_freshness("ok", max_delay_seconds=0)
         pid = pp.finalize()
+        _sync_to_codex_root(pid)
         print(f"✅ Published: {pid}")
     except Exception as e:
         pp.abort()
@@ -181,6 +224,7 @@ def cmd_publish_intraday_alerts():
                 pp.add_file(f"audit/{f}")
         pp.set_freshness("ok", max_delay_seconds=30)
         pid = pp.finalize()
+        _sync_to_codex_root(pid)
         print(f"✅ Published: {pid}")
     except Exception as e:
         pp.abort()
@@ -188,16 +232,16 @@ def cmd_publish_intraday_alerts():
 
 
 def cmd_publish_market():
-    """hermes package:publish-market"""
+    """hermes package:publish-market — 发布行情快照"""
     pp = PackagePublisher("market_snapshot")
     try:
-        for f in ["market/live_snapshot.csv", "market/valuation_snapshot.csv",
-                   "market/sector_snapshot.csv"]:
+        for f in ["market/live_snapshot.csv", "market/pool.csv"]:
             p = PATHS.get("data", Path()) / f
             if p.exists():
                 pp.add_file(f)
         pp.set_freshness("ok", max_delay_seconds=30)
         pid = pp.finalize()
+        _sync_to_codex_root(pid)
         print(f"✅ Published: {pid}")
     except Exception as e:
         pp.abort()

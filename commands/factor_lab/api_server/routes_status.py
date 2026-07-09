@@ -1,6 +1,7 @@
 """API Status routes — 版本状态 + Agent Console 核心"""
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from factor_lab.api_server.response import api_success
 from factor_lab.leader.auto_health import health
 from factor_lab.leader.roadmap_cursor import get_cursor
 from factor_lab.leader.workloop import read_completion, TASKS_DIR
@@ -24,7 +25,7 @@ async def get_status():
         latest = json.loads(lp.read_text())
     report = generate_report()
     be = policy_status()
-    return {
+    return api_success(data={
         "state": {"level": "green" if h.get("lock_status") == "free" else "red"},
         "health": h,
         "cursor": cursor,
@@ -37,7 +38,7 @@ async def get_status():
         },
         "backend": be,
         "report": report,
-    }
+    })
 
 
 @router.get("/agent-output")

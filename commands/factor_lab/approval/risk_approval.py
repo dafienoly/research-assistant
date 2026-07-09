@@ -2,6 +2,9 @@
 import os, json
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+from typing import Optional
+
+from factor_lab.risk.kill_switch import KillSwitch
 
 CST = timezone(timedelta(hours=8))
 BASE = Path("/mnt/d/HermesReports")
@@ -30,8 +33,18 @@ def run_approval(
     plan: str = "B",
     order_preview_dir: str = None,
     capital: float = 50000,
+    kill_switch: Optional[KillSwitch] = None,
 ) -> dict:
-    """运行风控审批"""
+    """运行风控审批
+
+    Args:
+        date: 交易日期
+        plan: 计划名称
+        order_preview_dir: order_preview 目录路径
+        capital: 可用资金
+        kill_switch: 可选的统一 KillSwitch 实例。如果提供，使用
+                     kill_switch.check_action() 进行风控检查。
+    """
     if order_preview_dir is None:
         order_preview_dir = str(BASE / "order_preview" / date.replace("-", ""))
 
@@ -46,9 +59,28 @@ def run_approval(
     orders = orders_data.get("orders", [])
     summary_in = orders_data.get("summary", {})
 
-    # Kill switch checks
-    ks_results = _check_kill_switch(orders, capital)
-    ks_triggered = any(not v.get("passed", True) for v in ks_results.values())
+    # ── Unified KillSwitch check ────────────────────────────────────
+    ks_triggered = False
+    ks_results = {}
+    if kill_switch is not None:
+        check_result = kill_switch.check_action(
+            action_type="trade",
+            action_name="approval",
+            source="risk_approval",
+            details={"date": date, "plan": plan, "n_orders": len(orders)},
+        )
+        ks_triggered = check_result.get("blocked", False)
+        ks_results = {
+            "kill_switch_unified": {
+                "passed": not ks_triggered,
+                "rule": f"KillSwitch state: {kill_switch.state}",
+                "block_reason": check_result.get("reason", ""),
+            }
+        }
+    else:
+        # Legacy mode: no KillSwitch instance provided; keep basic checks
+        ks_results = _legacy_checks(orders, capital)
+        ks_triggered = any(not v.get("passed", True) for v in ks_results.values())
 
     # Classify orders
     approved = []
@@ -129,8 +161,8 @@ def run_approval(
     return result
 
 
-def _check_kill_switch(orders, capital):
-    """执行 kill switch 检查"""
+def _legacy_checks(orders, capital):
+    """执行遗留/本地 Kill switch 检查（当未提供统一 KillSwitch 时使用）"""
     results = {}
     ks = KILL_SWITCH
 

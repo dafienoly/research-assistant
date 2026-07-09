@@ -31,6 +31,7 @@ import numpy as np
 import pandas as pd
 
 from factor_lab.metrics import compute_metrics
+from factor_lab.risk.st_watchlist import STWatchlist
 
 
 # ═══════════════════════════════════════════════════════════
@@ -55,18 +56,37 @@ def _is_limit_down(close: float, prev_close: float) -> bool:
 # 内部辅助函数
 # ═══════════════════════════════════════════════════════════
 
-def _infer_st(symbol: str, execution_log: list, date: pd.Timestamp | None = None) -> bool:
+def _infer_st(
+    symbol: str,
+    execution_log: list,
+    date: pd.Timestamp | None = None,
+    st_watchlist: STWatchlist | None = None,
+) -> bool:
     """通过 symbol 后缀推断是否 ST
 
     在没有 ST 标记字段时的 fallback 判断。
+    如果提供了 st_watchlist，优先使用数据库查询。
+    否则用 symbol 后缀回退推断（带 deprecation warning）。
+
     检查 symbol 中是否包含 ST/*ST 标记。
     若无法判断，记录 warning 并返回 False。
     """
+    # 优先使用 STWatchlist 数据库查询
+    if st_watchlist is not None:
+        return st_watchlist.is_st(symbol)
+
     if not isinstance(symbol, str) or len(symbol) < 3:
         return False
 
     # 提取 A 股代码 (前6位数字)
     code = "".join(ch for ch in symbol if ch.isdigit())[:6] if any(ch.isdigit() for ch in symbol) else ""
+
+    # deprecation: 没有 STWatchlist，使用回退推断
+    if code and len(code) >= 6:
+        execution_log.append(
+            f"deprecation: _infer_st 使用 symbol 后缀回退推断 {symbol}, "
+            f"建议传入 STWatchlist 实例替代"
+        )
 
     # 常见 ST 标记 — 严格匹配
     upper = symbol.upper().strip()
@@ -75,9 +95,9 @@ def _infer_st(symbol: str, execution_log: list, date: pd.Timestamp | None = None
     if " S T " in upper:
         return True
 
-    # "ST" 作为独立标记（前后是非字母或边界）
+# "ST" 作为独立标记（前后是非字母或边界）
     import re
-    if re.search(r'(?:^|[\s.\-_\[])[SsTt]{2}(?:$|[\s.\-_\]]|\.)', symbol):
+    if re.search(r"(?:^|[\s.\-\_\[\]])ST(?:$|[\s.\-\_\[\]]|\.)", symbol, re.I):
         return True
 
     # 宽松: ST 作为子串出现且 symbol 较短（含 ST 标记的股票代码通常较短）
@@ -225,6 +245,7 @@ class AShareBacktester:
         low_pivot: pd.DataFrame | None = None,
         volume_pivot: pd.DataFrame | None = None,
         amount_pivot: pd.DataFrame | None = None,
+        st_watchlist: STWatchlist | None = None,
     ):
         # 必需数据
         _require_not_empty(close_pivot, "close_pivot")
@@ -236,6 +257,9 @@ class AShareBacktester:
         self.low = low_pivot.copy() if low_pivot is not None else None
         self.volume = volume_pivot.copy() if volume_pivot is not None else None
         self.amount = amount_pivot.copy() if amount_pivot is not None else None
+
+        # ST 名单数据库
+        self.st_watchlist = st_watchlist
 
         # 默认交易成本（A股真实标准）
         self.commission_rate = 0.0003       # 万3
@@ -453,7 +477,7 @@ class AShareBacktester:
 
                     # ST 推断 + 排除
                     if st_exclude and sym not in st_cache:
-                        st_cache[sym] = _infer_st(sym, execution_log, d)
+                        st_cache[sym] = _infer_st(sym, execution_log, d, self.st_watchlist)
                     if st_exclude and st_cache.get(sym, False):
                         skipped["st"].append(sym)
                         continue

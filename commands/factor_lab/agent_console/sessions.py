@@ -49,6 +49,10 @@ def get_session(sid: str) -> dict:
     start = req.get("created_at", "")
     end = summary.get("updated_at", "")
     duration = _calc_duration(start, end)
+    startup_params = {}
+    spf = sdir / "startup_params.json"
+    if spf.exists():
+        startup_params = json.loads(spf.read_text())
     return {
         "session_id": sid, "events": events[-200:], "answer": answer,
         "diagnostics": diagnostics[-50:], "duration": duration or "—",
@@ -56,6 +60,7 @@ def get_session(sid: str) -> dict:
         "agent": req.get("agent", "?"), "prompt": req.get("prompt", "")[:200],
         "version": req.get("version", "") or "—",
         "git_commit": _last_git_commit() or "—", "created_at": req.get("created_at", ""),
+        "startup_params": startup_params,
     }
 
 

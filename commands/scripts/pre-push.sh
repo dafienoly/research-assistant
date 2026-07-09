@@ -24,6 +24,13 @@ while read local_ref local_sha remote_ref remote_sha; do
         $VENV $CLI leader:audit-and-push --mode push-hook
         EXIT_CODE=$?
 
+        if [ $EXIT_CODE -eq 0 ]; then
+            echo ""
+            echo "⏳ [pre-push] 运行反偷工减料审计 (4闸门)..."
+            timeout 60 $VENV $CLI leader:anti-cheat-audit --skip gate4
+            EXIT_CODE=$?
+        fi
+
         if [ $EXIT_CODE -ne 0 ]; then
             echo ""
             echo "❌ [pre-push] 审计未通过，推送已阻止"

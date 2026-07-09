@@ -441,6 +441,204 @@ def build_default_rules() -> list[RiskRule]:
         tags=["system", "pipeline"],
     ))
 
+    # === 单票风控规则 (V3.5.3) ===
+
+    rules.append(RiskRule(
+        name="single_stock_loss_5pct",
+        category=RuleCategory.LOSS.value,
+        description="单票亏损5% — 仓位减半",
+        severity=RuleSeverity.WARNING.value,
+        threshold=0.05,
+        max_consecutive_failures=1,
+        cooldown_seconds=3600,
+        auto_recoverable=False,
+        tags=["loss", "position", "stop_loss"],
+    ))
+
+    rules.append(RiskRule(
+        name="single_stock_loss_8pct",
+        category=RuleCategory.LOSS.value,
+        description="单票亏损8% — 强制止损",
+        severity=RuleSeverity.CRITICAL.value,
+        threshold=0.08,
+        max_consecutive_failures=1,
+        cooldown_seconds=7200,
+        auto_recoverable=False,
+        tags=["loss", "position", "stop_loss"],
+    ))
+
+    rules.append(RiskRule(
+        name="position_concentration_25pct",
+        category=RuleCategory.ACCOUNT.value,
+        description="单票仓位不超过25%",
+        severity=RuleSeverity.CRITICAL.value,
+        threshold=0.25,
+        max_consecutive_failures=1,
+        cooldown_seconds=600,
+        auto_recoverable=True,
+        tags=["position", "concentration"],
+    ))
+
+    rules.append(RiskRule(
+        name="low_liquidity_50m",
+        category=RuleCategory.DATA.value,
+        description="日成交额低于5000万禁止买入",
+        severity=RuleSeverity.WARNING.value,
+        threshold=50_000_000,
+        max_consecutive_failures=3,
+        cooldown_seconds=300,
+        auto_recoverable=True,
+        tags=["liquidity", "volume"],
+    ))
+
+    rules.append(RiskRule(
+        name="daily_buy_limit_70pct",
+        category=RuleCategory.ACCOUNT.value,
+        description="单日买入总额不超过总资产70%",
+        severity=RuleSeverity.WARNING.value,
+        threshold=0.70,
+        max_consecutive_failures=1,
+        cooldown_seconds=86400,
+        auto_recoverable=False,
+        tags=["order", "limit"],
+    ))
+
+    # === 组合风控规则 (V3.5.3) ===
+
+    rules.append(RiskRule(
+        name="portfolio_daily_loss_2pct",
+        category=RuleCategory.LOSS.value,
+        description="当日亏损2% — 停止新开仓",
+        severity=RuleSeverity.CRITICAL.value,
+        threshold=0.02,
+        max_consecutive_failures=1,
+        cooldown_seconds=3600,
+        auto_recoverable=False,
+        tags=["loss", "portfolio", "circuit_breaker"],
+    ))
+
+    rules.append(RiskRule(
+        name="portfolio_daily_loss_3pct",
+        category=RuleCategory.LOSS.value,
+        description="当日亏损3% — 只允许减仓",
+        severity=RuleSeverity.BLOCKER.value,
+        threshold=0.03,
+        max_consecutive_failures=1,
+        cooldown_seconds=7200,
+        auto_recoverable=False,
+        tags=["loss", "portfolio", "circuit_breaker"],
+    ))
+
+    rules.append(RiskRule(
+        name="portfolio_drawdown_8pct",
+        category=RuleCategory.LOSS.value,
+        description="最大回撤8% — 进入防守状态",
+        severity=RuleSeverity.CRITICAL.value,
+        threshold=0.08,
+        max_consecutive_failures=1,
+        cooldown_seconds=86400,
+        auto_recoverable=False,
+        tags=["loss", "drawdown", "defense"],
+    ))
+
+    rules.append(RiskRule(
+        name="portfolio_drawdown_12pct",
+        category=RuleCategory.LOSS.value,
+        description="最大回撤12% — 停止交易",
+        severity=RuleSeverity.BLOCKER.value,
+        threshold=0.12,
+        max_consecutive_failures=1,
+        cooldown_seconds=86400,
+        auto_recoverable=False,
+        tags=["loss", "drawdown", "stop"],
+    ))
+
+    rules.append(RiskRule(
+        name="industry_concentration_30pct",
+        category=RuleCategory.ACCOUNT.value,
+        description="单行业仓位不超过30%",
+        severity=RuleSeverity.WARNING.value,
+        threshold=0.30,
+        max_consecutive_failures=3,
+        cooldown_seconds=600,
+        auto_recoverable=True,
+        tags=["industry", "concentration"],
+    ))
+
+    # === 数据异常规则 (V3.5.4) ===
+
+    rules.append(RiskRule(
+        name="market_data_lag_60s",
+        category=RuleCategory.DATA.value,
+        description="行情延迟超过60秒 — 停止交易",
+        severity=RuleSeverity.CRITICAL.value,
+        threshold=60,
+        max_consecutive_failures=2,
+        cooldown_seconds=30,
+        auto_recoverable=True,
+        tags=["data", "market", "lag"],
+    ))
+
+    rules.append(RiskRule(
+        name="market_data_lag_300s",
+        category=RuleCategory.DATA.value,
+        description="行情延迟超过300秒 — 企业微信告警",
+        severity=RuleSeverity.BLOCKER.value,
+        threshold=300,
+        max_consecutive_failures=1,
+        cooldown_seconds=120,
+        auto_recoverable=True,
+        tags=["data", "market", "alert"],
+    ))
+
+    rules.append(RiskRule(
+        name="price_anomaly_15pct",
+        category=RuleCategory.DATA.value,
+        description="单日涨跌幅>15% — 价格异常标记（非ST/创业板/科创板）",
+        severity=RuleSeverity.WARNING.value,
+        threshold=0.15,
+        max_consecutive_failures=1,
+        cooldown_seconds=300,
+        auto_recoverable=True,
+        tags=["data", "price", "anomaly"],
+    ))
+
+    rules.append(RiskRule(
+        name="consecutive_order_failures_5",
+        category=RuleCategory.EXECUTION.value,
+        description="连续订单失败5次 — 停止交易",
+        severity=RuleSeverity.CRITICAL.value,
+        threshold=5,
+        max_consecutive_failures=1,
+        cooldown_seconds=600,
+        auto_recoverable=True,
+        tags=["execution", "order", "failure"],
+    ))
+
+    rules.append(RiskRule(
+        name="data_missing_rate_high",
+        category=RuleCategory.DATA.value,
+        description="数据缺失率超过30% — 标记数据不可用",
+        severity=RuleSeverity.CRITICAL.value,
+        threshold=0.30,
+        max_consecutive_failures=2,
+        cooldown_seconds=300,
+        auto_recoverable=True,
+        tags=["data", "missing"],
+    ))
+
+    rules.append(RiskRule(
+        name="duplicate_order_protection",
+        category=RuleCategory.EXECUTION.value,
+        description="防止重复下单 — 同一symbol 5分钟内重复买入",
+        severity=RuleSeverity.WARNING.value,
+        threshold=300,
+        max_consecutive_failures=1,
+        cooldown_seconds=600,
+        auto_recoverable=True,
+        tags=["execution", "duplicate", "protection"],
+    ))
+
     return rules
 
 

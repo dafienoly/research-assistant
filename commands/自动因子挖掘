@@ -1,0 +1,57 @@
+# 研究方向笔记本
+
+> 创建时间: 2026-07-07T18:17:17.898396+08:00
+
+## 当前 Baseline
+
+- 表达式: 
+- IC: 
+- 评分: 
+
+## 已完成实验
+
+- vwap_rsi_squeeze | 评分=0.0 | IC=0.0000 | rank(ts_delta(vwap, 5)) * rank(-bb_width(close, 20, 2)) * ra
+
+- vwap_volume_zscore_squeeze | 评分=0.0 | IC=0.0000 | rank(ts_delta(vwap, 5)) * rank(-bb_width(close, 20, 2)) * ra
+
+- vwap_returns_decay_squeeze | 评分=0.0 | IC=0.0000 | rank(ts_delta(vwap, 5)) * rank(-bb_width(close, 20, 2)) * ra
+
+- vwap_vol_surge_squeeze | 评分=0.0 | IC=0.0000 | rank(ts_zscore(ts_delta(vwap, 5), 20)) * rank(ts_zscore(volu
+
+- gen_4 | 评分=0.0 | IC=0.0000 | rank(ts_zscore(ts_delta(vwap, 5), 20))
+
+- close_vwap_div_squeeze | 评分=0.0 | IC=0.0000 | rank(ts_delta(close, 5) - ts_delta(vwap, 5)) * rank(-bb_widt
+
+- gen_4 | 评分=0.0 | IC=0.0000 | rank(ts_delta(ts_delta(vwap, 5), 5))
+
+- vwap_close_div_norm | 评分=0.0 | IC=0.0000 | rank(ts_zscore(close / vwap, 20)) * rank(-bb_width(close, 20
+
+- vwap_accel_bb | 评分=0.0 | IC=0.0000 | rank(ts_delta(ts_delta(vwap, 5), 5)) * rank(-bb_width(close,
+
+- vwap_bb_volume_reversal | 评分=0.0 | IC=0.0000 | rank(ts_delta(vwap, 5)) * rank(-bb_width(close, 20, 2)) * ra
+
+- gen_4 | 评分=0.0 | IC=0.0000 | rank(ts_delta(vwap, 5))
+
+- vwap_bb_corr_reversal | 评分=0.0 | IC=0.0000 | rank(ts_delta(vwap, 5)) * rank(-bb_width(close, 20, 2)) * ra
+
+- vwap_trend_bb_contract | 评分=0.0 | IC=0.0000 | rank(ts_delta(vwap,5)) * rank(-ts_delta(bb_width(close,20,2)
+
+- gen_4 | 评分=0.0 | IC=0.0000 | rank(ts_delta(vwap,5))
+
+- vwap_rtn_corr_bb | 评分=0.0 | IC=0.0000 | rank(ts_corr(vwap, returns, 10)) * rank(-bb_width(close,20,2
+
+- vwap_amount_squeeze_reversal | 评分=74.8 | IC=-0.0448 | rank(ts_delta(vwap, 5)) * rank(-ts_zscore(amount, 20)) * ran
+
+- bb_width_vwap_zscore | 评分=80.9 | IC=-0.0698 | rank(-bb_width(close, 20, 2)) * rank(ts_zscore(ts_delta(vwap
+
+- gen_4 | 评分=80.9 | IC=-0.0698 | rank(-bb_width(close, 20, 2))
+
+- gen_4 | 评分=53.0 | IC=-0.0248 | rank(ts_delta(vwap, 5))
+
+- gen_5 | 评分=80.9 | IC=-0.0698 | rank(-bb_width(close, 20, 2))
+
+- vwap_bb_squeeze_reversal | 评分=82.3 | IC=-0.0743 | rank(ts_delta(vwap, 5)) * rank(-bb_width(close, 20, 2))
+
+## 待探索方向
+
+## 备注

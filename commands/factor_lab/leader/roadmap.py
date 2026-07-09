@@ -10,6 +10,7 @@ class RoadmapItem:
     auto_allowed: bool = True
     manual_required: bool = False
     trading_mode: str = "none"
+    description: str = ""  # 详细任务描述，用于 agent-runner prompt
 
 
 ROADMAP_ITEMS = []
@@ -72,26 +73,41 @@ def _build():
         RoadmapItem("V7.4", "Roadmap Progress UI", "路线图进度"),
         RoadmapItem("V7.5", "Report Center", "报告中心"),
         RoadmapItem("V7.6", "Risk Dashboard", "风险仪表盘"),
-        RoadmapItem("V7.7", "Paper Trading Dashboard", "纸面交易"),
-        RoadmapItem("V7.8", "User Feedback/Task Intake UI", "用户反馈 UI"),
-        RoadmapItem("V7.9", "One-click Local Ops", "一键运维"),
+        RoadmapItem("V7.7", "Paper Trading Dashboard", "纸面交易", description="创建纸面交易（Paper Trading）前端页面：模拟交易仪表盘，包含虚拟账户余额、持仓列表、模拟下单表单、历史成交记录。后端需要 PaperTradingService 管理虚拟订单簿和成交模拟。新增 routes_paper.py、PaperDashboard.jsx、paper_trading_service.py，26+ 测试。"),
+        RoadmapItem("V7.8", "User Feedback/Task Intake UI", "用户反馈 UI", description="用户反馈提交和任务录入前端页面：FeedbackForm 组件、TaskIntake 页面、反馈列表/状态追踪。后端新增强 routes_feedback.py、feedback_store.py。前端页面 Feedback.jsx、TaskIntake.jsx。20+ 测试。"),
+        RoadmapItem("V7.9", "One-click Local Ops", "一键运维", description="一键运维脚本和前端页面：本地环境健康检查、一键重启/部署/备份。新增 ops_dashboard.py、routes_ops.py、OpsCenter.jsx。Shell 脚本整合。15+ 测试。"),
         # V8.x
-        RoadmapItem("V8.0", "Agent Role Registry", "角色注册"),
-        RoadmapItem("V8.1", "Agent Router", "Agent 路由"),
-        RoadmapItem("V8.2", "Auto Bugfix Loop", "自动 bugfix"),
-        RoadmapItem("V8.3", "Regression Test Planner", "回归测试"),
-        RoadmapItem("V8.4", "GitHub Issue/PR Pipeline", "Issue/PR 流水线"),
-        RoadmapItem("V8.5", "Documentation Generator", "文档生成"),
-        RoadmapItem("V8.6", "Release Manager", "发布管理"),
-        RoadmapItem("V8.7", "Self-Diagnostics", "自诊断"),
-        RoadmapItem("V8.8", "Cost/Token/Backend Policy", "成本策略"),
-        RoadmapItem("V8.9", "Continuous Improvement Engine", "持续改进"),
-        # V9.x backlog
-        RoadmapItem("V9.0", "Cloud/Local Hybrid Runner", "backlog", auto_allowed=False, manual_required=False, trading_mode="backlog"),
-        RoadmapItem("V9.1", "Distributed Backtest", "backlog", auto_allowed=False, manual_required=False, trading_mode="backlog"),
-        RoadmapItem("V9.2", "Multi-account Governance", "backlog", auto_allowed=False, manual_required=False, trading_mode="backlog"),
-        RoadmapItem("V9.3", "External Notification Center", "backlog", auto_allowed=False, manual_required=False, trading_mode="backlog"),
-        RoadmapItem("V9.4", "Enterprise-grade Audit", "backlog", auto_allowed=False, manual_required=False, trading_mode="backlog"),
+        RoadmapItem("V8.0", "Agent Role Registry", "角色注册", description="Agent 角色注册表：定义 Agent 角色 Schema、注册/发现 API、角色分配策略。新增 agent_registry.py、routes_agents.py、AgentRegistry.jsx。20+ 测试。"),
+        RoadmapItem("V8.1", "Agent Router", "Agent 路由", description="Agent 任务路由系统：根据角色和能力将任务分发到合适的 Agent 后端。新增 agent_router.py、路由策略配置、调度日志。20+ 测试。"),
+        RoadmapItem("V8.2", "Auto Bugfix Loop", "自动 bugfix", description="自动 Bug 修复循环：监听测试失败 → 分析错误 → Claude Code 修复 → 重跑测试。新增 auto_bugfix.py、regression_tracker.py。15+ 测试。"),
+        RoadmapItem("V8.3", "Regression Test Planner", "回归测试", description="回归测试规划器：分析代码变更影响范围 → 自动选择相关测试 → 生成测试计划。新增 regress_planner.py、impact_analyzer.py。20+ 测试。"),
+        RoadmapItem("V8.4", "GitHub Issue/PR Pipeline", "Issue/PR 流水线", description="GitHub Issue/PR 自动流水线：监控 Issue → 自动分析 → 创建 PR → 代码审查 → 合并。新增 github_pipeline.py、pr_manager.py。25+ 测试。"),
+        RoadmapItem("V8.5", "Documentation Generator", "文档生成", description="自动文档生成器：从代码注释和模块结构自动生成项目文档网站。新增 doc_generator.py、docs 模板。15+ 测试。"),
+        RoadmapItem("V8.6", "Release Manager", "发布管理", description="版本发布管理器：版本号管理、CHANGELOG 生成、发布包构建。新增 release_manager.py、routes_release.py。15+ 测试。"),
+        RoadmapItem("V8.7", "Self-Diagnostics", "自诊断", description="系统自诊断面板：组件健康检查、性能指标、错误聚合、依赖版本检查。新增 self_diagnose.py、Diagnostics.jsx。20+ 测试。"),
+        RoadmapItem("V8.8", "Cost/Token/Backend Policy", "成本策略", description="API 成本和 token 使用策略管理：用量追踪、预算告警、后端切换策略。新增 cost_tracker.py、routes_cost.py。15+ 测试。"),
+        RoadmapItem("V8.9", "Continuous Improvement Engine", "持续改进", description="持续改进引擎：分析过往版本失败模式 → 自动调整流程参数 → 优化 prompt。新增 improvement_engine.py。15+ 测试。"),
+        # V9.x backlog → 已激活
+        RoadmapItem("V9.0", "Cloud/Local Hybrid Runner", "云端+本地混合 Agent 执行环境",
+                    auto_allowed=True, manual_required=False, trading_mode="none",
+                    description="实现混合运行环境：云端执行重计算任务（回测/因子挖掘），本地执行轻量任务（CLI/快速验证）。"
+                              "新增 hybrid_runner.py、routes_hybrid.py、对应前端页面。20+ 测试。"),
+        RoadmapItem("V9.1", "Distributed Backtest", "分布式并行回测引擎",
+                    auto_allowed=True, manual_required=False, trading_mode="none",
+                    description="分布式回测引擎：任务分片 → 多机并行 → 结果聚合。支持多标的/多参数并行回测。"
+                              "新增 distributed_backtest.py、worker_manager.py。20+ 测试。"),
+        RoadmapItem("V9.2", "Multi-account Governance", "多账户治理与风控",
+                    auto_allowed=True, manual_required=False, trading_mode="none",
+                    description="多账户统一管理：账户注册、权限控制、独立风控策略、仓位汇总。"
+                              "新增 account_registry.py、routes_accounts.py、前端账户管理页。20+ 测试。"),
+        RoadmapItem("V9.3", "External Notification Center", "外部通知中心（Telegram/短信/邮件）",
+                    auto_allowed=True, manual_required=False, trading_mode="none",
+                    description="多渠道通知：Telegram/短信/邮件推送。通知模板、频率控制、告警规则。"
+                              "新增 notification_center.py、routes_notify.py、前端通知配置页。20+ 测试。"),
+        RoadmapItem("V9.4", "Enterprise-grade Audit", "企业级审计日志系统",
+                    auto_allowed=True, manual_required=False, trading_mode="none",
+                    description="全量操作审计：不可篡改日志、操作回放、合规报告。"
+                              "新增 audit_logger.py、routes_audit.py、前端审计查询页。20+ 测试。"),
     ]
     ROADMAP_ITEMS = items
     return items

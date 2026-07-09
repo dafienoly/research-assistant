@@ -19,8 +19,10 @@ from pathlib import Path
 
 # 确保能在任何目录下运行
 BASE = Path(__file__).parent.resolve()
+ROOT = BASE.parent.resolve()  # research-assistant/
 os.chdir(BASE)
 sys.path.insert(0, str(BASE))
+sys.path.insert(0, str(ROOT))
 
 from config import ensure_dirs, now_str, VENV_PYTHON
 
@@ -40,6 +42,12 @@ def show_help():
   strategy-lab:build-latest-signals 生成最新信号
   strategy-lab:build-review-material 生成评审材料
 
+分层股票池类 (V4.1):
+  universe:build                    构建 U0-U4 + ETF 替代池
+  universe:list                     列出所有股票池
+  universe:show <U0|U1|...|ETF>   查看指定股票池
+  universe:audit                    审计所有股票池
+
 个股分析类:
   stock:context <代码>              读取个股数据上下文
 
@@ -48,6 +56,14 @@ def show_help():
   mx:search <关键词>                资讯搜索（公告/新闻/研报）
   mx:xuangu <条件>                  智能选股（自然语言条件）
 
+事件因子类 (V4.10):
+  event:list [--days 90] [--type 订单] [--direction positive]
+                              列出近期半导体事件
+  event:factors [--days 365] [--output PATH]
+                              生成事件因子
+  event:report [--days 365] [--json]
+                              事件因子报告
+
 量化策略回测类:
   backtest:factor-top <因子名> [--rebalance weekly/monthly]
                                 因子 Top 组分位数回测 → 完整 HTML 报告
@@ -55,6 +71,10 @@ def show_help():
                                 因子 Walk-Forward 样本外验证 → 过拟合诊断报告
   factor:validate [--factor ret5] [--start 2025-01-02] [--end 2026-06-30] [--rebalance monthly]
                                 因子完整稳健性验证 → 反过拟合 + Walk-Forward + 评分
+  factor:validate-v4 [--factor ret5] [--top-quantile 0.2] [--rebalance monthly]
+                                V4.4 因子增强评价: 换手率/成本/回撤/胜率/CAGR/Calmar + 6基准对比 + 风险归因 (V4.4)
+  factor:risk-attribution [--factor ret5] [--top-quantile 0.2]
+                                V4.4 风险暴露归因: 市值/Beta/波动率/流动性/行业/Jackknife (V4.4)
   factor:batch [--factors ret5,vol_ratio60,...] [--start 2025-01-02] [--end 2026-06-30]
                                 批量因子验证 → 排行榜 HTML / CSV / JSON
   factor:composites [--candidate-pool PATH] [--methods equal_weight_score,...]
@@ -73,6 +93,17 @@ def show_help():
                                 每日盘前编排: 信号+ETF+报告+推送+决策模板 (V1.12)
   factor:decision-log [--date latest] [--plan B] [--action plan_b] [--confirm]
                                 人工决策记录 (V1.13)
+  portfolio:build-lowfreq [--signal-file PATH] [--signal-date YYYY-MM-DD]
+                                V4.7 低频组合构建: 因子信号→可执行建议
+  portfolio:recommend           查看最新低频组合推荐摘要
+  portfolio:risk                查看最新组合风险暴露
+  premarket:v4                  V4盘前组合建议 (等同于 build-lowfreq)
+  paper:v4-run [--date YYYY-MM-DD] [--capital 50000] [--top-n 10]
+                                V4.8 Paper Trading: 模拟盘运行 (组合→检查→成交→偏差)
+  paper:v4-dashboard            查看最新 V4.8 Paper Trading 看板
+  shadow:v4-run [--date YYYY-MM-DD] [--capital 50000] [--top-n 10]
+                                V4.8 Shadow Trading: 影子交易 (计划vs行情, 相对等权基准)
+  shadow:v4-report              查看 V4.8 Shadow Trading 多日报告
   factor:review-decisions --start YYYY-MM-DD --end YYYY-MM-DD
                                 决策复盘: 系统推荐 vs 人工执行表现 (V1.13)
   factor:rebalance-diff --date 2026-07-03 --positions data/positions/current_positions.csv --plan B
@@ -120,6 +151,8 @@ def show_help():
                                 Paper 晋级评审: candidate paper 表现评估 (V2.13)
   factor:live-readiness --latest [--candidate switch_to_plan_a] [--strict]
                                 实盘前门禁检查: 6 道 Gate + Checklist (V2.14)
+  live-readiness:v4              V4.9 小资金实盘 Readiness Gate: 13道门禁检查
+  live-gate:v4-report            V4.9 Readiness Gate 详细报告 (含证据+修复建议)
   architecture:audit             全局架构审计: 模块/CLI/Gate/Safety/V3 Readiness (V2.14.1)
   alpha:register --spec <path>  Alpha Factory: 注册外部 AlphaSpec (V3.0)
   alpha:list                     Alpha Factory: 列出已注册 Alpha (V3.0)
@@ -138,7 +171,7 @@ def show_help():
   leader:loop-once               Leader 循环: 读取 completion 并派发下一轮
   leader:audit-and-push [--version Vx.y] [--mode full|push-hook] [--force]
                                 审计代码变更并推送至 GitHub (ADR-022)
-  leader:anti-cheat-audit [--version Vx.y] [--skip gate2 gate3]
+  leader:anti-cheat-audit [--version Vx.y] [--skip gate2 gate3] [--enable-gate5] [--risk auto|LOW|MEDIUM|HIGH] [--output DIR] [--json]
                                 反偷工减料审计: 检测 stub/硬编码/缺测试 (4闸门)
   leader:lock-status             查看当前任务锁状态
 
@@ -157,6 +190,18 @@ leader:dashboard --host 127.0.0.1 --port 8766
 leader:dashboard [--host 127.0.0.1] [--port 8766]
                               FastAPI 后端: Dashboard + Agent Console 统一入口 (V3)
 leader:dashboard-json         输出 dashboard 使用的状态 JSON
+
+一键本地运维 (V7.9):
+  leader:ops-health            所有服务健康状态概览
+  leader:ops-status [id]      单个或全部服务详细状态
+  leader:ops-start <id>       启动服务 (dashboard/auto-loop/mcp)
+  leader:ops-stop <id>        停止服务
+  leader:ops-restart <id>     重启服务
+  leader:ops-backup           一键备份 (状态+配置+日志)
+  leader:ops-diagnostics      全面诊断报告
+  leader:ops-ports            端口占用扫描
+  leader:ops-all              启动全部核心服务 (dashboard+auto-loop)
+
 Leader 自动派发:
   leader:inspect                 Leader 只读检查本地报告/代码/Registry，判断 V3 阶段
   leader:dispatch [--dry-run]    按 Alpha Factory 路线图生成 agent_tasks 任务包
@@ -167,6 +212,24 @@ Leader 自动派发:
   leader:loop-watch             自动工作循环轮询运行
   leader:agent-runner --once    Codex 后台执行器单次运行
   leader:agent-runner --watch   Codex 后台执行器轮询运行
+
+Agent Role Registry (V8.0):
+  leader:agent-role-list [--capability <cap>] [--backend <backend>]
+                                列出已注册 Agent 角色
+  leader:agent-role-show --role-id <id>
+                                查看角色详情
+  leader:agent-role-register --role-id <id> --name <name> --description <desc>
+                                注册自定义角色
+  leader:agent-role-delete --role-id <id>
+                                删除角色
+  leader:agent-role-init        初始化注册表并填充标准角色 (PM/架构/开发/测试/审计)
+  leader:agent-role-assign --role-id <id> --task-id <id> --task-desc "<desc>"
+                                分配角色到任务
+  leader:agent-role-assignments [--role-id <id>] [--status assigned|running|completed]
+                                列出角色分配记录
+  leader:agent-role-match --role-id <id> [--preferred <backend>]
+                                查看角色推荐后端
+  leader:agent-role-stats        注册表统计
 
 投研 Skill 运行时 (V6.0):
   research:list-skills [--category analysis] [--tag data]
@@ -223,10 +286,13 @@ Factor ↔ Alpha 联动 (V3.0):
 基本面类:
   fundamentals:update-from-baostock  更新 Baostock 基本面
 
-数据质量类:
+|数据管理类:\\\\n  hermes data:bootstrap --source tushare --start 20190101  初始化全量数据拉取\\\\n  hermes data:update --source tushare --days 5            增量更新最近 N 个交易日数据\\\\n  hermes data:health                                       输出所有数据源健康状态表格\\\\n  hermes data:pull-daily --start 20190101 --end 20260708   全A日线批量拉取 (V4.2)\\\\n  hermes data:pull-fina --start 20190101 --end 20260708    全A财务指标批量拉取 (V4.2)\\\\n  hermes data:pull-valuation --start ... --end ...         全A估值数据批量拉取 (V4.2)\\\\n  hermes data:coverage                                      数据覆盖率报告 (V4.2)\\\\n  hermes data:survivorship                                  生存偏差检查报告 (V4.2)\\n  data:incremental-update [--date YYYYMMDD]        每日增量更新（日线+估值+资金流+北向）\\n  data:weekly-refresh                              每周维护（概念/行业/ETF持仓/财务增量）\\n  data:audit                                        数据新鲜度检查+缺口报告\\n  data:full-init                                    首次全量填充 normalized/ 目录\\n  data:full-init-by-date                            按交易日全量初始化（推荐方案）\\n  data:gap-plan                                     数据缺口报告 + 拉取计划\\\\n\\\\n|数据质量类:
   data:freshness-check             检查数据新鲜度
   data:gap-report                  报告数据缺口
   data:hub-rebuild [target]        补齐因子引擎时序数据 (fundamentals|fund-flow|sentiment|all)
+
+文档类:
+  docs:refresh-manual              [--force] 刷新 HERMES_RESEARCH_MANUAL.md（技能索引同步）
 
 盘中监测类:
   intraday:prepare                 初始化盘中状态
@@ -234,6 +300,9 @@ Factor ↔ Alpha 联动 (V3.0):
   intraday:watch [interval]        盘中循环监测
   intraday:publish-alerts          发布预警包
   intraday:stop                    停止监测
+  intraday:monitor [--interval]    低频全量监测
+  intraday:risk                    指数风险 + 成交额异常
+  intraday:wechat-alert [--live]   低频监测 + 企业微信推送
 
 企业微信类:
   wechat:test                      测试 webhook
@@ -356,6 +425,7 @@ def _handle_qmt_command(command, args):
 
 
 def main():
+    global sys
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
         show_help()
         return
@@ -465,6 +535,27 @@ def main():
         print(f"✅ 发布完成: {r['package_id']}")
         print(f"   路径: {r['path']}")
         print(f"   文件: {r['files']} 个")
+
+    # === V4.1 分层股票池 ===
+    elif command == "universe:build":
+        from universes import cmd_build
+        cmd_build()
+
+    elif command == "universe:list":
+        from universes import cmd_list
+        cmd_list()
+
+    elif command.startswith("universe:show"):
+        from universes import cmd_show
+        name = args[0] if args else ""
+        if not name:
+            print("用法: hermes universe:show <U0|U1|U2|U3|U4|ETF>")
+        else:
+            cmd_show(name)
+
+    elif command == "universe:audit":
+        from universes import cmd_audit
+        cmd_audit()
 
     elif command == "strategy-lab:run-parameter-search":
         from strategy_lab.param_search import run_parameter_grid
@@ -775,7 +866,12 @@ existing = [
     {{'name':'reversal5','mean_ic':-0.0345,'ir':0.20,'category':'reversal'}},
     {{'name':'close_gt_ma20','mean_ic':0.0333,'ir':0.18,'category':'trend'}},
     {{'name':'vol_ratio60','mean_ic':0.0310,'ir':0.20,'category':'volume'}},
-    {{'name':'vol_mom','mean_ic':0.0341,'ir':0.20,'category':'evolved'}},
+    {{'name':'roe_q','mean_ic':-0.044,'ir':0.15,'category':'quality'}},
+    {{'name':'bb_width','mean_ic':0.02,'ir':0.10,'category':'technical'}},
+    {{'name':'high_60_breakout','mean_ic':0.028,'ir':0.16,'category':'breakout'}},
+    {{'name':'volatility20','mean_ic':0.025,'ir':0.14,'category':'volatility'}},
+    {{'name':'sentiment_1d','mean_ic':0.01,'ir':0.08,'category':'sentiment'}},
+    {{'name':'net_inflow_1d','mean_ic':0.015,'ir':0.09,'category':'fund_flow'}},
 ]
 candidates = generate_candidates(existing)
 print(f'生成 {{len(candidates)}} 个新因子:')
@@ -875,6 +971,150 @@ print(f"\\n📁 输出目录: {{result.get('output_dir','?')}}")
                 print(f"⚠️ {'; '.join(err[:5])}")
         # 长任务完成通知
         __import__('subprocess').run(['bash','-c',f'source ~/.bashrc && cd {BASE} && {VENV_PYTHON} -c "import sys; sys.path.insert(0,\\"commands\\"); from factor_lab.notify import notify_goal_done; notify_goal_done(\'factor:batch 批量验证\', \'8个因子验证完成, 请回Hermes查看\', \'completed\')"'])
+
+    # === V4.3 基准体系命令 ===
+    elif command == "benchmark:list":
+        from benchmarks_v4 import cmd_list, ensure_universes
+        ensure_universes()
+        cmd_list()
+
+    elif command.startswith("benchmark:report"):
+        from benchmarks_v4 import cmd_report, ensure_universes
+        ensure_universes()
+        name = args[0] if args else ""
+        if not name:
+            print("用法: hermes benchmark:report <基准名> [--days N]")
+            print(f"   基准名: semiconductor_ew, semiconductor_core_ew, matched_control_ew, ew_a_share, ew_tradable, etf_basket_ew")
+            return
+        n_days = 60
+        for i, a in enumerate(args):
+            if a == "--days" and i + 1 < len(args):
+                try:
+                    n_days = int(args[i + 1])
+                except ValueError:
+                    pass
+        cmd_report(name, n_days=n_days)
+
+    # === V4.7 低频组合构建与推荐系统 ===
+    elif command == "portfolio:build-lowfreq":
+        from portfolio_builder import PortfolioBuilder
+        PortfolioBuilder.cmd_build_lowfreq(args)
+
+    elif command == "portfolio:recommend":
+        from portfolio_builder import PortfolioBuilder
+        PortfolioBuilder.cmd_recommend(args)
+
+    elif command == "portfolio:risk":
+        from portfolio_builder import PortfolioBuilder
+        PortfolioBuilder.cmd_risk(args)
+
+    elif command == "premarket:v4":
+        from portfolio_builder import PortfolioBuilder
+        PortfolioBuilder.cmd_premarket_v4(args)
+
+    # === V4.8 Paper / Shadow Trading ===
+    elif command == "paper:v4-run":
+        from factor_lab.paper.standing_paper_trading import PaperTradingV4
+        PaperTradingV4.cmd_v4_run(args)
+
+    elif command == "paper:v4-dashboard":
+        from factor_lab.paper.standing_paper_trading import PaperTradingV4
+        PaperTradingV4.cmd_v4_dashboard(args)
+
+    elif command == "shadow:v4-run":
+        from factor_lab.paper.shadow_trading import ShadowTradingEngine
+        ShadowTradingEngine.cmd_v4_run(args)
+
+    elif command == "shadow:v4-report":
+        from factor_lab.paper.shadow_trading import ShadowTradingEngine
+        ShadowTradingEngine.cmd_v4_report(args)
+
+    elif command == "factor:validate-v4":
+        import subprocess, os, sys
+        venv_python = VENV_PYTHON
+        factor_name = "ret5"
+        for i, a in enumerate(args):
+            if a.startswith("--factor") and i + 1 < len(args):
+                factor_name = args[i + 1]
+        start_date = "2025-01-02"
+        end_date = "2026-06-30"
+        for i, a in enumerate(args):
+            if a.startswith("--start") and i + 1 < len(args):
+                start_date = args[i + 1]
+            if a.startswith("--end") and i + 1 < len(args):
+                end_date = args[i + 1]
+        code = f"""
+import sys; sys.path.insert(0, '/home/ly/.hermes/research-assistant/commands')
+sys.path.insert(0, '/home/ly/.hermes/research-assistant/commands/factor_lab')
+import pandas as pd
+import numpy as np
+
+# 1) Load data (same as V3 validation)
+from factor_lab.factor_engine import load_stock_kline
+from factor_lab.factor_base import compute_factor, list_factors
+from factor_lab.validate_factor import TOP_FACTORS, FACTOR_NAME_MAP
+
+kline_dir = "/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline"
+all_syms = sorted([f.stem for f in __import__('pathlib').Path(kline_dir).glob('*.csv')])
+symbols = all_syms[:500]
+print(f"\\U0001f4e6 股票池: {{len(symbols)}} 只")
+
+df = load_stock_kline(symbols, '{start_date}', '{end_date}')
+print(f"\\U0001f4ca K 线: {{len(df)}} 行, {{df['date'].min()}} ~ {{df['date'].max()}}")
+df = df.sort_values(["symbol", "date"]).reset_index(drop=True)
+df["ret1"] = df.groupby("symbol")["close"].transform(lambda x: x.pct_change(-1))
+
+# 2) Compute the factor
+fname = '{factor_name}'
+reg_name = FACTOR_NAME_MAP.get(fname, fname)
+registry = {{f['name']: f for f in list_factors()}}
+if reg_name in registry:
+    s = compute_factor(df, reg_name)
+    if s is not None:
+        df[fname] = s.values if hasattr(s, 'values') else s
+    else:
+        df[fname] = np.nan
+else:
+    df[fname] = np.nan
+    print(f"\\u26a0\\ufe0f  因子 {{reg_name}} 未在注册表中找到")
+
+close_pivot = df.pivot(index="date", columns="symbol", values="close")
+
+# 3) Run V4 validation
+from factor_lab.validate_v4 import validate_factor_v4
+result = validate_factor_v4(fname, df, close_pivot)
+
+# 4) Run Gate
+from factor_lab.core.gate import check_semiconductor_pool_gate
+gate_result = check_semiconductor_pool_gate(result)
+print(f"\\n{'='*60}")
+print(f"\\U0001f3f7\\ufe0f 半导体同池 Gate: {{gate_result['verdict'].upper()}}")
+print(f"   通过: {{'\\u2705' if gate_result['passed'] else '\\u274c'}}")
+for c in gate_result['checks']:
+    icon = '\\u2705' if c['passed'] else '\\u274c'
+    print(f"   {{icon}} {{c['name']}}: {{c['message']}}")
+
+# 5) Save V4 report
+from factor_lab.validate_v4 import save_v4_report
+save_v4_report(fname, result)
+
+print(f"\\n{'='*60}")
+print(f"V4.3 验证完成: {{fname}}")
+print(f"  beats_semiconductor_peer = {{result.get('beats_semiconductor_peer')}}")
+print(f"  beats_core_peer = {{result.get('beats_core_peer')}}")
+print(f"  beats_matched_control = {{result.get('beats_matched_control')}}")
+print(f"  excess_vs_semiconductor_ew = {{result.get('excess_vs_semiconductor_ew', 0):+.2f}}%")
+print(f"  excess_vs_core_ew = {{result.get('excess_vs_core_ew', 0):+.2f}}%")
+print(f"  excess_vs_matched_control = {{result.get('excess_vs_matched_control', 0):+.2f}}%")
+print(f"  excess_vs_etf_basket = {{result.get('excess_vs_etf_basket', 0):+.2f}}%")
+print(f"  promotion_eligible = {{result.get('promotion_eligible')}}")
+"""
+        result = subprocess.run([venv_python, "-c", code], capture_output=True, text=True, timeout=600, env=os.environ)
+        print(result.stdout)
+        if result.stderr:
+            err = [l for l in result.stderr.split("\n") if l.strip() and "Warning" not in l and "findfont" not in l]
+            if err:
+                print(f"⚠️ {'; '.join(err[:5])}")
 
     elif command == "factor:composites":
         import subprocess, os
@@ -1213,6 +1453,36 @@ run_daily_premarket(no_notify=True)
     elif command == "strategy:run-skill":
         _handle_strategy_run_skill(args)
 
+    # ── 自动因子管线 ──────────────────────────────────────
+    elif command == "pipeline:info":
+        from factor_lab.pipeline_orchestrator import cmd_pipeline_info
+        print(cmd_pipeline_info())
+
+    elif command == "pipeline:pending":
+        from factor_lab.pipeline_confirm import cmd_pending_list
+        print(cmd_pending_list())
+
+    elif command == "pipeline:confirm":
+        alpha_id = _arg_value(args, "--alpha-id", "")
+        if not alpha_id:
+            print("用法: pipeline:confirm --alpha-id <id>")
+            return
+        from factor_lab.pipeline_confirm import cmd_confirm
+        print(cmd_confirm(alpha_id))
+
+    elif command == "pipeline:reject":
+        alpha_id = _arg_value(args, "--alpha-id", "")
+        reason = _arg_value(args, "--reason", "")
+        if not alpha_id:
+            print("用法: pipeline:reject --alpha-id <id> [--reason ...]")
+            return
+        from factor_lab.pipeline_confirm import cmd_reject
+        print(cmd_reject(alpha_id, reason))
+
+    elif command == "pipeline:shadow":
+        from factor_lab.shadow_observer import cmd_shadow_status
+        print(cmd_shadow_status())
+
 
     elif command == "leader:inspect":
         from factor_lab.leader.leader_cli import main as leader_main
@@ -1380,6 +1650,171 @@ run_daily_premarket(no_notify=True)
             args = ["watch"] + [a for a in args if a != "--watch"]
         leader_main(["agent-runner"] + args)
 
+    elif command == "leader:agent-role-list":
+        from factor_lab.leader.agent_role_registry import AgentRoleRegistry
+        import argparse
+        p = argparse.ArgumentParser()
+        p.add_argument("--capability", default="")
+        p.add_argument("--backend", default="")
+        a = p.parse_args(args)
+        registry = AgentRoleRegistry()
+        registry.seed_defaults()
+        if a.backend:
+            roles = registry.find_by_backend(a.backend)
+        else:
+            roles = registry.list(capability=a.capability or None)
+        if not roles:
+            print("  无已注册角色（可使用 leader:agent-role-init 初始化标准角色）")
+        else:
+            print(f"  📋 Agent 角色 ({len(roles)})\n")
+            for r in roles:
+                caps = ", ".join(r["capabilities"][:3])
+                if len(r["capabilities"]) > 3:
+                    caps += "..."
+                print(f"  {r['role_id']:15s} {r['name']:20s} {r['description'][:40]}")
+                print(f"  {'':15s} capabilities: {caps}")
+                print()
+
+    elif command == "leader:agent-role-show":
+        import argparse
+        p = argparse.ArgumentParser()
+        p.add_argument("--role-id", required=True)
+        a = p.parse_args(args)
+        from factor_lab.leader.agent_role_registry import AgentRoleRegistry
+        registry = AgentRoleRegistry()
+        spec = registry.get(a.role_id)
+        if not spec:
+            print(f"  ❌ 角色 '{a.role_id}' 不存在")
+        else:
+            print(f"  📖 角色详情: {spec.role_id}")
+            print(f"  名称: {spec.name}")
+            print(f"  描述: {spec.description}")
+            print(f"  能力: {', '.join(spec.capabilities)}")
+            print(f"  职责: ")
+            for r in spec.responsibilities:
+                print(f"    - {r}")
+            print(f"  约束: ")
+            for c in spec.constraints:
+                print(f"    - {c}")
+            print(f"  允许后端: {', '.join(spec.allowed_backends)}")
+            print(f"  最大并发: {spec.max_concurrent_tasks}")
+            print(f"  需审批: {'是' if spec.requires_approval else '否'}")
+            print(f"  可自动分配: {'是' if spec.auto_assignable else '否'}")
+
+    elif command == "leader:agent-role-register":
+        import argparse
+        p = argparse.ArgumentParser()
+        p.add_argument("--role-id", required=True)
+        p.add_argument("--name", required=True)
+        p.add_argument("--description", required=True)
+        p.add_argument("--capabilities", default="")
+        p.add_argument("--backends", default="dry-run")
+        a = p.parse_args(args)
+        from factor_lab.leader.agent_role_registry import AgentRoleRegistry, AgentRoleSpec
+        spec = AgentRoleSpec(
+            role_id=a.role_id,
+            name=a.name,
+            description=a.description,
+            capabilities=[c.strip() for c in a.capabilities.split(",") if c.strip()],
+            allowed_backends=[b.strip() for b in a.backends.split(",") if b.strip()],
+        )
+        registry = AgentRoleRegistry()
+        result = registry.register(spec)
+        if result["status"] == "ok":
+            print(f"  ✅ 角色 '{a.role_id}' 注册成功")
+        else:
+            print(f"  ❌ 注册失败: {result.get('errors', result.get('error', 'unknown'))}")
+
+    elif command == "leader:agent-role-delete":
+        import argparse
+        p = argparse.ArgumentParser()
+        p.add_argument("--role-id", required=True)
+        a = p.parse_args(args)
+        from factor_lab.leader.agent_role_registry import AgentRoleRegistry
+        registry = AgentRoleRegistry()
+        result = registry.delete(a.role_id)
+        if result["status"] == "ok":
+            print(f"  ✅ 角色 '{a.role_id}' 已删除")
+        else:
+            print(f"  ❌ 删除失败: {result.get('error', 'unknown')}")
+
+    elif command == "leader:agent-role-init":
+        from factor_lab.leader.agent_role_registry import AgentRoleRegistry
+        registry = AgentRoleRegistry()
+        count = registry.seed_defaults()
+        print(f"  ✅ 已初始化 Agent 角色注册表，新增 {count} 个标准角色")
+        for r in registry.list():
+            print(f"    - {r['role_id']}: {r['name']} ({len(r['capabilities'])} 能力)")
+
+    elif command == "leader:agent-role-assign":
+        import argparse
+        p = argparse.ArgumentParser()
+        p.add_argument("--role-id", required=True)
+        p.add_argument("--task-id", required=True)
+        p.add_argument("--task-desc", default="")
+        a = p.parse_args(args)
+        from factor_lab.leader.agent_role_registry import AgentRoleRegistry
+        registry = AgentRoleRegistry()
+        registry.seed_defaults()
+        result = registry.assign_role(a.role_id, a.task_id, a.task_desc)
+        if result["status"] == "ok":
+            ass = result["assignment"]
+            print(f"  ✅ 角色 '{ass['role_id']}' 已分配到任务 '{ass['task_id']}'")
+            print(f"  分配 ID: {ass['assignment_id']}")
+            print(f"  状态: {ass['status']}")
+        else:
+            print(f"  ❌ 分配失败: {result.get('error', 'unknown')}")
+
+    elif command == "leader:agent-role-assignments":
+        import argparse
+        p = argparse.ArgumentParser()
+        p.add_argument("--role-id", default=None)
+        p.add_argument("--status", default=None)
+        a = p.parse_args(args)
+        from factor_lab.leader.agent_role_registry import AgentRoleRegistry
+        registry = AgentRoleRegistry()
+        assigns = registry.list_assignments(
+            role_id=a.role_id, status=a.status,
+        )
+        if not assigns:
+            print("  无分配记录")
+        else:
+            print(f"  📋 角色分配记录 ({len(assigns)})")
+            for ass in assigns:
+                print(f"  [{ass['status']:9s}] {ass['assignment_id']}")
+                print(f"          角色: {ass['role_id']}, 任务: {ass['task_id']}")
+                print(f"          时间: {ass.get('assigned_at', '?')[:19]}")
+
+    elif command == "leader:agent-role-match":
+        import argparse
+        p = argparse.ArgumentParser()
+        p.add_argument("--role-id", required=True)
+        p.add_argument("--preferred", default=None)
+        a = p.parse_args(args)
+        from factor_lab.leader.agent_role_registry import AgentRoleRegistry
+        registry = AgentRoleRegistry()
+        result = registry.match_backend(a.role_id, a.preferred)
+        if "error" in result:
+            print(f"  ❌ 角色 '{a.role_id}' 不存在")
+        else:
+            print(f"  🎯 角色 '{a.role_id}' 推荐后端: {result['selected_backend']}")
+            print(f"  可用后端: {', '.join(result['available_backends'])}")
+
+    elif command == "leader:agent-role-stats":
+        from factor_lab.leader.agent_role_registry import AgentRoleRegistry
+        registry = AgentRoleRegistry()
+        registry.seed_defaults()
+        s = registry.stats()
+        print(f"  📊 Agent Role Registry 统计")
+        print(f"  角色总数: {s['total_roles']}")
+        print(f"  分配总数: {s['total_assignments']}")
+        print(f"  活跃分配: {s['active_assignments']}")
+        print(f"  已完成: {s['completed_assignments']}")
+        print(f"  失败: {s['failed_assignments']}")
+        print(f"  后端分布:")
+        for backend, count in s.get("roles_by_backend", {}).items():
+            print(f"    {backend}: {count} 个角色")
+
     elif command == "sector:rotation":
         _handle_sector_rotation(args)
     elif command == "sector:list":
@@ -1391,6 +1826,86 @@ run_daily_premarket(no_notify=True)
     elif command == "architecture:audit":
         from factor_lab.architecture.architecture_audit import run_architecture_audit
         run_architecture_audit()
+
+    # === V4.9 小资金实盘 Readiness Gate ===
+    elif command == "live-readiness:v4":
+        from live_readiness import cmd_live_readiness_v4
+        report = cmd_live_readiness_v4(args)
+        if report.overall != "READY":
+            sys.exit(1)
+
+    elif command == "live-gate:v4-report":
+        from live_readiness import cmd_live_gate_report
+        report = cmd_live_gate_report(args)
+        if report.overall != "READY":
+            sys.exit(1)
+
+    # === 数据管理类 ===
+    elif command == "data:bootstrap":
+        from data_manager import cmd_bootstrap
+        cmd_bootstrap(args)
+
+    elif command == "data:update":
+        from data_manager import cmd_update
+        cmd_update(args)
+
+    elif command == "data:health":
+        from data_manager import cmd_health
+        cmd_health(args)
+
+    # === V4.2 全A日线批量拉取 ===
+    elif command == "data:pull-daily":
+        from data_pipeline import cmd_pull_daily
+        cmd_pull_daily(args)
+
+    elif command == "data:pull-fina":
+        from data_pipeline import cmd_pull_fina
+        cmd_pull_fina(args)
+
+    elif command == "data:pull-valuation":
+        from data_pipeline import cmd_pull_valuation
+        cmd_pull_valuation(args)
+
+    # === V4.2 数据审计 ===
+    elif command == "data:coverage":
+        from data_audit import cmd_coverage
+        cmd_coverage(args)
+
+    elif command == "data:survivorship":
+        from data_audit import cmd_survivorship
+        cmd_survivorship(args)
+
+    elif command == "data:incremental-update":
+        from data_pipeline import cmd_incremental_update
+        cmd_incremental_update(args)
+
+    elif command == "data:weekly-refresh":
+        from data_pipeline import cmd_weekly_refresh
+        cmd_weekly_refresh(args)
+
+    elif command == "data:audit":
+        from data_pipeline import cmd_data_audit
+        cmd_data_audit(args)
+
+    elif command == "data:full-init":
+        from data_pipeline import cmd_full_init
+        cmd_full_init(args)
+
+    elif command == "data:full-init-by-date":
+        from data_pipeline import cmd_full_init_by_date
+        cmd_full_init_by_date(args)
+
+    elif command == "data:gap-plan":
+        from data_pipeline import cmd_gap_report
+        cmd_gap_report(args)
+
+    elif command == "data:backfill-timeseries":
+        from data_pipeline import cmd_backfill_timeseries
+        cmd_backfill_timeseries(args)
+
+    elif command == "data:registry-update-status":
+        from data_pipeline import cmd_registry_update_status
+        cmd_registry_update_status(args)
 
     # === 数据质量类 ===
     elif command == "data:freshness-check":
@@ -1406,7 +1921,16 @@ run_daily_premarket(no_notify=True)
         print(f"📋 数据缺口报告: {summary['total_gaps']} 缺口, {summary['blocking_gaps']} 阻塞")
         for g in report["gaps"]:
             icon = {'blocking': '🚫', 'partial': '⚠️', 'minor': 'ℹ️'}.get(g.get('impact', ''), '❓')
-            print(f"  {icon} [{g['category']}] {g['failure_reason']}")
+            print(f"  {icon} [{g['impact']}] {g['name']} — {g['description']}")
+
+    elif command == "docs:refresh-manual":
+        from scripts.refresh_manual import refresh_manual, cmd_main
+        force = "--force" in args if args else False
+        if not refresh_manual(force=force):
+            print("ℹ️  无变更，手册已是最新")
+        else:
+            print("✅ 手册已刷新")
+        sys.exit(0)
 
     elif command.startswith("data:hub-rebuild"):
         target = args[0] if args else "all"
@@ -1469,6 +1993,36 @@ run_daily_premarket(no_notify=True)
 
     elif command == "intraday:stop":
         print("⏹️ 停止监测（需在 watch 进程内按 Ctrl+C）")
+
+    elif command == "intraday:monitor":
+        """V4.11 盘中低频全量监测"""
+        from intraday_monitor import LowFreqMonitor, LowFreqReport
+        m = LowFreqMonitor()
+        report = m.run_all()
+        print(report.summary())
+
+    elif command == "intraday:risk":
+        """V4.11 指数风险 + 成交额异常"""
+        from intraday_monitor import LowFreqMonitor, LowFreqReport
+        m = LowFreqMonitor()
+        m.check_index_risk()
+        m.check_volume_anomaly()
+        report = LowFreqReport(m)
+        print(report.summary())
+
+    elif command == "intraday:wechat-alert":
+        """V4.11 低频监测 + 企业微信推送"""
+        from intraday_monitor import LowFreqMonitor, LowFreqReport
+        dry_run = "--live" not in args
+        if dry_run:
+            print("🔔 DRY-RUN 模式 (企业微信推送仅打印)")
+        m = LowFreqMonitor()
+        report = m.run_all()
+        print(report.summary())
+        results = m.send_wechat_alert(dry_run=dry_run)
+        for r in results:
+            icon = "✅" if r["sent"] else ("🔔" if dry_run else "❌")
+            print(f"  {icon} {r['channel']}: {r['summary']}")
 
     # === 企业微信类 ===
     elif command == "wechat:test":
@@ -1544,6 +2098,19 @@ run_daily_premarket(no_notify=True)
     elif command == "package:publish-all":
         from package_publisher import cmd_publish_all
         cmd_publish_all()
+
+    # === V4.10 事件因子 ===
+    elif command == "event:list":
+        from factor_lab.semiconductor_events import cmd_event_list
+        cmd_event_list(args)
+
+    elif command == "event:factors":
+        from factor_lab.semiconductor_events import cmd_event_factors
+        cmd_event_factors(args)
+
+    elif command == "event:report":
+        from factor_lab.semiconductor_events import cmd_event_report
+        cmd_event_report(args)
 
     else:
         print(f"❌ 未知命令: {command}")

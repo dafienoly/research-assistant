@@ -225,6 +225,18 @@ class KillSwitch:
             tags=["kill_switch", "triggered"],
         )
         self._triggered_by_incident = incident.incident_id
+
+        # V3.5.5: 发送企业微信通知（不阻塞主流程）
+        try:
+            from factor_lab.notify import notify_risk_event
+            notify_risk_event(
+                event_type="kill_switch_triggered",
+                detail=f"规则 {rule_name} 触发: {message}",
+                severity="blocker",
+            )
+        except Exception:
+            pass
+
         return incident
 
     def release(self, released_by: str = "system",

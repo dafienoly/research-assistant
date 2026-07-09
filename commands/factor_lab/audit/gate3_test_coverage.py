@@ -1,12 +1,10 @@
-"""Gate 3 — 测试覆盖检查
+"""Gate 3 — 测试覆盖检查 + 测试有效性验证
 
-检测目标:
-  1. 新代码（非测试文件）→ 检查对应测试文件是否存在
-  2. 新函数 → 检查对应测试函数是否存在
-  3. pytest-cov 覆盖率检查: 新代码覆盖不足 = 没写测试
-  4. 排除 __init__.py / 配置 / 文档等不需要测试的文件
-
-依赖: pytest-cov (pip install pytest-cov)
+继承原有（测试文件/函数存在），新增:
+  3. 执行 pytest 验证测试是否通过
+  4. 检查弱测试（assert True / 无断言 / 仅 import）
+  5. 检查失败路径测试缺失
+  6. 覆盖率和 diff coverage 建议输出
 """
 
 from __future__ import annotations
@@ -18,44 +16,20 @@ from pathlib import Path
 from typing import Optional
 
 from .base import AuditFinding, AuditReport, Severity
+from .git_utils import get_all_changed_files, BASE, COMMANDS
 
-BASE = Path(os.environ.get("RESEARCH_ASSISTANT_ROOT",
-                           "/home/ly/.hermes/research-assistant"))
-COMMANDS = BASE / "commands"
 VENV = str(BASE / ".venv_quant" / "bin" / "python3")
 TESTS_DIR = COMMANDS / "tests"
 
-# 不需要测试的文件
 NO_TEST_EXTENSIONS = {".md", ".txt", ".rst", ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg"}
 NO_TEST_FILES = {"__init__.py", "conftest.py", "setup.py", "conf.py"}
 
 
-# ─── Git 辅助 ───────────────────────────────────────────────────
-
 def _git_diff_files() -> list[str]:
-    files: set[str] = set()
-    for cmd in [["git", "diff", "--name-only"], ["git", "diff", "--cached", "--name-only"]]:
-        try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=10, cwd=str(BASE))
-            if r.returncode == 0:
-                files.update(r.stdout.strip().splitlines())
-        except Exception:
-            pass
-    if not files:
-        try:
-            r = subprocess.run(["git", "diff", "--name-only", "HEAD~3", "HEAD"],
-                               capture_output=True, text=True, timeout=10, cwd=str(BASE))
-            if r.returncode == 0:
-                files.update(r.stdout.strip().splitlines())
-        except Exception:
-            pass
-    return sorted(f for f in files if f.strip())
+    return get_all_changed_files()
 
-
-# ─── Test 文件映射 ──────────────────────────────────────────────
 
 def _classify_files(files: list[str]) -> tuple[list[str], list[str]]:
-    """分离测试文件和非测试文件"""
     test_files = []
     source_files = []
     for f in files:
@@ -64,22 +38,18 @@ def _classify_files(files: list[str]) -> tuple[list[str], list[str]]:
         if "/test_" in f_lower or f_lower.startswith("test_") or ext in NO_TEST_EXTENSIONS:
             test_files.append(f)
         elif Path(f).name in NO_TEST_FILES:
-            continue  # 忽略
+            continue
         elif f.endswith(".py"):
             source_files.append(f)
     return source_files, test_files
 
 
 def _expected_test_file(source: str) -> str:
-    """给定源文件路径，推断对应的测试文件路径"""
-    # 规则: src/module.py → tests/test_module.py
-    #        commands/factor_lab/foo.py → commands/tests/test_foo.py
     name = Path(source).stem
     return f"tests/test_{name}.py"
 
 
 def _extract_function_names(file_path: str) -> list[str]:
-    """从 Python 源文件中提取非测试、非特殊函数名"""
     full = Path(BASE, file_path) if not file_path.startswith("/") else Path(file_path)
     if not full.is_file():
         return []
@@ -88,12 +58,9 @@ def _extract_function_names(file_path: str) -> list[str]:
         tree = ast.parse(source, filename=file_path)
     except (SyntaxError, Exception):
         return []
-
     funcs: list[str] = []
-
     class FuncCollector(ast.NodeVisitor):
         def visit_FunctionDef(self, node: ast.FunctionDef):
-            # 跳过私有/魔术方法
             if not node.name.startswith("_") and not node.name.startswith("test_"):
                 funcs.append(node.name)
             self.generic_visit(node)
@@ -101,13 +68,11 @@ def _extract_function_names(file_path: str) -> list[str]:
             if not node.name.startswith("_") and not node.name.startswith("test_"):
                 funcs.append(node.name)
             self.generic_visit(node)
-
     FuncCollector().visit(tree)
     return funcs
 
 
 def _extract_test_functions(file_path: str) -> list[str]:
-    """从测试文件中提取 test_ 函数名"""
     full = Path(file_path)
     if not full.is_file():
         return []
@@ -116,28 +81,155 @@ def _extract_test_functions(file_path: str) -> list[str]:
         tree = ast.parse(source, filename=file_path)
     except (SyntaxError, Exception):
         return []
-
     test_funcs: list[str] = []
-
     class TestCollector(ast.NodeVisitor):
         def visit_FunctionDef(self, node: ast.FunctionDef):
             if node.name.startswith("test_"):
                 test_funcs.append(node.name)
             self.generic_visit(node)
-
     TestCollector().visit(tree)
     return test_funcs
 
 
-# ─── 核心检测 ───────────────────────────────────────────────────
+# ─── 新增: 弱测试检测 ─────────────────────────────────────────
+
+def _check_weak_test(test_file: Path) -> list[AuditFinding]:
+    """检查测试文件中是否存在弱测试。"""
+    findings: list[AuditFinding] = []
+    if not test_file.is_file():
+        return findings
+    try:
+        src = test_file.read_text(encoding="utf-8", errors="replace")
+        tree = ast.parse(src, filename=str(test_file))
+    except (SyntaxError, Exception):
+        return findings
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        if not node.name.startswith("test_"):
+            continue
+
+        # 收集断言和工具调用
+        has_assert = False
+        has_real_assert = False
+        only_imports = True
+        body = node.body
+
+        for stmt in body:
+            # 跳过 docstring
+            if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) \
+                    and isinstance(stmt.value.value, str):
+                continue
+
+            if isinstance(stmt, ast.Assert):
+                has_assert = True
+                # assert True 是弱断言
+                if isinstance(stmt.test, ast.Constant) and stmt.test.value is True:
+                    findings.append(AuditFinding(
+                        gate="gate3", severity="WARN", category="WEAK_ASSERT",
+                        file=str(test_file), line=stmt.lineno,
+                        message=f"测试 '{node.name}' 使用 assert True — 无效断言",
+                    ))
+                else:
+                    has_real_assert = True
+
+            if isinstance(stmt, (ast.Expr, ast.Call, ast.Assign, ast.If, ast.For, ast.While)):
+                only_imports = False
+
+        if not has_assert:
+            findings.append(AuditFinding(
+                gate="gate3", severity="WARN", category="NO_ASSERT",
+                file=str(test_file), line=node.lineno,
+                message=f"测试 '{node.name}' 没有 assert 语句",
+                detail="测试必须包含至少一个有效断言",
+            ))
+        elif not has_real_assert:
+            findings.append(AuditFinding(
+                gate="gate3", severity="WARN", category="WEAK_ASSERT",
+                file=str(test_file), line=node.lineno,
+                message=f"测试 '{node.name}' 仅有一个 assert True — 视为弱测试",
+            ))
+
+        if only_imports:
+            findings.append(AuditFinding(
+                gate="gate3", severity="WARN", category="TEST_ONLY_IMPORTS",
+                file=str(test_file), line=node.lineno,
+                message=f"测试 '{node.name}' 只 import 不验证行为",
+            ))
+
+    return findings
+
+
+# ─── 新增: 执行 pytest ────────────────────────────────────────
+
+def _run_pytest(source_files: list[str]) -> tuple[str, list[AuditFinding]]:
+    """执行 pytest，返回日志和发现。"""
+    findings: list[AuditFinding] = []
+    log = ""
+
+    # 只跑关联的测试文件
+    test_files = []
+    for sf in source_files:
+        expected = TESTS_DIR / f"test_{Path(sf).name}"
+        if expected.is_file():
+            test_files.append(str(expected))
+
+    if not test_files:
+        return "", findings
+
+    try:
+        cmd = [VENV, "-m", "pytest"] + test_files + ["-q", "--tb=line", "--no-header"]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=60,
+                           cwd=str(COMMANDS))
+        output = r.stdout + r.stderr
+        log = output[:3000]
+
+        if r.returncode != 0:
+            # 提取失败行
+            fail_lines = [l for l in output.splitlines() if "FAILED" in l]
+            for fl in fail_lines[:5]:
+                findings.append(AuditFinding(
+                    gate="gate3", severity="FAIL", category="PYTEST_FAILED",
+                    file="", message=f"pytest 失败: {fl.strip()[:120]}",
+                    detail=output[:1000],
+                ))
+            if not fail_lines:
+                findings.append(AuditFinding(
+                    gate="gate3", severity="FAIL", category="PYTEST_FAILED",
+                    file="", message=f"pytest 返回码 {r.returncode}",
+                    detail=output[:1000],
+                ))
+        else:
+            # 提取通过信息
+            passed_match = re.search(r"(\d+) passed", output)
+            if passed_match:
+                findings.append(AuditFinding(
+                    gate="gate3", severity="INFO", category="PYTEST_PASSED",
+                    file="", message=f"pytest 通过: {passed_match.group(0)}",
+                ))
+
+    except subprocess.TimeoutExpired:
+        findings.append(AuditFinding(
+            gate="gate3", severity="WARN", category="PYTEST_TIMEOUT",
+            file="", message="pytest 超时（60s），跳过执行",
+        ))
+    except Exception as e:
+        findings.append(AuditFinding(
+            gate="gate3", severity="WARN", category="PYTEST_ERROR",
+            file="", message=f"pytest 执行失败: {e}",
+        ))
+
+    return log, findings
+
+
+# ─── 原有: 测试文件/函数存在性 ───────────────────────────────
 
 def _check_test_file_exists(source_file: str) -> Optional[AuditFinding]:
-    """检查源文件是否有对应的测试文件"""
     expected = _expected_test_file(source_file)
     expected_full = COMMANDS / expected
     if expected_full.is_file():
-        return None  # 测试文件存在
-    # 也检查 tests 目录下是否有带子路径的测试文件
+        return None
     alt = TESTS_DIR / f"test_{Path(source_file).name}"
     if alt.is_file():
         return None
@@ -150,7 +242,6 @@ def _check_test_file_exists(source_file: str) -> Optional[AuditFinding]:
 
 
 def _check_function_tested(source_file: str, func_name: str, test_file: Path) -> Optional[AuditFinding]:
-    """检查源文件的函数是否有对应的测试"""
     expected_test_name = f"test_{func_name}"
     test_funcs = _extract_test_functions(str(test_file))
     if expected_test_name not in test_funcs:
@@ -164,22 +255,17 @@ def _check_function_tested(source_file: str, func_name: str, test_file: Path) ->
 
 
 def _run_pytest_coverage(source_files: list[str]) -> list[AuditFinding]:
-    """使用 pytest-cov 检查新代码的测试覆盖（只跑关联测试文件，30s 超时）"""
     findings: list[AuditFinding] = []
     if not source_files:
         return findings
-
-    # 只跑关联的测试文件
     test_files = []
     for sf in source_files:
         expected = TESTS_DIR / f"test_{Path(sf).name}"
         if expected.is_file():
             test_files.append(str(expected))
-
     if not test_files:
         return findings
 
-    # 构建 --cov 参数（源文件目录）
     cov_args = []
     seen = set()
     for sf in source_files:
@@ -189,7 +275,6 @@ def _run_pytest_coverage(source_files: list[str]) -> list[AuditFinding]:
             if parent not in seen:
                 seen.add(parent)
                 cov_args.extend(["--cov", parent])
-            # also add module dir
             mod_dir = str(full.parent)
             if mod_dir not in seen:
                 seen.add(mod_dir)
@@ -214,10 +299,8 @@ def _run_pytest_coverage(source_files: list[str]) -> list[AuditFinding]:
         ))
         return findings
 
-    # 解析覆盖率输出
     for line in output.splitlines():
         line_s = line.strip()
-        # 匹配 "src/module.py   85%  12 lines" 等
         m = re.match(r"^([\w./-]+\.py)\s+(\d+)%\s+", line_s)
         if m:
             mod = m.group(1)
@@ -226,24 +309,20 @@ def _run_pytest_coverage(source_files: list[str]) -> list[AuditFinding]:
                 findings.append(AuditFinding(
                     gate="gate3", severity="FAIL", category="LOW_COVERAGE",
                     file=mod, message=f"覆盖率 {cov_pct}% (< 60%)",
-                    detail=f"新代码测试覆盖不足，请在 tests/ 中添加对应测试",
                 ))
             elif cov_pct < 80:
                 findings.append(AuditFinding(
                     gate="gate3", severity="WARN", category="LOW_COVERAGE",
                     file=mod, message=f"覆盖率 {cov_pct}% (< 80%)",
                 ))
-
     return findings
 
 
-# ─── 主入口 ─────────────────────────────────────────────────────
+# ─── 主入口 ───────────────────────────────────────────────────
 
 def run_gate3(report: AuditReport) -> AuditReport:
-    """执行 Gate 3: 测试覆盖检查"""
     report.gates_run.append("gate3")
 
-    # 1. 获取变更文件
     all_files = _git_diff_files()
     if not all_files:
         report.add(AuditFinding(
@@ -253,11 +332,10 @@ def run_gate3(report: AuditReport) -> AuditReport:
         return report
 
     source_files, existing_test_files = _classify_files(all_files)
-
     if not source_files:
         report.add(AuditFinding(
             gate="gate3", severity="INFO", category="NO_SOURCE",
-            file="", message="变更中无可测试源文件（仅测试/文档/配置变更）",
+            file="", message="变更中无可测试源文件",
         ))
         return report
 
@@ -267,26 +345,25 @@ def run_gate3(report: AuditReport) -> AuditReport:
         detail="\n".join(source_files[:10]),
     ))
 
-    # 2. 测试文件存在性检查
+    # 1. 测试文件存在性
     missing_test = 0
     for sf in source_files:
         finding = _check_test_file_exists(sf)
         if finding:
             report.add(finding)
             missing_test += 1
-
     if missing_test == 0:
         report.add(AuditFinding(
             gate="gate3", severity="INFO", category="TEST_EXIST",
             file="", message=f"所有 {len(source_files)} 个源文件都有对应测试文件",
         ))
 
-    # 3. 函数级测试检查
+    # 2. 函数级测试检查
     untested_funcs = 0
     for sf in source_files:
         expected_test = COMMANDS / _expected_test_file(sf)
         if not expected_test.is_file():
-            continue  # 已在缺失文件步骤中报告
+            continue
         funcs = _extract_function_names(sf)
         for fn in funcs:
             finding = _check_function_tested(sf, fn, expected_test)
@@ -294,13 +371,17 @@ def run_gate3(report: AuditReport) -> AuditReport:
                 report.add(finding)
                 untested_funcs += 1
 
-    if untested_funcs == 0 and missing_test == 0:
-        report.add(AuditFinding(
-            gate="gate3", severity="INFO", category="FUNCTIONS_TESTED",
-            file="", message="所有新函数都有对应的测试",
-        ))
+    # 3. 新增: 弱测试检查
+    for sf in source_files:
+        expected_test = COMMANDS / _expected_test_file(sf)
+        weak = _check_weak_test(expected_test)
+        report.extend(weak)
 
-    # 4. pytest-cov 覆盖率检查
+    # 4. 新增: 执行 pytest
+    pytest_log, pytest_findings = _run_pytest(source_files)
+    report.extend(pytest_findings)
+
+    # 5. pytest-cov 覆盖率
     cov_findings = _run_pytest_coverage(source_files)
     report.extend(cov_findings)
 

@@ -96,6 +96,15 @@ def main():
     sp.add_argument("--key", required=True, help="策略键名")
     sp.add_argument("--value", required=True, help="新值 (JSON)")
 
+    # V3.2.5 — 验证结果回填
+    sp = sub.add_parser("update-from-validation")
+    sp.add_argument("--alpha-id", required=True, help="Alpha ID")
+    sp.add_argument("--validation-path", required=True, help="验证报告 JSON 路径")
+
+    sp = sub.add_parser("batch-update-from-validation")
+    sp.add_argument("--validation-dir", default="research_outputs/factor_validation",
+                    help="验证结果目录 (含 report.json 的子目录)")
+
     args = parser.parse_args()
 
     if args.command == "register":
@@ -156,6 +165,11 @@ def main():
     elif args.command == "retirement-policy-update":
         import json as _json
         _cmd_retirement_policy_update(args.key, _json.loads(args.value))
+    # V3.2.5
+    elif args.command == "update-from-validation":
+        _cmd_update_from_validation(args.alpha_id, args.validation_path)
+    elif args.command == "batch-update-from-validation":
+        _cmd_batch_update_from_validation(args.validation_dir)
     else:
         parser.print_help()
 
@@ -432,6 +446,38 @@ def _cmd_retirement_policy_show():
 def _cmd_retirement_policy_update(key: str, value):
     from factor_lab.alpha.retirement_engine import cmd_retirement_policy_update
     cmd_retirement_policy_update(key, value)
+
+
+# ─── V3.2.5 — 验证结果回填 ─────────────────────────────────
+
+
+def _cmd_update_from_validation(alpha_id: str, validation_path: str):
+    """从单个验证报告更新 Alpha 元数据"""
+    from factor_lab.alpha.registry import AlphaRegistry
+    with open(validation_path, encoding="utf-8") as f:
+        data = json.load(f)
+    reg = AlphaRegistry()
+    result = reg.update_alpha_from_validation(alpha_id, data)
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+def _cmd_batch_update_from_validation(validation_dir: str):
+    """从验证结果目录批量更新 Alpha 元数据"""
+    from factor_lab.alpha.registry import AlphaRegistry
+    reg = AlphaRegistry()
+    results = reg.batch_update_from_validation_dir(validation_dir)
+    updated = sum(1 for r in results if r.get("updated"))
+    failed = sum(1 for r in results if r.get("error"))
+    lines = [
+        f"批量更新: {updated}/{len(results)} 成功",
+        f"失败: {failed}/{len(results)}",
+    ]
+    for r in results:
+        if r.get("updated"):
+            lines.append(f"  ✅ {r.get('factor','?')} ({r.get('alpha_id','?')}) → {r.get('fields',[])}")
+        else:
+            lines.append(f"  ❌ {r.get('factor','?')}: {r.get('error','?')}")
+    print("\n".join(lines))
 
 
 if __name__ == "__main__":

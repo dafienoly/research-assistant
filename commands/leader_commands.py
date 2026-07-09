@@ -138,6 +138,93 @@ def handle(command: str, args: list[str]) -> bool:
         sync()
         return True
 
+    elif command == "leader:ops-health":
+        from factor_lab.leader.ops_dashboard import OpsManager
+        ops = OpsManager()
+        h = ops.health()
+        print(json.dumps(h, indent=2, ensure_ascii=False, default=str))
+        return True
+
+    elif command == "leader:ops-status":
+        from factor_lab.leader.ops_dashboard import OpsManager
+        ops = OpsManager()
+        sid = args[0] if args else ""
+        if sid:
+            s = ops.service_status(sid)
+        else:
+            s = ops.health()
+        print(json.dumps(s, indent=2, ensure_ascii=False, default=str))
+        return True
+
+    elif command == "leader:ops-start":
+        from factor_lab.leader.ops_dashboard import OpsManager
+        sid = args[0] if args else ""
+        if not sid:
+            print("用法: leader:ops-start <service_id>")
+            return True
+        ops = OpsManager()
+        r = ops.start_service(sid)
+        print(json.dumps(r, indent=2, ensure_ascii=False, default=str))
+        return True
+
+    elif command == "leader:ops-stop":
+        from factor_lab.leader.ops_dashboard import OpsManager
+        sid = args[0] if args else ""
+        if not sid:
+            print("用法: leader:ops-stop <service_id>")
+            return True
+        ops = OpsManager()
+        r = ops.stop_service(sid)
+        print(json.dumps(r, indent=2, ensure_ascii=False, default=str))
+        return True
+
+    elif command == "leader:ops-restart":
+        from factor_lab.leader.ops_dashboard import OpsManager
+        sid = args[0] if args else ""
+        if not sid:
+            print("用法: leader:ops-restart <service_id>")
+            return True
+        ops = OpsManager()
+        r = ops.restart_service(sid)
+        print(json.dumps(r, indent=2, ensure_ascii=False, default=str))
+        return True
+
+    elif command == "leader:ops-backup":
+        from factor_lab.leader.ops_dashboard import OpsManager
+        ops = OpsManager()
+        r = ops.backup()
+        print(json.dumps(r, indent=2, ensure_ascii=False, default=str))
+        return True
+
+    elif command == "leader:ops-diagnostics":
+        from factor_lab.leader.ops_dashboard import OpsManager
+        ops = OpsManager()
+        d = ops.diagnostics()
+        print(json.dumps(d, indent=2, ensure_ascii=False, default=str))
+        return True
+
+    elif command == "leader:ops-ports":
+        from factor_lab.leader.ops_dashboard import OpsManager
+        ops = OpsManager()
+        p = ops.port_scan()
+        print(json.dumps({"ports": p}, indent=2, ensure_ascii=False, default=str))
+        return True
+
+    elif command == "leader:ops-all":
+        """启动所有核心服务: dashboard + auto-loop"""
+        from factor_lab.leader.ops_dashboard import OpsManager
+        ops = OpsManager()
+        results = {}
+        for sid in ("dashboard", "auto-loop"):
+            r = ops.start_service(sid)
+            results[sid] = r
+            if r.get("success"):
+                print(f"  ✅ {r.get('message', sid)}")
+            else:
+                print(f"  ⚠️  {r.get('error', sid)}")
+        print(json.dumps(results, indent=2, ensure_ascii=False, default=str))
+        return True
+
     elif command == "leader:loop-watch":
         from factor_lab.leader.auto_executor import auto_loop
         auto_loop()

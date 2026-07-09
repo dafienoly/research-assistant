@@ -32,7 +32,7 @@ from config import VENV_PYTHON as _V
 CST = timezone(timedelta(hours=8))
 BASE_OUTPUT = Path("/mnt/d/HermesReports")
 PYTHON = _V
-FACTOR_LAB_DIR = Path(_V).resolve().parent.parent.parent / "commands" / "factor_lab"
+FACTOR_LAB_DIR = Path(_V).parent.parent.parent / "commands" / "factor_lab"
 
 # ─── Trading Calendar ────────────────────────────────────────────────
 

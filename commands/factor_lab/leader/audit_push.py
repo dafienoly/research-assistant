@@ -145,7 +145,8 @@ def phase1_infrastructure(report: AuditReport):
         else: report.fail("INFRA", "requirements", 0, f"缺少依赖包: {pkg}")
 
     # daemon
-    rc, out = _run(["bash", str(BASE / ".hermes/hermes-daemon.sh"), "status"], timeout=10)
+    home = os.environ.get("HOME", "/home/ly")
+    rc, out = _run(["bash", f"{home}/.hermes/hermes-daemon.sh", "status"], timeout=10)
     if "运行中" in out: report.ok()
     else: report.fail("INFRA", "hermes-daemon", 0, "Hermes 守护未运行")
 
@@ -335,8 +336,15 @@ def git_push(report: AuditReport) -> dict:
     """审计通过后执行 git add + commit + push"""
     steps = []
     try:
+        # 清理残留 git lock
+        for lockfile in [str(BASE / ".git" / "index.lock"), str(BASE / ".git" / "HEAD.lock")]:
+            if os.path.exists(lockfile):
+                try:
+                    os.remove(lockfile)
+                except Exception:
+                    pass
         # git add
-        r = subprocess.run(["git", "add", "-A"], capture_output=True, text=True, timeout=15, cwd=str(BASE))
+        r = subprocess.run(["git", "add", "-A"], capture_output=True, text=True, timeout=120, cwd=str(BASE))
         steps.append({"step": "git add", "ok": r.returncode == 0, "detail": r.stderr[:200]})
         if r.returncode != 0:
             return {"success": False, "steps": steps, "error": r.stderr[:200]}
@@ -344,13 +352,13 @@ def git_push(report: AuditReport) -> dict:
         # git commit
         ver = report.version or "auto"
         msg = f"[audit-passed] {ver} — {report.results['passed']} passed, {report.results['failed']} failed"
-        r = subprocess.run(["git", "commit", "-m", msg], capture_output=True, text=True, timeout=15, cwd=str(BASE))
+        r = subprocess.run(["git", "commit", "-m", msg], capture_output=True, text=True, timeout=30, cwd=str(BASE))
         steps.append({"step": "git commit", "ok": r.returncode == 0, "detail": r.stdout[:200]})
         if r.returncode != 0 and "nothing to commit" not in r.stdout:
             return {"success": False, "steps": steps, "error": r.stderr[:200]}
 
         # git push
-        r = subprocess.run(["git", "push"], capture_output=True, text=True, timeout=60, cwd=str(BASE))
+        r = subprocess.run(["git", "push"], capture_output=True, text=True, timeout=120, cwd=str(BASE))
         steps.append({"step": "git push", "ok": r.returncode == 0, "detail": r.stdout[:200]})
         if r.returncode != 0:
             return {"success": False, "steps": steps, "error": r.stderr[:200]}

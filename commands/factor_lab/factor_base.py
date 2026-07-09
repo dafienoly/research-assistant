@@ -187,7 +187,7 @@ def eps_factor(df):
         return pd.Series(np.nan, index=df.index)
     return df["eps"].fillna(0)
 
-@register("quality_composite", "quality", {}, "质量综合分(ROE+毛利+净利+低负债)")
+@register("quality_composite", "composite", {}, "综合质量评分(ROE+毛利+净利+低负债,截面rank归一化)")
 def quality_composite(df):
     """等权组合：ROE + 毛利率 + 净利率 + (-负债率)"""
     score = pd.Series(0.0, index=df.index)
@@ -203,8 +203,53 @@ def quality_composite(df):
             n += 1
     return score / n if n > 0 else pd.Series(np.nan, index=df.index)
 
-# ═══════════════════════════════════════════════
-# 八、资金流向因子 (Fund Flow) — 需 fund_flow_timeseries.csv
+# ═══════════════════════════════════════════════════════════
+# 八、估值因子 (Valuation) — V3.2.2 需基本面CSV含pe_ttm/pb_lf/ps_ttm/pcf_ttm
+# ═══════════════════════════════════════════════════════════
+
+@register("pe_ttm_inv", "valuation", {}, "PE_TTM倒数 — 越高越低估")
+def pe_ttm_inv_factor(df):
+    if "pe_ttm" not in df.columns:
+        return pd.Series(np.nan, index=df.index)
+    inv = 1 / df["pe_ttm"].replace(0, np.nan).abs()
+    return inv.fillna(0)
+
+@register("pb_lf_inv", "valuation", {}, "PB倒数 — 越高越低估")
+def pb_lf_inv_factor(df):
+    if "pb_lf" not in df.columns:
+        return pd.Series(np.nan, index=df.index)
+    inv = 1 / df["pb_lf"].replace(0, np.nan)
+    return inv.fillna(0)
+
+@register("ep", "valuation", {}, "E/P 比率 (PE_TTM倒数)")
+def ep_factor(df):
+    return pe_ttm_inv_factor(df)
+
+@register("ps_ttm_inv", "valuation", {}, "PS_TTM倒数 — 越高越低估")
+def ps_ttm_inv_factor(df):
+    if "ps_ttm" not in df.columns:
+        return pd.Series(np.nan, index=df.index)
+    inv = 1 / df["ps_ttm"].replace(0, np.nan).abs()
+    return inv.fillna(0)
+
+# ═══════════════════════════════════════════════════════════
+# 九、成长因子 (Growth) — V3.2.2 需基本面CSV含revenue/profit_growth_q
+# ═══════════════════════════════════════════════════════════
+
+@register("revenue_growth_q", "growth", {}, "单季营收同比增速")
+def revenue_growth_factor(df):
+    if "revenue_growth_q" not in df.columns:
+        return pd.Series(np.nan, index=df.index)
+    return df["revenue_growth_q"].fillna(0)
+
+@register("profit_growth_q", "growth", {}, "单季净利润同比增速")
+def profit_growth_factor(df):
+    if "profit_growth_q" not in df.columns:
+        return pd.Series(np.nan, index=df.index)
+    return df["profit_growth_q"].fillna(0)
+
+# ═══════════════════════════════════════════════════════════
+# 十一、资金流向因子 (Fund Flow) — 需 fund_flow_timeseries.csv
 # ═══════════════════════════════════════════════
 # 字段: net_main_force, net_super_large, net_large, net_medium, net_small
 
@@ -257,7 +302,7 @@ def flow_momentum(df):
 
 
 # ═══════════════════════════════════════════════
-# 八-B、资金流增强因子 V3.3 (Enhanced Fund Flow)
+# 十一-B、资金流增强因子 V3.3 (Enhanced Fund Flow)
 # ═══════════════════════════════════════════════
 # 字段: net_main_force, net_super_large, net_large, net_medium, net_small
 
@@ -335,7 +380,7 @@ def consecutive_inflow(df):
 
 
 # ═══════════════════════════════════════════════
-# 八-C、北向资金因子 V3.3 (North-bound Capital)
+# 十一-C、北向资金因子 V3.3 (North-bound Capital)
 # ═══════════════════════════════════════════════
 # 字段: nb_net_flow, nb_total_buy, nb_total_sell, nb_holding_value, nb_holding_ratio
 
@@ -400,7 +445,7 @@ def nb_flow_momentum(df):
 
 
 # ═══════════════════════════════════════════════
-# 八-D、两融因子 V3.3 (Margin Trading & Securities Lending)
+# 十一-D、两融因子 V3.3 (Margin Trading & Securities Lending)
 # ═══════════════════════════════════════════════
 # 字段: margin_buy, margin_repay, margin_balance, sec_lending_volume, sec_lending_balance, margin_ratio
 
@@ -482,7 +527,7 @@ def margin_flow_momentum(df):
 
 
 # ═══════════════════════════════════════════════
-# 九、新闻情绪因子 (Sentiment) — 需 news_sentiment_timeseries.csv
+# 十二、新闻情绪因子 (Sentiment) — 需 news_sentiment_timeseries.csv
 # ═══════════════════════════════════════════════
 
 @register("sentiment_1d", "sentiment", {}, "新闻情绪(今日)")
@@ -511,7 +556,7 @@ def sentiment_mom(df):
 
 
 # ═══════════════════════════════════════════════
-# 十五、技术指标因子 V3.4 (Technical Pattern Control)
+# 十三、技术指标因子 V3.4 (Technical Pattern Control)
 # ═══════════════════════════════════════════════
 # 注意: MACD/KDJ/Bollinger 在 A 股作为单独的 alpha 信号
 # 预测能力有限, 主要用作 control/baseline/redundancy 参考。
@@ -855,8 +900,11 @@ def _make_dyn_func(expr: str):
             _cache[expr] = ExpressionParser()
         try:
             return _cache[expr].eval(expr, df)
-        except Exception:
-            return pd.Series(0.0, index=df.index)
+        except Exception as e:
+            import traceback
+            print(f"  ⚠️ 进化因子表达式执行失败 ({expr[:50]}...): {e}")
+            traceback.print_exc()
+            return pd.Series(np.nan, index=df.index)
     return dyn_func
 
 # ═══════════════════════════════════════════════
@@ -1223,7 +1271,60 @@ def cross_sector_strength(df):
 
 
 # ═══════════════════════════════════════════════
-# 十五、事件驱动因子 V3.5 (Event-driven Alpha Pack)
+# 十五、行业轮动因子 (Industry Rotation)
+# ═══════════════════════════════════════════════
+# 这些因子直接用于行业轮动分析和行业中性化。
+# 需要 df 中的 "industry" 列, 否则返回 0。
+
+@register("industry_relative_ret5", "industry_relative", {},
+          "5日动量行业中位数调整")
+def industry_relative_ret5(df):
+    """5日动量行业中位数调整: ret5 - median(ret5) by industry
+    
+    正值=该股票在同行业内相对强势, 负值=相对弱势。
+    用于构建行业内选股信号 (long strongest, short weakest within sector)。
+    """
+    if "ret5" not in df.columns or "industry" not in df.columns:
+        return pd.Series(0.0, index=df.index)
+    ind_median = df.groupby("industry")["ret5"].transform("median")
+    return (df["ret5"] - ind_median).fillna(0)
+
+
+@register("industry_momentum", "industry_relative", {},
+          "行业动量 — 行业中位数收益")
+def industry_momentum(df):
+    """行业动量: 同行业内所有股票的 ret5 均值/中位数
+    
+    正值=该行业整体动量向上, 负值=行业整体动量向下。
+    用于行业轮动: 做多高行业动量板块, 做空低行业动量板块。
+    """
+    if "ret5" not in df.columns or "industry" not in df.columns:
+        return pd.Series(0.0, index=df.index)
+    ind_mean = df.groupby("industry")["ret5"].transform("mean")
+    return ind_mean.fillna(0)
+
+
+@register("industry_concentration", "industry_relative", {},
+          "行业拥挤度 — 行业成交额占比")
+def industry_concentration(df):
+    """行业拥挤度: 行业成交额 / 全市场成交额
+    
+    越高=该行业交易越拥挤 (可能过热)。
+    用于拥挤度预警: 高拥挤度行业可能即将反转/调整。
+    截面值 (每日归一化)。
+    """
+    if "amount" not in df.columns or "industry" not in df.columns:
+        return pd.Series(0.0, index=df.index)
+    total = df["amount"].sum()
+    if total > 0:
+        ind_ratio = df.groupby("industry")["amount"].transform("sum") / total
+    else:
+        ind_ratio = pd.Series(0.0, index=df.index)
+    return ind_ratio.fillna(0)
+
+
+# ═══════════════════════════════════════════════
+# 十六、事件驱动因子 V3.5 (Event-driven Alpha Pack)
 # ═══════════════════════════════════════════════
 # 事件: 解禁(Lockup expiry), 回购(Buyback), 分红(Dividend), 业绩预告(Earnings Forecast)
 # 数据来源: announcements_extracted.csv, adjust_factor.csv, forecast_report.csv
@@ -1412,3 +1513,19 @@ def event_composite_score(df):
         score += ((lock_days > 0) & (lock_days <= 5)).astype(float) * (-0.3)
 
     return score
+
+
+# ═══════════════════════════════════════════════════════════════
+# 自动加载半导体因子模块（确保注册装饰器生效）
+# ═══════════════════════════════════════════════════════════════
+
+def _load_semiconductor_factors():
+    """尝试加载半导体因子模块，将所有 @register 因子注册到 REGISTRY"""
+    try:
+        from factor_lab import semiconductor_factors as _sf
+        return True
+    except Exception:
+        return False
+
+# 模块加载时自动尝试
+_load_semiconductor_factors()

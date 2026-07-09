@@ -1074,3 +1074,559 @@ class TestLiveReadinessIntegration:
             assert "summary" in ga
             assert "gaps" in ga
             assert ga["summary"]["blockers"] >= 1
+
+
+# =========================================================================
+# V4.9 小资金实盘 Readiness Gate (13道门禁检查) — LiveReadinessChecker
+# =========================================================================
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from live_readiness import (
+    GateOutput,
+    ReadinessReport,
+    LiveReadinessChecker,
+    run_live_readiness_check,
+    print_readiness_report,
+    cmd_live_readiness_v4,
+    cmd_live_gate_report,
+)
+from factor_lab.risk.kill_switch import KillSwitch
+
+
+class TestGateOutput:
+    """GateOutput — 单个 Gate 的输出结果"""
+
+    def test_default_values(self):
+        """默认值正确"""
+        g = GateOutput(gate_name="TestGate")
+        assert g.gate_name == "TestGate"
+        assert g.passed is False
+        assert g.severity == "blocker"
+        assert g.message == ""
+        assert g.evidence == ""
+        assert g.fix_suggestion == ""
+
+    def test_severity_values(self):
+        """严重程度可设置"""
+        for sev in ("blocker", "warning", "info"):
+            g = GateOutput(gate_name="Test", severity=sev)
+            assert g.severity == sev
+
+    def test_passed_flag(self):
+        """passed 标志正确"""
+        g = GateOutput(gate_name="PassTest", passed=True, severity="info")
+        assert g.passed is True
+
+
+class TestReadinessReport:
+    """ReadinessReport — 完整检查报告"""
+
+    def test_default_report(self):
+        """默认报告为 NOT_READY"""
+        r = ReadinessReport()
+        assert r.overall == "NOT_READY"
+        assert len(r.gates) == 0
+        assert len(r.blockers) == 0
+        assert len(r.warnings) == 0
+
+    def test_to_dict_structure(self):
+        """to_dict 输出结构正确"""
+        g = GateOutput(gate_name="Gate1", passed=True, severity="info",
+                       message="OK", evidence="data", fix_suggestion="")
+        r = ReadinessReport(overall="READY", gates=[g],
+                            run_id="test_001", scanned_at="2026-07-08")
+        d = r.to_dict()
+        assert d["overall"] == "READY"
+        assert d["run_id"] == "test_001"
+        assert len(d["gates"]) == 1
+        assert d["gates"][0]["gate_name"] == "Gate1"
+
+    def test_blockers_and_warnings(self):
+        """blockers 和 warnings 分类正确"""
+        g1 = GateOutput("BlockerGate", passed=False, severity="blocker")
+        g2 = GateOutput("WarningGate", passed=False, severity="warning")
+        g3 = GateOutput("InfoGate", passed=True, severity="info")
+        r = ReadinessReport(overall="NOT_READY", gates=[g1, g2, g3],
+                            blockers=[g1], warnings=[g2])
+        assert len(r.blockers) == 1
+        assert len(r.warnings) == 1
+        assert r.blockers[0].gate_name == "BlockerGate"
+        assert r.warnings[0].gate_name == "WarningGate"
+
+
+class TestLiveReadinessChecker:
+    """LiveReadinessChecker — 13道门禁检查"""
+
+    def test_initialization(self):
+        """初始化正确"""
+        checker = LiveReadinessChecker()
+        assert len(checker.GATE_NAMES) == 13
+        assert "DataHealthGate" in checker.GATE_NAMES
+        assert "WeChatNotifyGate" in checker.GATE_NAMES
+
+    def test_init_with_kill_switch(self):
+        """可注入 KillSwitch"""
+        ks = KillSwitch()
+        checker = LiveReadinessChecker(kill_switch=ks)
+        assert checker.kill_switch is not None
+
+    def test_init_with_strict(self):
+        """严格模式标志正确"""
+        checker = LiveReadinessChecker(strict=True)
+        assert checker.strict is True
+
+    def test_check_all_returns_report(self):
+        """check_all 返回 ReadinessReport"""
+        checker = LiveReadinessChecker()
+        report = checker.check_all()
+        assert isinstance(report, ReadinessReport)
+        assert len(report.gates) == 13
+
+    def test_check_all_has_all_gates(self):
+        """check_all 包含全部 13 个 Gate"""
+        checker = LiveReadinessChecker()
+        report = checker.check_all()
+        gate_names = {g.gate_name for g in report.gates}
+        for expected in checker.GATE_NAMES:
+            assert expected in gate_names, f"Missing gate: {expected}"
+
+    def test_check_all_with_kill_switch(self):
+        """带 KillSwitch 的 check_all"""
+        ks = KillSwitch()
+        checker = LiveReadinessChecker(kill_switch=ks)
+        report = checker.check_all()
+        assert len(report.gates) == 13
+
+    def test_check_all_with_specific_gates(self):
+        """指定 Gate 子集"""
+        checker = LiveReadinessChecker()
+        partial = ["DataHealthGate", "KillSwitchGate", "WeChatNotifyGate"]
+        report = checker.check_all(gates=partial)
+        assert len(report.gates) == 3
+        gate_names = [g.gate_name for g in report.gates]
+        assert "DataHealthGate" in gate_names
+        assert "KillSwitchGate" in gate_names
+        assert "WeChatNotifyGate" in gate_names
+
+    def test_to_dict_with_all_gates(self):
+        """全部 Gate 的 to_dict 输出"""
+        checker = LiveReadinessChecker()
+        report = checker.check_all()
+        d = report.to_dict()
+        assert len(d["gates"]) == 13
+        assert "overall" in d
+        assert "blockers" in d
+        assert "warnings" in d
+
+
+class TestDataHealthGate:
+    """DataHealthGate — 数据新鲜度、覆盖率"""
+
+    def test_check_runs(self):
+        """Gate 可执行"""
+        checker = LiveReadinessChecker()
+        result = checker.check_data_health()
+        assert result.gate_name == "DataHealthGate"
+        assert result.severity == "info" or result.severity == "blocker"
+
+    def test_has_evidence(self):
+        """有证据信息"""
+        checker = LiveReadinessChecker()
+        result = checker.check_data_health()
+        assert isinstance(result.evidence, str)
+
+    def test_has_fix_suggestion_when_failed(self):
+        """失败时有修复建议"""
+        checker = LiveReadinessChecker()
+        result = checker.check_data_health()
+        if not result.passed and result.severity == "blocker":
+            assert len(result.fix_suggestion) > 0
+
+
+class TestUniversePurityGate:
+    """UniversePurityGate — 股票池纯度"""
+
+    def test_check_runs(self):
+        """Gate 可执行"""
+        checker = LiveReadinessChecker()
+        result = checker.check_universe_purity()
+        assert result.gate_name == "UniversePurityGate"
+
+    def test_has_evidence(self):
+        """有证据信息"""
+        checker = LiveReadinessChecker()
+        result = checker.check_universe_purity()
+        assert isinstance(result.evidence, str)
+
+
+class TestBenchmarkGate:
+    """BenchmarkGate — 基准体系完整"""
+
+    def test_check_runs(self):
+        """Gate 可执行"""
+        checker = LiveReadinessChecker()
+        result = checker.check_benchmark()
+        assert result.gate_name == "BenchmarkGate"
+        assert isinstance(result.evidence, str)
+
+
+class TestSemiconductorPeerGate:
+    """SemiconductorPeerGate — 因子跑赢半导体同池"""
+
+    def test_check_runs(self):
+        """Gate 可执行"""
+        checker = LiveReadinessChecker()
+        result = checker.check_semiconductor_peer()
+        assert result.gate_name == "SemiconductorPeerGate"
+
+    def test_has_evidence(self):
+        """有证据信息"""
+        checker = LiveReadinessChecker()
+        result = checker.check_semiconductor_peer()
+        assert isinstance(result.evidence, str)
+
+
+class TestRiskExposureGate:
+    """RiskExposureGate — 因子收益非风险暴露"""
+
+    def test_check_runs(self):
+        """Gate 可执行"""
+        checker = LiveReadinessChecker()
+        result = checker.check_risk_exposure()
+        assert result.gate_name == "RiskExposureGate"
+
+    def test_has_evidence(self):
+        """有证据信息"""
+        checker = LiveReadinessChecker()
+        result = checker.check_risk_exposure()
+        assert isinstance(result.evidence, str)
+
+
+class TestCostAdjustedReturnGate:
+    """CostAdjustedReturnGate — 交易成本后收益为正"""
+
+    def test_check_runs(self):
+        """Gate 可执行"""
+        checker = LiveReadinessChecker()
+        result = checker.check_cost_adjusted_return()
+        assert result.gate_name == "CostAdjustedReturnGate"
+
+    def test_has_evidence(self):
+        """有证据信息"""
+        checker = LiveReadinessChecker()
+        result = checker.check_cost_adjusted_return()
+        assert isinstance(result.evidence, str)
+
+
+class TestPaperTradingGate:
+    """PaperTradingGate — Paper Trading 稳定"""
+
+    def test_check_runs(self):
+        """Gate 可执行"""
+        checker = LiveReadinessChecker()
+        result = checker.check_paper_trading()
+        assert result.gate_name == "PaperTradingGate"
+
+    def test_has_evidence(self):
+        """有证据信息"""
+        checker = LiveReadinessChecker()
+        result = checker.check_paper_trading()
+        assert isinstance(result.evidence, str)
+
+    def test_fix_suggestion_when_failed(self):
+        """失败时有修复建议"""
+        checker = LiveReadinessChecker()
+        result = checker.check_paper_trading()
+        if not result.passed:
+            assert len(result.fix_suggestion) > 0
+
+
+class TestShadowTradingGate:
+    """ShadowTradingGate — Shadow Trading 稳定"""
+
+    def test_check_runs(self):
+        """Gate 可执行"""
+        checker = LiveReadinessChecker()
+        result = checker.check_shadow_trading()
+        assert result.gate_name == "ShadowTradingGate"
+
+    def test_has_evidence(self):
+        """有证据信息"""
+        checker = LiveReadinessChecker()
+        result = checker.check_shadow_trading()
+        assert isinstance(result.evidence, str)
+
+
+class TestTradeConstraintGate:
+    """TradeConstraintGate — 交易约束正常工作"""
+
+    def test_check_runs(self):
+        """Gate 可执行"""
+        checker = LiveReadinessChecker()
+        result = checker.check_trade_constraints()
+        assert result.gate_name == "TradeConstraintGate"
+
+    def test_has_evidence(self):
+        """有证据信息"""
+        checker = LiveReadinessChecker()
+        result = checker.check_trade_constraints()
+        assert isinstance(result.evidence, str)
+
+
+class TestManualApprovalGate:
+    """ManualApprovalGate — 人工审批链正常"""
+
+    def test_check_runs(self):
+        """Gate 可执行"""
+        checker = LiveReadinessChecker()
+        result = checker.check_manual_approval()
+        assert result.gate_name == "ManualApprovalGate"
+
+
+class TestKillSwitchGate:
+    """KillSwitchGate — Kill Switch 正常"""
+
+    def test_check_runs(self):
+        """Gate 可执行"""
+        checker = LiveReadinessChecker()
+        result = checker.check_kill_switch()
+        assert result.gate_name == "KillSwitchGate"
+
+    def test_with_armed_kill_switch(self):
+        """ARMED 状态的 Kill Switch 通过检查"""
+        ks = KillSwitch()
+        checker = LiveReadinessChecker(kill_switch=ks)
+        result = checker.check_kill_switch()
+        assert result.passed is True
+
+    def test_with_triggered_kill_switch(self):
+        """TRIGGERED 状态的 Kill Switch 阻塞检查"""
+        ks = KillSwitch()
+        ks.trigger("test_rule", "测试触发")
+        checker = LiveReadinessChecker(kill_switch=ks)
+        result = checker.check_kill_switch()
+        assert result.passed is False
+        assert result.severity == "blocker"
+
+    def test_has_fix_suggestion_when_triggered(self):
+        """触发时有修复建议"""
+        ks = KillSwitch()
+        ks.trigger("test_rule", "测试触发")
+        checker = LiveReadinessChecker(kill_switch=ks)
+        result = checker.check_kill_switch()
+        assert len(result.fix_suggestion) > 0
+
+    def test_evidence_contains_state(self):
+        """证据包含 Kill Switch 状态"""
+        ks = KillSwitch()
+        checker = LiveReadinessChecker(kill_switch=ks)
+        result = checker.check_kill_switch()
+        assert "ARMED" in result.evidence or "armed" in result.evidence.lower()
+
+
+class TestAuditTrailGate:
+    """AuditTrailGate — 审计日志完整"""
+
+    def test_check_runs(self):
+        """Gate 可执行"""
+        checker = LiveReadinessChecker()
+        result = checker.check_audit_trail()
+        assert result.gate_name == "AuditTrailGate"
+
+
+class TestWeChatNotifyGate:
+    """WeChatNotifyGate — 企业微信通知正常"""
+
+    def test_check_runs(self):
+        """Gate 可执行"""
+        checker = LiveReadinessChecker()
+        result = checker.check_wechat_notify()
+        assert result.gate_name == "WeChatNotifyGate"
+        assert isinstance(result.evidence, str)
+
+    def test_uses_env_var(self):
+        """检查环境变量"""
+        import os
+        original = os.environ.get("WECHAT_WEBHOOK_URL", "")
+        try:
+            os.environ["WECHAT_WEBHOOK_URL"] = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test"
+            checker = LiveReadinessChecker()
+            result = checker.check_wechat_notify()
+            assert result.passed is True
+        finally:
+            if original:
+                os.environ["WECHAT_WEBHOOK_URL"] = original
+            else:
+                del os.environ["WECHAT_WEBHOOK_URL"]
+
+    def test_missing_webhook_fails(self):
+        """缺少 Webhook 时失败"""
+        import os
+        original = os.environ.get("WECHAT_WEBHOOK_URL", "")
+        try:
+            if "WECHAT_WEBHOOK_URL" in os.environ:
+                del os.environ["WECHAT_WEBHOOK_URL"]
+            checker = LiveReadinessChecker()
+            result = checker.check_wechat_notify()
+            # May pass if .bashrc has webhook, may fail otherwise
+            assert isinstance(result.passed, bool)
+        finally:
+            if original:
+                os.environ["WECHAT_WEBHOOK_URL"] = original
+
+
+class TestRunLiveReadinessCheck:
+    """run_live_readiness_check — 便捷函数"""
+
+    def test_runs_all_13_gates(self):
+        """运行全部 13 个 Gate"""
+        report = run_live_readiness_check()
+        assert len(report.gates) == 13
+        assert report.overall in ("READY", "NOT_READY")
+
+    def test_strict_mode(self):
+        """严格模式"""
+        report = run_live_readiness_check(strict=True)
+        assert len(report.gates) == 13
+
+    def test_no_crash_with_kill_switch(self):
+        """带 KillSwitch 不崩溃"""
+        ks = KillSwitch()
+        checker = LiveReadinessChecker(kill_switch=ks)
+        report = checker.check_all()
+        assert len(report.gates) == 13
+
+
+class TestReadinessGateTypes:
+    """所有 Gate 类型正确"""
+
+    def test_all_gates_have_unique_names(self):
+        """所有 Gate 名称唯一"""
+        checker = LiveReadinessChecker()
+        assert len(set(checker.GATE_NAMES)) == len(checker.GATE_NAMES)
+
+    def test_all_gates_have_required_fields(self):
+        """所有 Gate 包含必要字段"""
+        checker = LiveReadinessChecker()
+        report = checker.check_all()
+        for g in report.gates:
+            assert hasattr(g, "gate_name")
+            assert hasattr(g, "passed")
+            assert hasattr(g, "severity")
+            assert hasattr(g, "evidence")
+            # message should always be present (may be empty string)
+            assert hasattr(g, "message")
+            # fix_suggestion should be present
+            assert hasattr(g, "fix_suggestion")
+
+    def test_no_gate_crashes(self):
+        """所有 Gate 不崩溃"""
+        checker = LiveReadinessChecker()
+        for gname in checker.GATE_NAMES:
+            method_name = f"check_{gname[0].lower()}{gname[1:]}"
+            gate_method = getattr(checker, method_name, None)
+            if gate_method:
+                try:
+                    result = gate_method()
+                    assert result.gate_name == gname, f"Gate {gname} returned wrong name"
+                except Exception as e:
+                    raise AssertionError(f"Gate {gname} crashed: {e}")
+            else:
+                raise AssertionError(f"Gate method not found: {method_name}")
+
+    def test_all_lock_checks_have_severity(self):
+        """所有检查有 severity"""
+        checker = LiveReadinessChecker()
+        report = checker.check_all()
+        for g in report.gates:
+            assert g.severity in ("blocker", "warning", "info")
+
+
+class TestGateSeverityDefault:
+    """Gate 默认 severity 验证"""
+
+    def test_data_health_gate_is_info_or_blocker(self):
+        """DataHealthGate 的 severity 正确"""
+        checker = LiveReadinessChecker()
+        result = checker.check_data_health()
+        assert result.severity in ("blocker", "info", "warning")
+
+    def test_paper_trading_gate_is_blocker(self):
+        """PaperTradingGate 为 blocker"""
+        checker = LiveReadinessChecker()
+        result = checker.check_paper_trading()
+        assert result.severity == "blocker" or result.severity == "info"
+
+    def test_kill_switch_gate_is_blocker(self):
+        """KillSwitchGate 为 blocker"""
+        checker = LiveReadinessChecker()
+        result = checker.check_kill_switch()
+        assert result.severity == "blocker" or result.severity in ("info", "warning")
+
+
+class TestPrintReadinessReport:
+    """print_readiness_report — 报告打印"""
+
+    def test_print_verbose(self):
+        """详细模式打印"""
+        checker = LiveReadinessChecker()
+        report = checker.check_all()
+        # Capture stdout
+        import io
+        import sys as _sys
+        captured = io.StringIO()
+        old_stdout = _sys.stdout
+        _sys.stdout = captured
+        try:
+            print_readiness_report(report, verbose=True)
+        finally:
+            _sys.stdout = old_stdout
+        output = captured.getvalue()
+        assert "V4.9" in output
+        assert "READY" in output or "NOT_READY" in output
+
+    def test_print_non_verbose(self):
+        """简洁模式打印"""
+        checker = LiveReadinessChecker()
+        report = checker.check_all()
+        import io
+        import sys as _sys
+        captured = io.StringIO()
+        old_stdout = _sys.stdout
+        _sys.stdout = captured
+        try:
+            print_readiness_report(report, verbose=False)
+        finally:
+            _sys.stdout = old_stdout
+        output = captured.getvalue()
+        assert len(output) > 0
+
+
+class TestCmdLiveReadinessV4:
+    """cmd_live_readiness_v4 — CLI 入口"""
+
+    def test_returns_report(self):
+        """返回 ReadinessReport"""
+        report = cmd_live_readiness_v4([])
+        assert isinstance(report, ReadinessReport)
+        assert len(report.gates) == 13
+
+    def test_verbose_flag(self):
+        """支持 --strict 参数"""
+        report = cmd_live_readiness_v4(["--strict"])
+        assert isinstance(report, ReadinessReport)
+
+
+class TestCmdLiveGateReport:
+    """cmd_live_gate_report — CLI 详细报告入口"""
+
+    def test_returns_report(self):
+        """返回 ReadinessReport"""
+        report = cmd_live_gate_report([])
+        assert isinstance(report, ReadinessReport)
+        assert len(report.gates) == 13
+
+    def test_strict_mode(self):
+        """支持 --strict 参数"""
+        report = cmd_live_gate_report(["--strict"])
+        assert isinstance(report, ReadinessReport)

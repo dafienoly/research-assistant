@@ -18,8 +18,13 @@ The sentinel runs as a background check — it does NOT block actions itself.
 Instead, it reports violations and lets the Kill Switch enforce blocking.
 """
 
+import json
+import os
+import threading
+import time
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from typing import Any, Optional
 
 from factor_lab.risk.risk_rules import (
@@ -28,8 +33,10 @@ from factor_lab.risk.risk_rules import (
 )
 from factor_lab.risk.incident_log import IncidentLog, IncidentRecord
 from factor_lab.risk.kill_switch import KillSwitch
+from factor_lab.data_health import health_check
 
 CST = timezone(timedelta(hours=8))
+STATE_DIR = Path("/mnt/d/HermesData/risk_sentinel")
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +124,8 @@ class RiskSentinel:
                  incident_log: Optional[IncidentLog] = None,
                  kill_switch: Optional[KillSwitch] = None,
                  auto_trigger_kill_switch: bool = True,
-                 name: str = "default"):
+                 name: str = "default",
+                 anomaly_detector: Optional["DataAnomalyDetector"] = None):
         """Initialize the risk sentinel.
 
         Args:
@@ -127,6 +135,7 @@ class RiskSentinel:
             auto_trigger_kill_switch: If True, automatically triggers
                 kill switch on BLOCKER violations.
             name: Sentinel name for identification.
+            anomaly_detector: DataAnomalyDetector instance (V3.5.4).
         """
         self.name = name
         self._rules: dict[str, RiskRule] = {}
@@ -139,6 +148,14 @@ class RiskSentinel:
         self._checks: list[SentinelCheck] = []
         self._last_status: Optional[SentinelStatus] = None
         self._check_counter: int = 0
+        self.anomaly_detector = anomaly_detector  # V3.5.4
+        self.last_market_ts: Optional[datetime] = None  # V3.5.4
+
+        # Daemon mode (background thread)
+        self._running: bool = False
+        self._thread: Optional[threading.Thread] = None
+        self._interval: int = 30
+        self._daemon_lock: threading.Lock = threading.Lock()
 
         # Load rules
         if rules is not None:
@@ -462,4 +479,338 @@ class RiskSentinel:
             "kill_switch": self._kill_switch.to_dict(),
             "incident_log": self._incident_log.summary(),
             "checks": self.get_check_history(5),
+        }
+
+    # ------------------------------------------------------------------ #
+    #  Data freshness & connectivity checks
+    # ------------------------------------------------------------------ #
+
+    def check_data_freshness(self) -> dict:
+        """Check data freshness by calling data_health.health_check().
+
+        Returns a dict with:
+          - checked_at: ISO timestamp
+          - healthy: bool (all sources healthy)
+          - total_sources: int
+          - healthy_sources: int
+          - unhealthy_sources: int
+          - details: list of source health info
+        """
+        try:
+            result = health_check()
+            self._incident_log.record(
+                rule_name="data_freshness",
+                severity="info",
+                message=f"Data freshness check: {result.get('healthy', 0)}/"
+                        f"{result.get('total_sources', 0)} sources healthy",
+                category="data",
+                source="risk_sentinel",
+                tags=["data_freshness", "check"],
+            )
+            # If unhealthy sources exist, trigger a warning-level incident
+            unhealthy = result.get("unhealthy", 0)
+            if unhealthy > 0:
+                self._incident_log.record(
+                    rule_name="data_freshness",
+                    severity="warning",
+                    message=f"{unhealthy} data source(s) unhealthy",
+                    category="data",
+                    source="risk_sentinel",
+                    details={"unhealthy_sources": [
+                        s for s in result.get("sources", [])
+                        if not s.get("healthy", False)
+                    ]},
+                    tags=["data_freshness", "unhealthy"],
+                )
+            return result
+        except Exception as exc:
+            error_result = {
+                "checked_at": datetime.now(CST).isoformat(),
+                "healthy": False,
+                "error": str(exc),
+                "total_sources": 0,
+                "healthy_sources": 0,
+                "unhealthy_sources": 0,
+                "sources": [],
+            }
+            self._incident_log.record(
+                rule_name="data_freshness",
+                severity="error",
+                message=f"Data freshness check failed: {exc}",
+                category="data",
+                source="risk_sentinel",
+                tags=["data_freshness", "error"],
+            )
+            return error_result
+
+    def check_market_connectivity(self) -> dict:
+        """Check market data connectivity.
+
+        Performs a connectivity probe on registered data sources.
+        Returns a dict with connectivity status per source.
+        """
+        try:
+            result = health_check()
+            # Derive connectivity from health status
+            sources = result.get("sources", [])
+            connected = sum(1 for s in sources if s.get("healthy", False))
+            total = len(sources)
+
+            connectivity_result = {
+                "checked_at": datetime.now(CST).isoformat(),
+                "connected": connected,
+                "total": total,
+                "all_connected": connected == total if total > 0 else False,
+                "sources": [
+                    {
+                        "source_id": s.get("source_id", ""),
+                        "name": s.get("name", ""),
+                        "connected": s.get("healthy", False),
+                    }
+                    for s in sources
+                ],
+            }
+
+            if not connectivity_result["all_connected"]:
+                disconnected = [s for s in sources if not s.get("healthy", False)]
+                self._incident_log.record(
+                    rule_name="market_connectivity",
+                    severity="critical" if total > 0 and connected == 0 else "warning",
+                    message=f"Market connectivity: {connected}/{total} sources connected",
+                    category="data",
+                    source="risk_sentinel",
+                    details={"disconnected_sources": [
+                        {"id": s.get("source_id"), "name": s.get("name")}
+                        for s in disconnected
+                    ]},
+                    tags=["market_connectivity", "check"],
+                )
+
+            return connectivity_result
+        except Exception as exc:
+            return {
+                "checked_at": datetime.now(CST).isoformat(),
+                "connected": 0,
+                "total": 0,
+                "all_connected": False,
+                "error": str(exc),
+                "sources": [],
+            }
+
+    # ------------------------------------------------------------------ #
+    #  Run cycle — unified check + persistence
+    # ------------------------------------------------------------------ #
+
+    def run_cycle(self, contexts: dict[str, Any] = None) -> dict:
+        """Execute one full check cycle.
+
+        Combines:
+          1. Rule evaluation via check_all()
+          2. Data freshness check
+          3. Market connectivity check
+          4. State persistence to disk
+
+        Args:
+            contexts: Optional dict of dimension -> context for rule evaluation.
+
+        Returns:
+            dict with full cycle state including all checks.
+        """
+        contexts = contexts or {}
+        started_at = datetime.now(CST).isoformat()
+
+        # 1. Rule evaluation
+        status = self.check_all(contexts)
+
+        # 2. Data freshness
+        freshness = self.check_data_freshness()
+
+        # 3. Market connectivity
+        connectivity = self.check_market_connectivity()
+
+        # 4. 异常检测 (V3.5.4 新增)
+        anomaly = {}
+        if self.anomaly_detector:
+            try:
+                if self.last_market_ts:
+                    lag = self.anomaly_detector.check_market_lag(self.last_market_ts)
+                    anomaly["market_lag"] = lag
+            except Exception as exc:
+                anomaly["error"] = str(exc)
+
+        # 5. Build state dict
+        state = {
+            "sentinel_name": self.name,
+            "cycle_started_at": started_at,
+            "completed_at": datetime.now(CST).isoformat(),
+            "overall_status": status.status,
+            "kill_switch_state": self._kill_switch.state,
+            "kill_switch_triggered": self._kill_switch.is_triggered(),
+            "n_rules_checked": status.n_rules_checked,
+            "n_violations": status.n_violations,
+            "n_blockers": status.n_blockers,
+            "n_open_incidents": status.n_open_incidents,
+            "dimensions": status.dimensions,
+            "data_freshness": freshness,
+            "market_connectivity": connectivity,
+            "anomaly": anomaly,
+            "last_check_at": status.last_check_at,
+        }
+
+        # Persist state
+        self._save_state(state)
+
+        # V3.5.5: 检测到 blocker 时发送风控摘要（每天最多1次）
+        blockers = [
+            r for r in (getattr(status, "checks", None) or [])
+            if isinstance(r, dict) and r.get("severity") == "blocker"
+        ]
+        if blockers and self._should_send_daily_summary():
+            try:
+                from factor_lab.notify import notify_risk_summary
+                summary = {
+                    "date": datetime.now(CST).strftime("%Y-%m-%d"),
+                    "total_checks": status.n_rules_checked,
+                    "passed": status.n_rules_checked - status.n_violations,
+                    "warnings": status.n_violations - status.n_blockers,
+                    "blockers": status.n_blockers,
+                    "kill_switch_state": self._kill_switch.state,
+                    "top_events": [
+                        str(r.get("message", ""))
+                        for r in blockers[:5]
+                    ],
+                }
+                notify_risk_summary(summary)
+            except Exception:
+                pass
+
+        return state
+
+    # ------------------------------------------------------------------ #
+    #  Daemon mode (background thread)
+    # ------------------------------------------------------------------ #
+
+    def start(self, interval_seconds: int = 30):
+        """Start the sentinel daemon in a background thread.
+
+        Args:
+            interval_seconds: Seconds between check cycles (default: 30).
+        """
+        with self._daemon_lock:
+            if self._running:
+                return  # Already running
+
+            self._interval = interval_seconds
+            self._running = True
+            self._thread = threading.Thread(
+                target=self._daemon_loop,
+                name=f"RiskSentinel-{self.name}",
+                daemon=True,
+            )
+            self._thread.start()
+
+            self._incident_log.record(
+                rule_name="risk_sentinel",
+                severity="info",
+                message=f"RiskSentinel daemon started (interval={interval_seconds}s)",
+                category="system",
+                source="risk_sentinel",
+                tags=["risk_sentinel", "daemon", "start"],
+            )
+
+    def stop(self):
+        """Stop the sentinel daemon gracefully."""
+        with self._daemon_lock:
+            if not self._running:
+                return
+
+            self._running = False
+
+            self._incident_log.record(
+                rule_name="risk_sentinel",
+                severity="info",
+                message="RiskSentinel daemon stopped",
+                category="system",
+                source="risk_sentinel",
+                tags=["risk_sentinel", "daemon", "stop"],
+            )
+
+    def is_running(self) -> bool:
+        """Check if the daemon is currently running."""
+        return self._running
+
+    def _daemon_loop(self):
+        """Internal daemon loop — runs check cycles at fixed intervals."""
+        while self._running:
+            try:
+                self.run_cycle()
+            except Exception as exc:
+                self._incident_log.record(
+                    rule_name="risk_sentinel",
+                    severity="error",
+                    message=f"Daemon cycle error: {exc}",
+                    category="system",
+                    source="risk_sentinel",
+                    details={"error": str(exc)},
+                    tags=["risk_sentinel", "error"],
+                )
+
+            # Sleep in small increments so stop() is responsive
+            for _ in range(self._interval):
+                if not self._running:
+                    break
+                time.sleep(1)
+
+    # V3.5.5: 每日风控摘要冷却
+    def _should_send_daily_summary(self) -> bool:
+        """检查是否可以发送每日风控摘要（每天最多 1 次）。"""
+        today = datetime.now(CST).strftime("%Y-%m-%d")
+        if getattr(self, '_last_summary_date', None) != today:
+            self._last_summary_date = today
+            return True
+        return False
+
+    # ------------------------------------------------------------------ #
+    #  State persistence
+    # ------------------------------------------------------------------ #
+
+    def _save_state(self, state: dict):
+        """Persist sentinel state to state.json on disk."""
+        try:
+            os.makedirs(str(STATE_DIR), exist_ok=True)
+            path = STATE_DIR / "state.json"
+            with open(str(path), "w", encoding="utf-8") as f:
+                json.dump(state, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass  # Best-effort persistence; never crash on write failure
+
+    def get_state(self) -> dict:
+        """Return the current sentinel state snapshot.
+
+        Reads from the persisted state.json if available, otherwise
+        builds a live state from in-memory data.
+        """
+        # Try to read persisted state first
+        try:
+            path = STATE_DIR / "state.json"
+            if path.exists():
+                with open(str(path), "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except Exception:
+            pass
+
+        # Fall back to live data
+        status = self.get_status()
+        return {
+            "sentinel_name": self.name,
+            "completed_at": datetime.now(CST).isoformat(),
+            "overall_status": status.status,
+            "kill_switch_state": self._kill_switch.state,
+            "kill_switch_triggered": self._kill_switch.is_triggered(),
+            "n_rules_checked": status.n_rules_checked,
+            "n_violations": status.n_violations,
+            "n_blockers": status.n_blockers,
+            "n_open_incidents": status.n_open_incidents,
+            "dimensions": status.dimensions,
+            "last_check_at": status.last_check_at,
         }

@@ -514,7 +514,32 @@ def main():
             if k != "status":
                 print(f"      {k}: {v}")
 
+    # 更新注册表：情感数据源
+    if "sentiment" in results:
+        _update_registry_sentiment(results["sentiment"])
+
     return 0 if all(r.get("status") == "ok" for r in results.values()) else 1
+
+
+def _update_registry_sentiment(result: dict) -> None:
+    """更新 sentiment_data 注册表状态"""
+    try:
+        from factor_lab.data_source_registry import update_source_status
+        from datetime import datetime, timezone, timedelta
+        CST = timezone(timedelta(hours=8))
+
+        ok = result.get("status") == "ok"
+        status = "active" if ok else "pending"
+        rows = result.get("new_records", 0)
+        update_source_status(
+            "sentiment_data", status,
+            last_refresh=datetime.now(CST).isoformat(),
+            record_count=rows,
+            extra={"pipeline": "data_hub_rebuilder", "target": "sentiment"},
+        )
+        print(f"  📋 注册表: sentiment_data → {status} ({rows}条) ✅")
+    except Exception as e:
+        print(f"  ⚠️ 注册表更新失败: {e}")
 
 
 if __name__ == "__main__":

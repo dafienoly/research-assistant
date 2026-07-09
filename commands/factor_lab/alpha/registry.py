@@ -2,6 +2,7 @@
 import os, json, csv, shutil
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 from factor_lab.alpha.schema import AlphaSpec
 from factor_lab.alpha.lifecycle import AlphaLifecycle
 from factor_lab.core.audit import AuditTrail
@@ -119,3 +120,166 @@ def export_registry(output_path: str):
             w = csv.DictWriter(f, fieldnames=index[0].keys())
             w.writeheader()
             w.writerows(index)
+
+
+# ─── V3.2.5 — AlphaRegistry 类 + 验证结果回填 ──────────────────────
+
+
+class AlphaRegistry:
+    """文件系统 Alpha 注册表（类封装，兼容现有模块级函数）"""
+
+    def __init__(self, root: Optional[str | Path] = None):
+        self.root = Path(root) if root else REGISTRY_ROOT
+
+    # ── 内部辅助 ──────────────────────────────────────
+
+    def _get_alpha_dir(self, alpha_id: str) -> Path:
+        return self.root / alpha_id
+
+    def _load_index(self) -> list:
+        idx_path = self.root / "registry_index.json"
+        if idx_path.exists():
+            return json.loads(idx_path.read_text())
+        return []
+
+    def _save_index(self, index: list):
+        (self.root / "registry_index.json").write_text(
+            json.dumps(index, indent=2, ensure_ascii=False)
+        )
+
+    def _find_alpha_by_name(self, name: str) -> str:
+        """通过因子名查找 Alpha ID"""
+        index = self._load_index()
+        for entry in index:
+            if entry.get("name") == name:
+                return entry.get("alpha_id", "")
+        # 回退：读每个 spec 的 name 字段
+        for entry in index:
+            aid = entry.get("alpha_id", "")
+            spec_path = self._get_alpha_dir(aid) / "alpha_spec.json"
+            if spec_path.exists():
+                try:
+                    spec = json.loads(spec_path.read_text())
+                    if spec.get("name") == name:
+                        return aid
+                except (json.JSONDecodeError, OSError):
+                    continue
+        return ""
+
+    def load_index(self) -> dict:
+        """返回 {alpha_id: entry, ...} 格式索引"""
+        raw = self._load_index()
+        return {e.get("alpha_id", ""): e for e in raw if e.get("alpha_id")}
+
+    # ── 核心：从验证结果回填 Alpha 元数据 ──────────────────
+
+    def update_alpha_from_validation(self, alpha_id: str, validation_data: dict) -> dict:
+        """从因子验证结果更新 Alpha 元数据
+
+        Args:
+            alpha_id: Alpha ID
+            validation_data: 验证结果 dict（含 ic_analysis, scoring, anti_overfit 等）
+
+        更新 spec.json 中的 ic_mean_history, peer_benchmark_result 等字段。
+        """
+        alpha_dir = self._get_alpha_dir(alpha_id)
+        spec_path = alpha_dir / "alpha_spec.json"
+        if not spec_path.exists():
+            return {"error": f"Alpha {alpha_id} 不存在"}
+
+        with open(spec_path) as f:
+            spec = json.load(f)
+
+        now = datetime.now(CST)
+        today = now.strftime("%Y-%m-%d")
+
+        updates = {}
+
+        # 1) IC 历史
+        if "ic_analysis" in validation_data:
+            ic = validation_data["ic_analysis"]
+            new_record = {
+                "date": today,
+                "ic_mean": ic.get("ic_mean"),
+                "ic_ir": ic.get("ic_ir"),
+                "pos_ratio": ic.get("pos_ratio"),
+            }
+            history = spec.get("ic_mean_history", [])
+            # 避免同一天重复写入
+            if not history or history[-1].get("date") != today:
+                history.append(new_record)
+            updates["ic_mean_history"] = history
+            updates["last_validated"] = now.isoformat()
+
+        # 2) 评分
+        if "scoring" in validation_data:
+            score_data = validation_data["scoring"]
+            updates["overall_score"] = score_data.get("overall_score")
+            updates["grade"] = score_data.get("grade")
+
+        # 3) 同行基准对比
+        if "anti_overfit" in validation_data:
+            ao = validation_data["anti_overfit"]
+            if "peer_benchmark" in ao:
+                updates["peer_benchmark_result"] = ao["peer_benchmark"]
+
+        # 4) 基准比较
+        if "benchmark_comparison" in validation_data:
+            updates["benchmark_comparison"] = validation_data["benchmark_comparison"]
+
+        # 5) Audit log
+        audit_entry = {
+            "date": today,
+            "action": "validation_backfill",
+            "source": validation_data.get("factor_name", ""),
+            "fields": list(updates.keys()),
+        }
+        audit_log = spec.get("audit_log", [])
+        audit_log.append(audit_entry)
+        updates["audit_log"] = audit_log
+
+        spec.update(updates)
+        spec["updated_at"] = now.isoformat()
+
+        with open(spec_path, "w") as f:
+            json.dump(spec, f, indent=2, ensure_ascii=False)
+
+        return {"updated": True, "fields": list(updates.keys())}
+
+    def batch_update_from_validation_dir(self, validation_dir: str) -> list[dict]:
+        """从验证结果目录批量更新 Alpha 元数据
+
+        Args:
+            validation_dir: 如 research_outputs/factor_validation/
+
+        遍历所有子目录中的 report.json，匹配 alpha name 并更新。
+        """
+        results = []
+        val_path = Path(validation_dir)
+        if not val_path.exists():
+            return [{"error": f"目录不存在: {validation_dir}"}]
+
+        for report_path in sorted(val_path.glob("*/report.json")):
+            factor_name = report_path.parent.name
+            try:
+                with open(report_path) as f:
+                    data = json.load(f)
+            except (json.JSONDecodeError, OSError) as e:
+                results.append({"factor": factor_name, "error": str(e)})
+                continue
+
+            alpha_id = self._find_alpha_by_name(factor_name)
+            if not alpha_id:
+                results.append({
+                    "factor": factor_name,
+                    "updated": False,
+                    "error": "未在 Alpha Registry 中找到对应因子",
+                })
+                continue
+
+            result = self.update_alpha_from_validation(alpha_id, data)
+            result["factor"] = factor_name
+            result["alpha_id"] = alpha_id
+            results.append(result)
+
+        return results

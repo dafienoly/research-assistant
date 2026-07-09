@@ -32,11 +32,39 @@ ALL_CODES: list[str] = []
 # ======================================================================
 
 def _load_holdings():
-    """从 datahub 管线拉取 588710 前十大重仓股（含权重）"""
+    """从 Tushare 拉取 588710 前十大重仓股（含权重），降级用 akshare"""
     global HOLDINGS, ALL_CODES
 
-    # 用 akshare 获取持仓（含权重）
+    # P1: Tushare fund_portfolio (优先, 已验证可用)
     try:
+        from factor_lab.data.tushare_client import get_ts_client
+        tc = get_ts_client()
+        df = tc._query('fund_portfolio', ts_code='588710.SH',
+                       start_date='20260331', end_date='20260630')
+        if not df.empty and 'stk_mkv_ratio' in df.columns:
+            top = df.sort_values('stk_mkv_ratio', ascending=False).head(10)
+            holdings = {}
+            for _, r in top.iterrows():
+                symbol = str(r['symbol']).strip()
+                ratio = float(r['stk_mkv_ratio'])
+                # 用 stock_basic 查名称
+                try:
+                    name_df = tc._query('stock_basic', ts_code=symbol,
+                                        fields='ts_code,name')
+                    name = str(name_df.iloc[0]['name']) if not name_df.empty else symbol
+                except Exception:
+                    name = symbol
+                holdings[symbol] = (name, ratio)
+            if len(holdings) >= 5:
+                HOLDINGS.clear()
+                HOLDINGS.update(holdings)
+                ALL_CODES.clear()
+                ALL_CODES.extend([ETF_CODE] + list(HOLDINGS.keys()))
+                return
+    except Exception as e:
+        print(f"  [Tushare 持仓获取失败, 尝试降级: {e}]")
+
+    # P2: akshare (降级)
         import akshare as ak
         from dive_prediction.proxy_bypass import call_no_proxy
         df = call_no_proxy(ak.fund_etf_fund_info_em, fund=ETF_CODE)
@@ -211,15 +239,28 @@ def get_quotes() -> dict:
     except Exception:
         pass
 
-    # P4: Tencent (免费无限量) — 再补充
-    try:
-        from provider_matrix import TencentProvider
-        tencent = TencentProvider().get_quotes(ALL_CODES)
-        for k, v in tencent.items():
-            if k not in merged or merged[k].get("price") is None:
-                merged[k] = v
-    except Exception:
-        pass
+    # P4: Tencent (免费无限量, 直连) — 填充剩余缺失
+    missing = [c for c in ALL_CODES if c not in merged or merged[c].get("price") is None]
+    for code in missing:
+        try:
+            import requests
+            # 腾讯格式: sh688012 / sz000001
+            prefix = "sz" if code.startswith(("00", "30", "15")) else "sh"
+            url = f"https://qt.gtimg.cn/q={prefix}{code[:6]}"
+            r = requests.get(url, timeout=3)
+            if r.status_code == 200:
+                parts = r.text.split("~")
+                if len(parts) >= 6:
+                    merged[code] = {
+                        "code": parts[2], "name": parts[1],
+                        "price": float(parts[3]) if parts[3] else None,
+                        "open": float(parts[5]) if parts[5] else None,
+                        "high": float(parts[33]) if len(parts) > 33 else None,
+                        "low": float(parts[34]) if len(parts) > 34 else None,
+                        "change_pct": float(parts[32]) if len(parts) > 32 else None,
+                    }
+        except Exception:
+            pass
 
     return merged
 

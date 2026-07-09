@@ -31,7 +31,7 @@ for pyfile in $STAGED_PY; do
     fi
 
     # 基础风格检查：tab vs 空格混用
-    grep -Pn "^\t+ " "$pyfile" >/dev/null 2>&1 && grep -Pn "^ +\t" "$pyfile" >/dev/null 2>&1
+    grep -Pn "^\t+ " "$pyfile" >/dev/null 2>&1 || grep -Pn "^ +\t" "$pyfile" >/dev/null 2>&1
     if [ $? -eq 0 ]; then
         echo "⚠️  [pre-commit] 缩进混用 (tab+空格): $pyfile"
         # 不因此阻止 commit，仅警告
@@ -42,6 +42,17 @@ if [ $HAS_ERROR -ne 0 ]; then
     echo "❌ [pre-commit] 语法检查未通过，提交已阻止"
     echo "   修复后重新 git add + git commit"
     exit 1
+fi
+
+# 检查技能有变更 → 刷新手册
+SCRIPT=/home/ly/.hermes/research-assistant/commands/scripts/refresh_manual.py
+if [ -f "$SCRIPT" ]; then
+    $VENV $SCRIPT --check >/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        # 有变更，执行刷新并提示
+        $VENV $SCRIPT --force >/dev/null 2>&1 && \
+            echo "📖 [pre-commit] 技能索引已同步到 docs/HERMES_RESEARCH_MANUAL.md"
+    fi
 fi
 
 exit 0

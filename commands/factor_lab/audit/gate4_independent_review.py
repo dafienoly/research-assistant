@@ -22,10 +22,7 @@ from pathlib import Path
 from typing import Optional
 
 from .base import AuditFinding, AuditReport, Severity
-
-BASE = Path(os.environ.get("RESEARCH_ASSISTANT_ROOT",
-                           "/home/ly/.hermes/research-assistant"))
-COMMANDS = BASE / "commands"
+from .git_utils import get_all_changed_files, BASE, COMMANDS
 
 
 # ─── Git 辅助 ───────────────────────────────────────────────────
@@ -43,23 +40,7 @@ def _git_diff_text() -> str:
 
 
 def _git_diff_files() -> list[str]:
-    files: set[str] = set()
-    for cmd in [["git", "diff", "--name-only"], ["git", "diff", "--cached", "--name-only"]]:
-        try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=10, cwd=str(BASE))
-            if r.returncode == 0:
-                files.update(r.stdout.strip().splitlines())
-        except Exception:
-            pass
-    if not files:
-        try:
-            r = subprocess.run(["git", "diff", "--name-only", "HEAD~3", "HEAD"],
-                               capture_output=True, text=True, timeout=10, cwd=str(BASE))
-            if r.returncode == 0:
-                files.update(r.stdout.strip().splitlines())
-        except Exception:
-            pass
-    return sorted(f for f in files if f.strip())
+    return get_all_changed_files()
 
 
 def _get_recent_plans() -> str:

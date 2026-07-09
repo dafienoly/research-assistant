@@ -2,6 +2,7 @@
 import os, json
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 from factor_lab.live.account_profile import get_board, is_self_tradable, ACCOUNT_PROFILE as AP
 
 CST = timezone(timedelta(hours=8))
@@ -12,12 +13,36 @@ SLIPPAGE_BPS = 10
 LOT_SIZE = 100
 
 
+# ── 整手规则工具 ──────────────────────────────────────────
+
+def round_to_lot_size(shares: int, lot_size: int = LOT_SIZE) -> int:
+    """将股数截断到指定整手数的整数倍
+
+    规则:
+        1. 始终向下取整 (截断, 不四舍五入)
+        2. 如果截断后为 0, 至少返回 1 手
+        3. 对于 sell 订单, 外部调用方应额外 min(实际持仓)
+
+    Args:
+        shares: 原始股数
+        lot_size: 每手股数 (A 股默认 100)
+
+    Returns:
+        整手倍数股数
+    """
+    if shares <= 0:
+        return 0
+    lots = shares // lot_size
+    return lots * lot_size if lots > 0 else lot_size
+
+
 def generate_order_preview(
     date: str,
     plan: str = "B",
     rebalance_dir: str = None,
     capital: float = 50000,
     current_prices: dict = None,
+    risk_manager: Optional["MultiLayerRiskManager"] = None,  # V3.5.3 新增
 ) -> dict:
     """从 rebalance_diff 生成委托预览"""
     # 加载 rebalance diff
@@ -55,11 +80,12 @@ def generate_order_preview(
         source = src.get("source", "unknown")
         manual_confirm = src.get("manual_confirm", False)
 
-        # 股数
+        # 股数 — 强制整手规则 (100股整数倍截断)
         target_shares = int(src.get("target_shares", 100))
-        order_shares = (target_shares // LOT_SIZE) * LOT_SIZE or LOT_SIZE
+        order_shares = round_to_lot_size(target_shares)
         if side == "sell":
             order_shares = min(order_shares, int(src.get("shares", 0)))
+            order_shares = round_to_lot_size(order_shares)
 
         # 价格
         ref_price = current_prices.get(sym, 10.0) if current_prices else 10.0
@@ -112,6 +138,25 @@ def generate_order_preview(
         }
         orders.append(order)
 
+    # 风控检查（V3.5.3 新增）
+    if risk_manager:
+        risk_context = {
+            "positions": _build_position_context(orders),
+            "capital": capital,
+            "daily_pnl": _current_pnl() or 0,
+            "drawdown": _current_drawdown() or 0,
+        }
+        risk_result = risk_manager.apply_rules(risk_context)
+
+        if risk_result["blocked"]:
+            # 阻断所有买入订单
+            for o in orders:
+                if o.get("side") == "buy" and not o.get("tradable", False):
+                    continue
+                o["tradable"] = False
+                o["block_reason"] = "; ".join(risk_result["blocker_reasons"])
+                o["risk_level"] = "blocked"
+
     result = {
         "date": date,
         "plan": plan,
@@ -132,6 +177,45 @@ def generate_order_preview(
     }
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# V3.5.3 辅助函数
+# ---------------------------------------------------------------------------
+def _build_position_context(orders: list) -> dict:
+    """从订单列表提取持仓信息
+    
+    Returns {symbol: {"weight": ..., "unrealized_pnl_pct": ...}}
+    """
+    total_amount = sum(o.get("estimated_amount", 0) for o in orders if o["side"] == "buy")
+    positions = {}
+    for o in orders:
+        sym = o["symbol"]
+        if sym not in positions:
+            amount = o.get("estimated_amount", 0)
+            positions[sym] = {
+                "weight": amount / total_amount if total_amount > 0 else 0,
+                "unrealized_pnl_pct": 0,  # 无实时盈亏数据时默认0
+            }
+    return positions
+
+
+def _current_pnl() -> float:
+    """获取当日盈亏比例（暂无实时数据源时返回 0）"""
+    try:
+        # TODO: 接入实时模拟盘/交易所盈亏数据
+        return 0.0
+    except Exception:
+        return 0.0
+
+
+def _current_drawdown() -> float:
+    """获取当前回撤比例（暂无实时数据源时返回 0）"""
+    try:
+        # TODO: 接入回测器/模拟盘回撤数据
+        return 0.0
+    except Exception:
+        return 0.0
 
 
 def generate_order_report(result: dict, output_dir: str):

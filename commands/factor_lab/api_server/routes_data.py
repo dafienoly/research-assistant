@@ -8,8 +8,13 @@ from pathlib import Path
 import json
 import os
 
+from datetime import datetime, timezone, timedelta
+
+from factor_lab.api_server.response import api_response, api_success
 from factor_lab.data_source.registry import DataRegistry
 from factor_lab.data_source.health import HealthTracker
+
+CST = timezone(timedelta(hours=8))
 
 router = APIRouter()
 
@@ -51,7 +56,7 @@ async def data_overview():
     blocking_gaps = gaps.get("summary", {}).get("blocking_gaps", 0)
     total_gaps = gaps.get("summary", {}).get("total_gaps", 0)
 
-    return {
+    return api_success(data={
         "checked_at": freshness.get("check_time", ""),
         "summary": {
             "total_sources": total,
@@ -63,7 +68,7 @@ async def data_overview():
             "freshness_status": freshness_status,
             "total_gaps": total_gaps,
         },
-    }
+    })
 
 
 @router.get("/data/providers")
@@ -120,9 +125,7 @@ async def data_providers(source_id: str = None):
         })
 
     return {
-        "checked_at": __import__("datetime").datetime.now(
-            __import__("datetime").timezone(__import__("datetime").timedelta(hours=8))
-        ).isoformat(),
+        "checked_at": datetime.now(CST).isoformat(),
         "total": len(results),
         "sources": results,
     }
@@ -208,3 +211,131 @@ def _run_gap_report() -> dict:
             "summary": {"total_gaps": 0, "blocking_gaps": 0, "partial_gaps": 0, "blocking_codex": False},
             "error": str(e),
         }
+
+
+# =========================================================================
+# /api/data/coverage — 数据覆盖扫描
+# /api/data/manifests — 数据清单
+# 前端 DataStatus.tsx 依赖这两个端点
+# =========================================================================
+
+
+@router.get("/data/coverage")
+async def data_coverage():
+    """扫描数据目录，返回各数据集的覆盖统计"""
+    import csv
+    from pathlib import Path
+
+    base = Path(__file__).resolve().parent.parent.parent.parent  # .../research-assistant/
+    data_dir = base / "data"
+    kline_dir = data_dir / "market" / "daily_kline"
+    norm_dir = data_dir / "normalized"
+    fund_flow_dir = norm_dir / "fund_flow"
+    market_dir = norm_dir / "market"
+
+    coverage = []
+    total_stocks = 0
+    total_rows = 0
+
+    # K线日线
+    if kline_dir.exists():
+        kfiles = sorted(kline_dir.glob("*_daily_kline.csv"))
+        if kfiles:
+            all_dates = []
+            for f in kfiles:
+                with open(f, newline="") as fh:
+                    reader = csv.DictReader(fh)
+                    rows = list(reader)
+                    dates = [r.get("timeString", "") for r in rows if r.get("timeString")]
+                    all_dates.extend(dates)
+            valid = [d for d in all_dates if d]
+            coverage.append({
+                "dataset": "daily_kline",
+                "stock_count": len(kfiles),
+                "row_count": len(all_dates),
+                "trade_days": [min(valid), max(valid)] if valid else ["", ""],
+                "latest_date": max(valid) if valid else "",
+                "missing_rate": 0,
+            })
+            total_stocks += len(kfiles)
+            total_rows += len(all_dates)
+
+    # 个股资金流
+    if fund_flow_dir.exists():
+        ffiles = sorted(fund_flow_dir.glob("*.csv"))
+        if ffiles:
+            coverage.append({
+                "dataset": "fund_flow",
+                "stock_count": len(ffiles),
+                "row_count": 0,
+                "trade_days": ["", ""],
+                "latest_date": "",
+                "missing_rate": round((1 - len(ffiles) / 5863) * 100, 1),
+            })
+            total_stocks += len(ffiles)
+
+    # 个股估值
+    if market_dir.exists():
+        mfiles = sorted(market_dir.glob("valuation_*.csv"))
+        if mfiles:
+            coverage.append({
+                "dataset": "valuation",
+                "stock_count": len(mfiles),
+                "row_count": 0,
+                "trade_days": ["", ""],
+                "latest_date": "",
+                "missing_rate": 0,
+            })
+            total_stocks += len(mfiles)
+
+    return api_success(data={
+        "coverage": coverage,
+        "total_stocks": total_stocks,
+        "total_rows": total_rows,
+    })
+
+
+@router.get("/data/manifests")
+async def data_manifests():
+    """读取 data/manifest.json 和其他清单文件"""
+    from pathlib import Path
+
+    base = Path(__file__).resolve().parent.parent.parent.parent
+    data_dir = base / "data"
+    manifest_file = data_dir / "manifest.json"
+
+    manifests = []
+
+    if manifest_file.exists():
+        with open(manifest_file) as f:
+            m = json.load(f)
+        manifests.append({
+            "manifest_id": "main",
+            "source_id": "kline_refresh",
+            "dataset": "daily_kline",
+            "file": str(manifest_file),
+            "record_count": m.get("summary", {}).get("total_kline_files", 0),
+            "file_size": manifest_file.stat().st_size,
+            "file_hash": "",
+            "created_at": m.get("generated_at", ""),
+            "lineage": ["Tushare daily"],
+            "children": [f["file"] for f in m.get("files_analyzed", [])][:20],
+        })
+
+    # universes.json
+    uf = data_dir / "universes.json"
+    if uf.exists():
+        manifests.append({
+            "manifest_id": "universes",
+            "source_id": "universe_builder",
+            "dataset": "universe",
+            "file": str(uf),
+            "record_count": uf.stat().st_size,
+            "file_size": uf.stat().st_size,
+            "file_hash": "",
+            "created_at": datetime.fromtimestamp(uf.stat().st_mtime, tz=CST).isoformat(),
+            "lineage": ["Tushare stock_basic", "Tushare daily_basic"],
+            "children": ["U0", "U1", "U2", "U3", "U4", "ETF"],
+        })
+
+    return api_success(data={"manifests": manifests})

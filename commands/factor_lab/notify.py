@@ -1,20 +1,132 @@
-"""企业微信通知工具 — 任务完成时推送提醒
+"""企业微信通知工具 — 任务完成推送 + 风控事件通知 + 每日摘要 + 盘前信号摘要
 
 用法:
     from factor_lab.notify import notify_goal_done
     notify_goal_done("V1.7 策略验证", "ret5+close_gt_ma20 gate 全面超越基线")
 
+    from factor_lab.notify import notify_risk_event, notify_risk_summary
+    notify_risk_event("drawdown_exceeded", "最大回撤超过阈值", severity="critical")
+    notify_risk_summary({"date": "2026-07-08", ...})
+
+    from factor_lab.notify import notify_signal_summary
+    notify_signal_summary("2026-07-08", "momentum_strategy", 15, 3, [...])
+
 环境变量:
     WECHAT_WEBHOOK_URL — 企业微信机器人 webhook (已在 .bashrc 中)
 """
-import os, json, urllib.request
+import json
+import logging
+import os
+import subprocess
+import urllib.request
 from datetime import datetime, timezone, timedelta
 
 CST = timezone(timedelta(hours=8))
 
+# ---------------------------------------------------------------------------
+# 风控通知配置
+# ---------------------------------------------------------------------------
+_COLORS = {
+    "info": "info",
+    "warning": "warning",
+    "critical": "warning",
+    "blocker": "warning",
+}
+_SEVERITY_LABELS = {
+    "info": "ℹ️ 信息",
+    "warning": "⚠️ 警告",
+    "critical": "🚨 严重",
+    "blocker": "🛑 阻断",
+}
+_last_sent: dict = {}  # 冷却缓存 {event_key: timestamp}
+
+
+def _get_webhook() -> str:
+    """获取企业微信 webhook URL。
+
+    优先从环境变量读取，失败时尝试从 .bashrc 加载。
+    """
+    webhook = os.environ.get("WECHAT_WEBHOOK_URL", "")
+    if webhook:
+        return webhook
+    try:
+        r = subprocess.run(
+            ["bash", "-c", "source ~/.bashrc && echo $WECHAT_WEBHOOK_URL"],
+            capture_output=True, text=True, timeout=5,
+        )
+        webhook = r.stdout.strip()
+    except Exception:
+        logging.warning("notify: failed to read WECHAT_WEBHOOK_URL from .bashrc")
+    return webhook
+
+
+def _send_wecom_markdown(title: str, content: str) -> bool:
+    """发送企业微信 Markdown 消息（通用函数）。
+
+    Args:
+        title: 消息标题（仅用于日志，企业微信 markdown 中不单独显示标题）
+        content: Markdown 正文内容（最大 4096 字节）
+
+    Returns:
+        True 发送成功，False 发送失败或无 webhook 配置。
+    """
+    webhook = _get_webhook()
+    if not webhook:
+        print("⚠️ WECHAT_WEBHOOK_URL 未配置, 跳过企业微信通知")
+        return False
+
+    # 企业微信 Markdown 消息最大 4096 字节，超长截断
+    content_bytes = content.encode("utf-8")
+    if len(content_bytes) > 4096:
+        # 截断到 4000 字节再补截断标记
+        content = content_bytes[:4000].decode("utf-8", errors="ignore") + "\n\n> ⚠️ 内容已截断（原消息超 4096 字节）"
+
+    payload = json.dumps({
+        "msgtype": "markdown",
+        "markdown": {"content": content},
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        webhook,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            body = resp.read().decode()
+        print(f"✅ 企业微信通知已发送: {title}")
+        return True
+    except Exception as e:
+        print(f"⚠️ 企业微信通知失败 ({title}): {e}")
+        return False
+
+
+def _check_cooldown(event_key: str, cooldown_seconds: int = 300) -> bool:
+    """冷却检查，相同 event_key 在冷却期内不重复发送。
+
+    使用内存 dict 做冷却缓存，进程重启后冷却重置。
+
+    Args:
+        event_key: 事件唯一键（如 "kill_switch_triggered" 或 "daily_summary_2026-07-08"）
+        cooldown_seconds: 冷却秒数（默认 300 秒 / 5 分钟）
+
+    Returns:
+        True 表示在冷却期内（应跳过发送），False 表示可以发送。
+    """
+    import time
+    now = time.time()
+    last = _last_sent.get(event_key)
+    if last is not None and (now - last) < cooldown_seconds:
+        remaining = int(cooldown_seconds - (now - last))
+        print(f"⏳ {event_key} 在冷却期内（剩余 {remaining}s），跳过重复发送")
+        return True  # 冷却中
+    _last_sent[event_key] = now
+    return False  # 可以发送
+
 
 def notify_goal_done(goal_name: str, summary: str = "", status: str = "completed"):
-    """推送长任务完成通知到企业微信
+    """推送长任务完成通知到企业微信。
 
     仅在耗时较长的后台任务完成后调用, 通知用户回到 Hermes 会话查看结果。
 
@@ -23,19 +135,7 @@ def notify_goal_done(goal_name: str, summary: str = "", status: str = "completed
         summary:   摘要 (如 "ret5+ma20_gate Sharpe+26%")
         status:    completed / failed / partial
     """
-    webhook = os.environ.get("WECHAT_WEBHOOK_URL")
-    if not webhook:
-        # 从 .bashrc 直接读取
-        import subprocess
-        try:
-            r = subprocess.run(
-                ["bash", "-c", "source ~/.bashrc && echo $WECHAT_WEBHOOK_URL"],
-                capture_output=True, text=True, timeout=5
-            )
-            webhook = r.stdout.strip()
-        except Exception:
-            import logging; logging.warning('notify: webhook failed')
-
+    webhook = _get_webhook()
     if not webhook:
         print("⚠️ WECHAT_WEBHOOK_URL 未配置, 跳过企业微信通知")
         return
@@ -50,11 +150,11 @@ def notify_goal_done(goal_name: str, summary: str = "", status: str = "completed
     )
     if summary:
         content += f"> {summary}\n"
-    content += f"> 请回到 Hermes 会话查看详细结果\n"
+    content += "> 请回到 Hermes 会话查看详细结果\n"
 
     payload = json.dumps({
         "msgtype": "markdown",
-        "markdown": {"content": content}
+        "markdown": {"content": content},
     }).encode("utf-8")
 
     req = urllib.request.Request(
@@ -69,3 +169,141 @@ def notify_goal_done(goal_name: str, summary: str = "", status: str = "completed
         print(f"✅ 企业微信通知已发送: {goal_name}")
     except Exception as e:
         print(f"⚠️ 企业微信通知失败: {e}")
+
+
+def notify_risk_event(
+    event_type: str,
+    detail: str,
+    severity: str = "warning",
+    symbol: str | None = None,
+    value: float | None = None,
+    threshold: float | None = None,
+) -> bool:
+    """推送风控事件到企业微信。
+
+    参数:
+        event_type: 事件类型标识（如 "drawdown_exceeded", "position_concentration"）
+        detail:     事件详细描述
+        severity:   严重级别: info / warning / critical / blocker
+        symbol:     关联标的代码（可选）
+        value:      当前实际值（可选）
+        threshold:  阈值（可选）
+
+    Returns:
+        True 发送成功，False 发送失败或在冷却期内。
+    """
+    # 冷却检查：同一 event_type 5 分钟内不重复发送
+    if _check_cooldown(f"risk_event:{event_type}", cooldown_seconds=300):
+        return False
+
+    label = _SEVERITY_LABELS.get(severity, "ℹ️ 信息")
+    color = _COLORS.get(severity, "info")
+    now = datetime.now(CST).strftime("%H:%M:%S")
+
+    lines = [
+        f"**{label} 风控事件**",
+        f"> 事件类型: {event_type}",
+        f"> 时间: {now}",
+        f"> 详情: {detail}",
+    ]
+    if symbol:
+        lines.append(f"> 标的: {symbol}")
+    if value is not None:
+        lines.append(f"> 当前值: {value}")
+    if threshold is not None:
+        lines.append(f"> 阈值: {threshold}")
+
+    content = "\n".join(lines)
+    return _send_wecom_markdown(f"[{severity.upper()}] {event_type}", content)
+
+
+def notify_risk_summary(summary: dict) -> bool:
+    """推送每日风控总结到企业微信。
+
+    Args:
+        summary: 风控摘要字典，包含:
+            - date: 日期字符串 "2026-07-08"
+            - total_checks: 总检查项数
+            - passed: 通过数
+            - warnings: 警告数
+            - blockers: 阻断数
+            - kill_switch_state: kill switch 状态
+            - top_events: 重要事件列表（最多 5 条）
+
+    Returns:
+        True 发送成功，False 发送失败。
+    """
+    date_str = summary.get("date", datetime.now(CST).strftime("%Y-%m-%d"))
+
+    # 冷却检查：每日摘要一天只发一次
+    if _check_cooldown(f"daily_summary:{date_str}", cooldown_seconds=86400):
+        return False
+
+    total = summary.get("total_checks", 0)
+    passed = summary.get("passed", 0)
+    warnings = summary.get("warnings", 0)
+    blockers = summary.get("blockers", 0)
+    ks_state = summary.get("kill_switch_state", "armed")
+
+    status_icon = "🟢" if blockers == 0 else "🔴"
+    lines = [
+        f"**{status_icon} 每日风控摘要 — {date_str}**",
+        "",
+        f"> 检查总数: **{total}**",
+        f"> ✅ 通过: {passed}",
+        f"> ⚠️ 警告: {warnings}",
+        f"> 🛑 阻断: {blockers}",
+        f"> Kill Switch: **{ks_state.upper()}**",
+    ]
+
+    top_events = summary.get("top_events", [])
+    if top_events:
+        lines.append("")
+        lines.append("**TOP 事件:**")
+        for i, evt in enumerate(top_events[:5], 1):
+            lines.append(f"> {i}. {evt}")
+
+    content = "\n".join(lines)
+    return _send_wecom_markdown(f"每日风控摘要 {date_str}", content)
+
+
+def notify_signal_summary(
+    signal_date: str,
+    strategy: str,
+    n_candidates: int,
+    n_blocked: int,
+    top5: list,
+) -> bool:
+    """推送盘前信号摘要到企业微信。
+
+    Args:
+        signal_date: 信号日期 "2026-07-08"
+        strategy:    策略名称
+        n_candidates: 候选信号总数
+        n_blocked:   被风控阻断数
+        top5:        前 5 信号简要列表（每项为字符串）
+
+    Returns:
+        True 发送成功，False 发送失败。
+    """
+    # 盘前信号可按日期冷却，一天最多发几次（设 3600s 冷却避免短时重复）
+    if _check_cooldown(f"signal_summary:{signal_date}:{strategy}", cooldown_seconds=3600):
+        return False
+
+    active = n_candidates - n_blocked
+    lines = [
+        f"**📊 盘前信号摘要 — {signal_date}**",
+        f"> 策略: **{strategy}**",
+        f"> 候选信号: {n_candidates}",
+        f"> 风控阻断: {n_blocked}",
+        f"> 有效信号: {active}",
+    ]
+
+    if top5:
+        lines.append("")
+        lines.append("**TOP 5 信号:**")
+        for i, sig in enumerate(top5[:5], 1):
+            lines.append(f"> {i}. {sig}")
+
+    content = "\n".join(lines)
+    return _send_wecom_markdown(f"盘前信号 {strategy} {signal_date}", content)

@@ -9,11 +9,12 @@
 
 可通过环境变量 HERMES_REPORTS_BASE 自定义报告根目录，默认 /mnt/d/HermesReports。
 """
-import json, os, shutil
+import json, os, shutil, asyncio
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from fastapi import APIRouter, Query
+from factor_lab.api_server.response import api_success, api_error
 
 CST = timezone(timedelta(hours=8))
 
@@ -81,6 +82,28 @@ def _file_age_hours(path: Path) -> float:
     return (datetime.now(CST).timestamp() - path.stat().st_mtime) / 3600
 
 
+# ─── TTL Cache helper ────────────────────────────────────────────
+_CACHE_TTL = 120  # 2 分钟缓存
+_cache: dict[str, tuple[float, list[dict]]] = {}
+
+
+def _cached_discover(key: str, discover_fn, ttl: int = _CACHE_TTL) -> list[dict]:
+    """带 TTL 的缓存包装器。"""
+    now = datetime.now(CST).timestamp()
+    if key in _cache:
+        ts, data = _cache[key]
+        if (now - ts) < ttl:
+            return data
+    result = discover_fn()
+    _cache[key] = (now, result)
+    return result
+
+
+def _clear_cache():
+    """清除所有缓存（测试用）。"""
+    _cache.clear()
+
+
 def _suffix_popular(report_type: str) -> tuple:
     """返回 (display_name, icon)"""
     M = {
@@ -123,7 +146,7 @@ def _discover_backtest_reports() -> list[dict]:
             "name": meta.get("strategy_name", meta.get("factor_name", sub.name)),
             "factor": meta.get("factor_name", ""),
             "created_at": meta.get("generated_at", datetime.fromtimestamp(sub.stat().st_mtime, tz=CST).isoformat()),
-            "size_bytes": sum(f.stat().st_size for f in sub.iterdir() if f.is_file()) if sub.exists() else 0,
+            "size_bytes": 0,  # 轻量计算：不递归扫描大目录
             "metrics": {
                 "sharpe": meta.get("sharpe"),
                 "cagr": meta.get("cagr"),
@@ -168,11 +191,17 @@ def _discover_strategy_reports() -> list[dict]:
 
 
 def _discover_version_reports() -> list[dict]:
-    """发现所有版本完成报告（JSON）"""
+    """发现所有版本完成报告（JSON），带 60s TTL 缓存"""
+    ttl = 60
+    now = datetime.now(CST).timestamp()
+    if _discover_version_reports._cache and (now - _discover_version_reports._ts) < ttl:
+        return _discover_version_reports._cache
     base = _get_reports_base()
     results = []
     vr_dir = base / "version_reports"
     if not vr_dir.exists():
+        _discover_version_reports._cache = results
+        _discover_version_reports._ts = now
         return results
     for f in sorted(vr_dir.iterdir(), reverse=True):
         if not f.is_file() or f.suffix != ".json":
@@ -183,12 +212,10 @@ def _discover_version_reports() -> list[dict]:
             data = json.loads(f.read_text())
         except (json.JSONDecodeError, OSError):
             continue
-        # 兼容 completion_ 和 version_report_ 两种前缀
         is_completion = f.name.startswith("completion_")
         version = data.get("version", "")
         name = data.get("name", "")
         status = data.get("status", "completed" if is_completion else "report")
-        # completion 文件包含 commits / files_changed
         commits = data.get("commits", [])
         files_changed = data.get("files_changed", [])
         results.append({
@@ -205,7 +232,11 @@ def _discover_version_reports() -> list[dict]:
             "files_changed": files_changed,
             "path": str(f),
         })
+    _discover_version_reports._cache = results
+    _discover_version_reports._ts = now
     return results
+_discover_version_reports._cache = None
+_discover_version_reports._ts = 0
 
 
 def _discover_session_backups() -> list[dict]:
@@ -281,10 +312,10 @@ _REPORT_DISCOVERERS = {
 
 
 def _discover_all() -> list[dict]:
-    """发现所有类型的报告"""
+    """发现所有类型的报告（带缓存）"""
     all_reports = []
-    for discoverer in _REPORT_DISCOVERERS.values():
-        all_reports.extend(discoverer())
+    for key, discoverer in _REPORT_DISCOVERERS.items():
+        all_reports.extend(_cached_discover(key, discoverer))
     # 按创建时间倒序
     all_reports.sort(key=lambda r: r.get("created_at", ""), reverse=True)
     return all_reports
@@ -299,7 +330,7 @@ async def reports_health():
     """报告中心健康检查"""
     h = _healthy()
     status = "ok" if h["exists"] else "unavailable"
-    return {"status": status, **h}
+    return api_success(data={"status": status, **h})
 
 
 @router.get("/reports/summary")
@@ -307,17 +338,16 @@ async def reports_summary():
     """报告中心概览统计"""
     if not _ensure_base():
         base = _get_reports_base()
-        return {
+        return api_success(data={
             "total": 0, "by_type": {}, "recent_7d": 0,
             "total_size_mb": 0.0, "report_base": str(base),
-            "error": "reports base not accessible",
             "generated_at": datetime.now(CST).isoformat(),
-        }
-    backtests = _discover_backtest_reports()
-    strategies = _discover_strategy_reports()
-    versions = _discover_version_reports()
-    sessions = _discover_session_backups()
-    roadmaps = _discover_roadmap_backups()
+        })
+    backtests = _cached_discover("backtest", _discover_backtest_reports)
+    strategies = _cached_discover("strategy", _discover_strategy_reports)
+    versions = _cached_discover("version", _discover_version_reports)
+    sessions = _cached_discover("session", _discover_session_backups)
+    roadmaps = _cached_discover("roadmap", _discover_roadmap_backups)
 
     total = len(backtests) + len(strategies) + len(versions) + len(sessions) + len(roadmaps)
 
@@ -334,12 +364,14 @@ async def reports_summary():
             except (ValueError, TypeError):
                 pass
 
-    # 总大小
-    total_bytes = sum(
-        r.get("size_bytes", 0) for r in [*backtests, *strategies, *versions, *sessions, *roadmaps]
-    )
+    # 总大小（轻量计算，只取第一层）
+    total_bytes = 0
+    for r in [*backtests, *strategies, *versions, *sessions, *roadmaps]:
+        size = r.get("size_bytes", 0)
+        if isinstance(size, (int, float)):
+            total_bytes += size
 
-    return {
+    return api_success(data={
         "total": total,
         "by_type": {
             "backtest": len(backtests),
@@ -352,7 +384,7 @@ async def reports_summary():
         "total_size_mb": round(total_bytes / (1024 * 1024), 1),
         "report_base": str(_get_reports_base()),
         "generated_at": datetime.now(CST).isoformat(),
-    }
+    })
 
 
 @router.get("/reports")
@@ -364,17 +396,18 @@ async def list_reports(
 ):
     """列出报告，支持类型过滤和分页"""
     if not _ensure_base():
-        return {"total": 0, "offset": offset, "limit": limit, "type": type or "all",
-                "display_name": "全部报告", "icon": "📁", "reports": [],
-                "error": "reports base not accessible"}
+        return api_success(data={
+            "total": 0, "offset": offset, "limit": limit, "type": type or "all",
+            "display_name": "全部报告", "icon": "📁", "reports": [],
+        })
     if type and type in _REPORT_DISCOVERERS:
-        all_reports = _REPORT_DISCOVERERS[type]()
+        all_reports = _cached_discover(type, _REPORT_DISCOVERERS[type])
     else:
         all_reports = _discover_all()
     total = len(all_reports)
     page = all_reports[offset:offset + limit]
     display_name, icon = _suffix_popular(type or "all")
-    return {
+    return api_success(data={
         "total": total,
         "offset": offset,
         "limit": limit,
@@ -382,28 +415,28 @@ async def list_reports(
         "display_name": display_name,
         "icon": icon,
         "reports": page,
-    }
+    })
 
 
 @router.get("/reports/backtest")
 async def list_backtest_reports(limit: int = Query(50, ge=1, le=200)):
     """列出所有回测报告"""
-    reports = _discover_backtest_reports()
-    return {"total": len(reports), "reports": reports[:limit]}
+    reports = _cached_discover("backtest", _discover_backtest_reports)
+    return api_success(data={"total": len(reports), "reports": reports[:limit]})
 
 
 @router.get("/reports/strategy")
 async def list_strategy_reports(limit: int = Query(50, ge=1, le=200)):
     """列出所有策略报告"""
-    reports = _discover_strategy_reports()
-    return {"total": len(reports), "reports": reports[:limit]}
+    reports = _cached_discover("strategy", _discover_strategy_reports)
+    return api_success(data={"total": len(reports), "reports": reports[:limit]})
 
 
 @router.get("/reports/version")
 async def list_version_reports(limit: int = Query(50, ge=1, le=200)):
     """列出所有版本报告"""
-    reports = _discover_version_reports()
-    return {"total": len(reports), "reports": reports[:limit]}
+    reports = _cached_discover("version", _discover_version_reports)
+    return api_success(data={"total": len(reports), "reports": reports[:limit]})
 
 
 @router.get("/reports/detail/{report_type}/{report_id:path}")
@@ -477,7 +510,7 @@ async def recent_reports(hours: int = Query(48, ge=1, le=720)):
                 recent.append(r)
         except (ValueError, TypeError):
             continue
-    return {"hours": hours, "total": len(recent), "reports": recent}
+    return api_success(data={"hours": hours, "total": len(recent), "reports": recent})
 
 
 # ──────────────────────────────────────────────

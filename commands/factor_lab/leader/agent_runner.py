@@ -1,4 +1,4 @@
-"""Agent Runner V2.15.2 — 可插拔后端自动执行器"""
+"""Agent Runner V2.15.3 — 可插拔后端自动执行器 (集成 AgentRouter V8.1)"""
 import os, sys, json, subprocess, traceback, shutil, threading, queue, time
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -6,6 +6,7 @@ from factor_lab.leader.workloop import (
     acquire_lock, release_lock, is_locked,
     write_completion, read_completion, TASKS_DIR,
 )
+from factor_lab.leader.agent_router import AgentRouter, TaskProfile, RouteStrategy, TaskRoute
 
 CST = timezone(timedelta(hours=8))
 REPO_ROOT = Path("/home/ly/.hermes/research-assistant")
@@ -161,11 +162,13 @@ def _run_streaming_process(cmd, log_file: Path, input_text: str | None = None,
 
 
 class AgentRunner:
-    def __init__(self, backend: str = DEFAULT_BACKEND, interval: int = 180):
+    def __init__(self, backend: str = DEFAULT_BACKEND, interval: int = 180,
+                 router: AgentRouter | None = None):
         self.backend = backend if backend in BACKEND_PRIORITY else DEFAULT_BACKEND
         self.interval = interval
         self.run_id = ""
         self.log_dir = None
+        self.router = router or AgentRouter()
 
     def run_once(self) -> dict:
         """执行一次任务消费"""
@@ -220,8 +223,16 @@ class AgentRunner:
             prompt = _build_agent_prompt(tid, task_md, current_version)
             prompts.append(prompt)
 
+            # 通过 AgentRouter 路由选择角色和后端
+            route = self._route_task(tid, task_md, current_version)
+            if route.blocked:
+                remaining.append(tid)
+                continue
+
+            routed_backend = route.backend if route.backend != self.backend else self.backend
+
             # 调用 backend 执行
-            result = self._execute(prompt, tid)
+            result = self._execute(prompt, tid, override_backend=routed_backend)
             if result.get("success"):
                 completed.append(tid)
             else:
@@ -248,21 +259,29 @@ class AgentRunner:
         return {"status": status, "completed": completed, "remaining": remaining,
                 "log_dir": str(self.log_dir)}
 
-    def _execute(self, prompt: str, task_id: str) -> dict:
-        """根据 backend 执行任务"""
+    def _execute(self, prompt: str, task_id: str,
+                  override_backend: str | None = None) -> dict:
+        """根据 backend 执行任务
+
+        Args:
+            prompt:         Agent prompt
+            task_id:        任务 ID
+            override_backend: 路由层指定的后端 (可选，覆盖 self.backend)
+        """
+        effective_backend = override_backend or self.backend
         log_file = self.log_dir / f"{task_id}.log"
 
-        if self.backend == "dry-run":
+        if effective_backend == "dry-run":
             return self._backend_dry_run(prompt, task_id, log_file)
-        elif self.backend == "claude":
+        elif effective_backend == "claude":
             return self._backend_claude(prompt, task_id, log_file)
-        elif self.backend == "command":
+        elif effective_backend == "command":
             return self._backend_command(prompt, task_id, log_file)
-        elif self.backend == "codex":
+        elif effective_backend == "codex":
             return self._backend_codex(prompt, task_id, log_file)
-        elif self.backend == "research":
+        elif effective_backend == "research":
             return self._backend_research(prompt, task_id, log_file)
-        return {"success": False, "error": f"未知 backend: {self.backend}"}
+        return {"success": False, "error": f"未知 backend: {effective_backend}"}
 
     def _backend_dry_run(self, prompt, task_id, log_file):
         """dry-run: 只生成 prompt 和日志"""
@@ -273,10 +292,10 @@ class AgentRunner:
         """claude: --print 模式，最高思维强度 (CLAUDE_CODE_EFFORT_LEVEL=ultra)。"""
         claude_bin = os.environ.get("HERMES_CLAUDE_BIN") or shutil.which("claude") or "claude"
         _env = os.environ.copy()
-        _env["CLAUDE_CODE_EFFORT_LEVEL"] = "ultra"
         cmd = [
             claude_bin, "--print",
             "--dangerously-skip-permissions",
+            "--permission-mode", "bypassPermissions",
             "--add-dir", str(COMMANDS_DIR),
             "--model", "deepseek-v4",
         ]
@@ -368,6 +387,76 @@ class AgentRunner:
             result = self.run_once()
             print(f"  [{datetime.now(CST).strftime('%H:%M:%S')}] {result.get('status', '?')}")
             time.sleep(self.interval)
+
+    # ─── AgentRouter Integration ───────────────────────────────────
+
+    def _route_task(self, tid: str, task_md: str, version: str) -> TaskRoute:
+        """使用 AgentRouter 路由任务
+
+        从任务 Markdown 构建 TaskProfile，通过路由器选择角色和后端。
+
+        Returns:
+            TaskRoute — 包含 role_id, backend, 路由决策
+        """
+        try:
+            profile = TaskProfile.from_task_md(task_md)
+            if not profile.version:
+                profile.version = version
+            if not profile.task_id:
+                profile.task_id = tid
+            route = self.router.route(profile)
+            return route
+        except Exception as exc:
+            # 路由失败时降级到默认
+            return TaskRoute(
+                task_id=tid,
+                role_id="developer",
+                backend=self.backend,
+                strategy=RouteStrategy.DIRECT,
+                confidence=0.3,
+                reasoning=f"Routing fallback (error: {exc})",
+            )
+
+    def route_from_latest(self) -> dict:
+        """路由 latest.json 中的当前任务并返回路由结果
+
+        用于 CLI 快速查看路由决策，不实际执行任务。
+
+        Returns:
+            {"task_id": ..., "route": TaskRoute dict, ...}
+            或 {"error": ...}
+        """
+        latest = TASKS_DIR / "latest.json"
+        if not latest.exists():
+            return {"error": "latest.json 不存在"}
+
+        data = json.loads(latest.read_text())
+        run_dir = Path(data["path"])
+        tasks_json = run_dir / "tasks.json"
+        if not tasks_json.exists():
+            return {"error": "tasks.json 不存在"}
+
+        task_ids = json.loads(tasks_json.read_text())
+        version = data.get("current", "")
+        results = []
+
+        for tid in task_ids:
+            task_md = _find_task_file(run_dir / "tasks", tid)
+            if not task_md:
+                results.append({"task_id": tid, "error": "task file not found"})
+                continue
+            route = self._route_task(tid, task_md, version)
+            results.append({
+                "task_id": tid,
+                "route": route.to_dict(),
+            })
+
+        return {
+            "run_id": data["run_id"],
+            "current_version": version,
+            "routed_tasks": results,
+            "routed_at": datetime.now(CST).isoformat(),
+        }
 
 
 def _find_task_file(tasks_dir: Path, tid: str) -> str:

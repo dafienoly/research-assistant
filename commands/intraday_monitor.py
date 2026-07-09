@@ -16,11 +16,42 @@ from typing import Optional
 from datetime import datetime, timedelta
 
 from config import (
-    PATHS, CODEX_READ_ONLY, now_str, now_cst, ensure_dirs,
-    read_csv_safe, append_jsonl, safe_write_json, file_rows,
+    PATHS, CODEX_READ_ONLY, now_str, now_cst, CST, date_id, ts_id,
+    ensure_dirs, read_csv_safe, append_jsonl, safe_write_json, file_rows,
+    VENV_PYTHON,
 )
 from wechat_push import WeChatPusher, build_position_drop_notice, build_position_critical_alert
 from rsscast_mcp import fetch_stock_prices, fetch_sina_quotes
+
+# ========== V4.11 盘中低频监测常量 ==========
+
+# 半导体ETF跳水预警监测目标
+ETF_DIVE_WATCH_CODES = [
+    "512480",  # 国联安中证全指半导体ETF
+    "588290",  # 华安上证科创板芯片ETF
+    "159516",  # 国泰中证半导体材料设备ETF
+]
+
+# U3 半导体核心池静态回退代码（优先从 semiconductor_chain_tags 动态加载）
+U3_SEMICONDUCTOR_FALLBACK_CODES = [
+    "688072", "688012", "688981", "688126", "688008",
+    "002371", "002049", "300604", "300661", "603986",
+    "603501", "600703", "600745", "300782", "300223",
+]
+
+# 指数监测目标
+INDEX_WATCH_CODES = {
+    "000001": "上证指数",
+    "000688": "科创50",
+    "000300": "沪深300",
+}
+
+# 全A情绪代码（通过 sina 或 eastmoney 获取）
+WIND_A_CODE = "881001"
+
+# 成交额异常阈值
+VOLUME_ANOMALY_THRESHOLD_PCT = 30      # 当日成交额偏离20日均值 ±30% 即告警
+VOLUME_ANOMALY_ABS_THRESHOLD = 500_000_000_000  # 全A成交额低于5000亿也告警
 
 
 # ========== 规则定义 ==========
@@ -959,6 +990,770 @@ def cmd_check_once():
     print(f"总事件: {len(events)}")
 
 
+# =============================================================================
+# V4.11 盘中低频监测引擎
+# =============================================================================
+
+class LowFreqMonitor:
+    """盘中低频监测引擎 — 增强 V4.11
+
+    功能:
+    - 半导体ETF跳水预警
+    - U3半导体核心池扩散度（上涨占比）
+    - 全A情绪指标（涨跌家数比）
+    - 指数风险监测
+    - 成交额异常监测（当日 vs 20日均）
+    - 企业微信推送预警
+
+    使用方式:
+        monitor = LowFreqMonitor()
+        report = monitor.run_all()
+        print(report.summary())
+        monitor.send_wechat_alert()
+    """
+
+    def __init__(self):
+        self.ensure_dirs()
+        self.events: list[dict] = []
+        self.etf_watch_codes = ETF_DIVE_WATCH_CODES
+        self.index_codes = list(INDEX_WATCH_CODES.keys())
+        self.report_time = now_cst()
+
+        # 数据缓存
+        self.quotes: dict[str, dict] = {}  # code -> {price, change_pct, volume, amount}
+        self.index_quotes: dict[str, dict] = {}  # index_code -> {price, change_pct}
+        self.market_snapshot: dict[str, dict] = {}  # all codes snapshot
+
+        # 结果
+        self.etf_alerts: list[dict] = []
+        self.u3_diffusion: dict = {"rising": 0, "total": 0, "ratio": 0.0}
+        self.sentiment: dict = {"advance": 0, "decline": 0, "ratio": 0.0}
+        self.index_risk: list[dict] = []
+        self.volume_anomaly: dict = {}
+        self.push_results: list[dict] = []
+
+    @staticmethod
+    def ensure_dirs():
+        """确保监测数据目录存在"""
+        PATHS["intraday"].mkdir(parents=True, exist_ok=True)
+
+    # ── 数据获取 ──────────────────────────────────────────
+
+    def fetch_quotes(self, codes: list[str]) -> dict[str, dict]:
+        """从 RSScast → Sina → 本地缓存逐级获取行情
+
+        Returns:
+            {code: {price, change_pct, volume, amount, source}}
+        """
+        merged: dict[str, dict] = {}
+        if not codes:
+            return merged
+
+        # P1: RSScast MCP
+        try:
+            prices = fetch_stock_prices(codes[:50])
+            for p in prices:
+                code = str(p.get("code", ""))
+                if code:
+                    merged[code] = {
+                        "code": code,
+                        "price": p.get("last_price"),
+                        "change_pct": (p.get("change_pct", 0) or 0) * 100,
+                        "volume": p.get("volume", 0),
+                        "amount": p.get("amount", 0),
+                        "source": "rsscast",
+                    }
+        except Exception as e:
+            print(f"  ⚠️ RSScast 行情获取失败: {e}")
+
+        # P2: Sina 补充缺失
+        missing = [c for c in codes if c not in merged or merged[c].get("price") is None]
+        if missing:
+            try:
+                sina = fetch_sina_quotes(missing[:200])
+                for code, data in sina.items():
+                    if code not in merged or merged[code].get("price") is None:
+                        merged[code] = {
+                            "code": code,
+                            "price": data.get("last_price"),
+                            "change_pct": (data.get("change_pct", 0) or 0) * 100,
+                            "volume": data.get("volume", 0),
+                            "amount": data.get("amount", 0),
+                            "source": "sina",
+                        }
+            except Exception as e:
+                print(f"  ⚠️ Sina 行情获取失败: {e}")
+
+        self.quotes.update(merged)
+        return merged
+
+    def fetch_u3_codes(self) -> list[str]:
+        """动态加载 U3 半导体核心池代码"""
+        codes = []
+        try:
+            tags_csv = CODEX_READ_ONLY.get("semiconductor_chain_tags",
+                                            PATHS["tags"] / "semiconductor_chain_tags.csv")
+            rows = read_csv_safe(tags_csv)
+            for row in rows:
+                code = str(row.get("code", "")).strip()
+                tag = str(row.get("tag", "") or row.get("theme", "") or "")
+                if code and ("半导体" in tag or "芯片" in tag or "设备" in tag or "材料" in tag):
+                    codes.append(code)
+        except Exception:
+            pass
+
+        if not codes:
+            # 回退到静态列表
+            codes = list(U3_SEMICONDUCTOR_FALLBACK_CODES)
+        return codes
+
+    # ── 监测检查项 ────────────────────────────────────────
+
+    def check_etf_dive(self) -> list[dict]:
+        """1. 半导体ETF跳水预警
+
+        Returns:
+            [{"code", "name", "price", "change_pct", "alert_level", ...}]
+        """
+        alerts = []
+        quotes = self.fetch_quotes(self.etf_watch_codes)
+        for code in self.etf_watch_codes:
+            q = quotes.get(code, {})
+            if q.get("price") is None:
+                continue
+            change_pct = float(q.get("change_pct", 0) or 0)
+            price = float(q.get("price", 0) or 0)
+
+            # 跌幅 >= 2% 预警, >= 4% 严重
+            if change_pct <= -2:
+                alert = {
+                    "code": code,
+                    "name": self._etf_name(code),
+                    "price": price,
+                    "change_pct": change_pct,
+                    "volume": q.get("volume", 0),
+                    "amount": q.get("amount", 0),
+                    "alert_level": "严重" if change_pct <= -4 else "预警",
+                    "source": q.get("source", "unknown"),
+                    "monitor_type": "etf_dive",
+                    "trigger_rule": f"半导体ETF跌幅{change_pct:.1f}%",
+                }
+                alerts.append(alert)
+        self.etf_alerts = alerts
+        return alerts
+
+    def check_u3_diffusion(self) -> dict:
+        """2. U3 半导体核心池扩散度（上涨占比）
+
+        Returns:
+            {"rising": int, "total": int, "ratio": float, "stocks": [...]}
+        """
+        codes = self.fetch_u3_codes()
+        quotes = self.fetch_quotes(codes)
+        rising = 0
+        total = 0
+        stocks_detail = []
+        for code in codes:
+            q = quotes.get(code, {})
+            if q.get("change_pct") is None:
+                continue
+            change = float(q["change_pct"])
+            total += 1
+            if change > 0:
+                rising += 1
+            stocks_detail.append({
+                "code": code,
+                "change_pct": change,
+                "up": change > 0,
+            })
+
+        ratio = rising / total if total > 0 else 0.0
+        self.u3_diffusion = {
+            "rising": rising,
+            "total": total,
+            "ratio": round(ratio, 4),
+            "ratio_pct": round(ratio * 100, 1),
+            "stocks": stocks_detail,
+        }
+        return self.u3_diffusion
+
+    def check_sentiment(self) -> dict:
+        """3. 全A情绪指标（涨跌家数比）
+
+        Returns:
+            {"advance": int, "decline": int, "ratio": float, "status": str}
+        """
+        advance = 0
+        decline = 0
+        total = 0
+
+        # 尝试从 akshare 获取全A涨跌家数
+        try:
+            import akshare as ak
+            from dive_prediction.proxy_bypass import call_no_proxy
+            df = call_no_proxy(ak.stock_zh_a_spot_em)
+            if df is not None and not df.empty:
+                for _, row in df.iterrows():
+                    change = row.get("涨跌幅", None)
+                    if change is not None:
+                        total += 1
+                        if float(change) > 0:
+                            advance += 1
+                        elif float(change) < 0:
+                            decline += 1
+            else:
+                # 通过 sina 全A快照
+                try:
+                    sina = fetch_sina_quotes(["sh000001", "sz399001"])
+                    # 只能取指数, 用已有报价估
+                    pass
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # 回退: 尝试 sina 批次快照
+        if total == 0:
+            try:
+                sina = fetch_sina_quotes(["sh600000", "sh600001"])
+                # 如果 sina 也失败, 使用已有 quotes 估
+                if self.quotes:
+                    for code, q in self.quotes.items():
+                        cp = q.get("change_pct")
+                        if cp is not None:
+                            total += 1
+                            if float(cp) > 0:
+                                advance += 1
+                            elif float(cp) < 0:
+                                decline += 1
+            except Exception:
+                pass
+
+        ratio = advance / decline if decline > 0 else (advance if advance > 0 else 0)
+        if advance == 0 and decline == 0:
+            ratio = 0.0
+
+        status = "正常"
+        if ratio < 0.3 and total > 10:
+            status = "极低迷"
+        elif ratio < 0.5 and total > 10:
+            status = "低迷"
+        elif ratio > 2.0:
+            status = "过热"
+
+        self.sentiment = {
+            "advance": advance,
+            "decline": decline,
+            "total": total,
+            "ratio": round(ratio, 2),
+            "status": status,
+        }
+        return self.sentiment
+
+    def check_index_risk(self) -> list[dict]:
+        """4. 指数风险监测
+
+        Returns:
+            [{"code", "name", "price", "change_pct", "risk_level", ...}]
+        """
+        results = []
+        codes_with_prefix = []
+        # 上证指数 sh000001, 沪深300 sh000300, 科创50 sh000688
+        for code in self.index_codes:
+            prefix = "sh" if code.startswith("000") else "sz"
+            codes_with_prefix.append(f"{prefix}{code}")
+
+        quotes = self.fetch_quotes(codes_with_prefix)
+        for prefixed_code in codes_with_prefix:
+            q = quotes.get(prefixed_code, {})
+            if q.get("price") is None:
+                # 去掉前缀再试 raw code
+                bare = prefixed_code[2:] if prefixed_code[:2] in ("sh", "sz") else prefixed_code
+                q = self.quotes.get(bare, {})
+            if q.get("price") is None:
+                continue
+
+            bare = prefixed_code[2:] if prefixed_code[:2] in ("sh", "sz") else prefixed_code
+            change_pct = float(q.get("change_pct", 0) or 0)
+            name = INDEX_WATCH_CODES.get(bare, prefixed_code)
+
+            risk_level = "正常"
+            if change_pct <= -2:
+                risk_level = "风险"
+            elif change_pct <= -1:
+                risk_level = "关注"
+            elif change_pct >= 3:
+                risk_level = "过热"
+
+            result = {
+                "code": bare,
+                "name": name,
+                "price": q.get("price"),
+                "change_pct": change_pct,
+                "risk_level": risk_level,
+                "source": q.get("source", "unknown"),
+                "monitor_type": "index_risk",
+            }
+            results.append(result)
+
+        self.index_risk = results
+        return results
+
+    def check_volume_anomaly(self) -> dict:
+        """5. 成交额异常监测（当日 vs 20日均）
+
+        通过 mx:data 或 akshare 获取全市场成交额数据。
+
+        Returns:
+            {"today_volume": float, "avg_20d": float, "pct_deviation": float, "alert": bool}
+        """
+        result = {
+            "today_volume": 0.0,
+            "avg_20d": 0.0,
+            "pct_deviation": 0.0,
+            "alert": False,
+        }
+
+        # 汇总已有 quotes 中的成交额
+        total_amount = 0.0
+        count = 0
+        for code, q in self.quotes.items():
+            amt = q.get("amount")
+            if amt is not None:
+                total_amount += float(amt)
+                count += 1
+
+        # 尝试通过 mx:data 获取全A成交额
+        try:
+            import subprocess
+            mx_script = PATHS["commands"] / "mx.py"
+            if mx_script.exists():
+                r = subprocess.run(
+                    [str(VENV_PYTHON), str(mx_script), "data", "全A成交额 今日"],
+                    capture_output=True, text=True, timeout=15,
+                )
+                output = r.stdout + r.stderr
+                import re
+                # 寻找 "成交额" 后的数字
+                amount_matches = re.findall(r'(\d+\.?\d*)\s*亿', output)
+                if amount_matches:
+                    total_amount = float(amount_matches[0]) * 1e8
+        except Exception:
+            pass
+
+        today_vol = total_amount if total_amount > 0 else 0.0
+
+        # 估算20日均（使用本地缓存或默认）
+        avg_20d = 0.0
+        cache_path = PATHS["market"] / "daily_kline"
+        if cache_path.exists():
+            try:
+                kline_files = sorted(cache_path.glob("*.csv"))
+                if kline_files:
+                    import csv
+                    amounts_20d = []
+                    for kf in kline_files[-3:]:  # 最近3个文件作为样本
+                        with open(kf, encoding="utf-8-sig") as f:
+                            for row in csv.DictReader(f):
+                                amt = row.get("amount", "")
+                                if amt:
+                                    amounts_20d.append(float(amt))
+                    if amounts_20d:
+                        avg_20d = sum(amounts_20d) / len(amounts_20d)
+            except Exception:
+                pass
+
+        if avg_20d == 0 and today_vol > 0:
+            avg_20d = today_vol * 0.85  # 保守估算
+
+        pct_dev = 0.0
+        if avg_20d > 0 and today_vol > 0:
+            pct_dev = (today_vol - avg_20d) / avg_20d * 100
+
+        alert = False
+        if today_vol > 0:
+            if abs(pct_dev) >= VOLUME_ANOMALY_THRESHOLD_PCT:
+                alert = True
+            if today_vol < VOLUME_ANOMALY_ABS_THRESHOLD:
+                alert = True
+
+        result = {
+            "today_volume": round(today_vol, 2),
+            "avg_20d": round(avg_20d, 2),
+            "pct_deviation": round(pct_dev, 2),
+            "alert": alert,
+            "volume_label": self._fmt_vol(today_vol),
+            "avg_label": self._fmt_vol(avg_20d),
+        }
+        self.volume_anomaly = result
+        return result
+
+    # ── 报告生成 ──────────────────────────────────────────
+
+    def run_all(self) -> "LowFreqReport":
+        """执行所有低频检查项，返回报告对象"""
+        self.report_time = now_cst()
+
+        # 按顺序执行各项检查
+        self.check_etf_dive()
+        self.check_u3_diffusion()
+        self.check_sentiment()
+        self.check_index_risk()
+        self.check_volume_anomaly()
+
+        return LowFreqReport(self)
+
+    def build_markdown_summary(self) -> str:
+        """构建企业微信 Markdown 格式摘要"""
+        lines = [f"**📊 盘中低频监测报告 — {now_str()}**", ""]
+        dt_str = self.report_time.strftime("%Y-%m-%d %H:%M")
+        lines.append(f"> 生成时间: {dt_str}")
+        lines.append("")
+
+        # 1. ETF跳水预警
+        lines.append("**1️⃣ 半导体ETF跳水预警**")
+        if self.etf_alerts:
+            for a in self.etf_alerts:
+                icon = "🔴" if a["alert_level"] == "严重" else "🟡"
+                lines.append(
+                    f"> {icon} {a['code']} {a.get('name', '')} "
+                    f"跌幅 {a['change_pct']:.1f}% "
+                    f"级别: {a['alert_level']}"
+                )
+        else:
+            lines.append("> ✅ 正常")
+        lines.append("")
+
+        # 2. U3扩散度
+        u3 = self.u3_diffusion
+        lines.append("**2️⃣ U3半导体核心池扩散度**")
+        lines.append(
+            f"> 上涨 {u3.get('rising', 0)} / {u3.get('total', 0)} "
+            f"= {u3.get('ratio_pct', 0)}%"
+        )
+        if u3.get("total", 0) > 0:
+            r = u3.get("ratio", 0)
+            if r < 0.3:
+                lines.append("> 🔴 扩散度偏低，市场情绪弱")
+            elif r < 0.5:
+                lines.append("> 🟡 扩散度中等")
+            else:
+                lines.append("> 🟢 扩散度健康")
+        lines.append("")
+
+        # 3. 情绪指标
+        s = self.sentiment
+        lines.append("**3️⃣ 全A情绪指标**")
+        lines.append(
+            f"> 上涨 {s.get('advance', 0)} / 下跌 {s.get('decline', 0)} "
+            f"= {s.get('ratio', 0):.2f} ({s.get('status', '未知')})"
+        )
+        lines.append("")
+
+        # 4. 指数风险
+        lines.append("**4️⃣ 指数风险监测**")
+        if self.index_risk:
+            for idx in self.index_risk:
+                icon = {"风险": "🔴", "关注": "🟡", "过热": "🟡", "正常": "🟢"}.get(
+                    idx.get("risk_level", ""), "⚪"
+                )
+                cp = idx.get("change_pct", 0)
+                cp_str = f"+{cp:.1f}%" if cp >= 0 else f"{cp:.1f}%"
+                lines.append(
+                    f"> {icon} {idx.get('name', '')} ({idx['code']}) "
+                    f"{cp_str}  {idx.get('risk_level', '')}"
+                )
+        else:
+            lines.append("> ⏳ 暂无指数数据")
+        lines.append("")
+
+        # 5. 成交额异常
+        v = self.volume_anomaly
+        lines.append("**5️⃣ 成交额监测**")
+        if v.get("today_volume", 0) > 0:
+            icon = "🔴" if v.get("alert") else "🟢"
+            lines.append(
+                f"> {icon} 今日 {v.get('volume_label', '--')} "
+                f"| 20日均 {v.get('avg_label', '--')} "
+                f"| 偏离 {v.get('pct_deviation', 0):.1f}%"
+            )
+        else:
+            lines.append("> ⏳ 数据加载中...")
+        lines.append("")
+
+        # 6. 预警汇总
+        total_alerts = len(self.etf_alerts)
+        risk_count = sum(1 for r in self.index_risk if r.get("risk_level") in ("风险", "关注"))
+        vol_alert = self.volume_anomaly.get("alert", False)
+        if total_alerts > 0 or risk_count > 0 or vol_alert:
+            lines.append("**⚠️ 预警汇总**")
+            if total_alerts > 0:
+                lines.append(f"> ETF跳水预警: {total_alerts} 条")
+            if risk_count > 0:
+                lines.append(f"> 指数风险: {risk_count} 条")
+            if vol_alert:
+                lines.append("> 成交额异常: 是")
+        else:
+            lines.append("**✅ 整体评估**")
+            lines.append("> 各项指标正常，无预警")
+
+        lines.append("")
+        lines.append(f"> Hermes 低频监测 @ {now_str()}")
+        return "\n".join(lines)
+
+    def send_wechat_alert(self, dry_run: bool = True) -> list[dict]:
+        """通过企业微信推送低频监测报告
+
+        Args:
+            dry_run: True=仅打印, False=实际发送
+
+        Returns:
+            [{"channel", "sent", "summary", ...}]
+        """
+        results = []
+
+        # 1. ETF跳水预警推送 (严重级别直接推)
+        for alert in self.etf_alerts:
+            if alert["alert_level"] == "严重":
+                msg_lines = [
+                    f"🔴 ETF跳水预警",
+                    f"━━━━━━━━━━━━━━━",
+                    f"ETF: {alert['code']} {alert.get('name', '')}",
+                    f"跌幅: {alert['change_pct']:.1f}%",
+                    f"级别: {alert['alert_level']}",
+                ]
+
+                if dry_run:
+                    print("\n".join(msg_lines))
+                    results.append({"channel": "etf_dive", "sent": False, "summary": f"[DRY-RUN] {alert['code']}跳水预警"})
+                else:
+                    try:
+                        from factor_lab.notify import notify_risk_event
+                        ok = notify_risk_event(
+                            event_type=f"etf_dive_{alert['code']}",
+                            detail=f"{alert['code']} {alert.get('name', '')} 跌幅 {alert['change_pct']:.1f}%",
+                            severity="critical" if alert["alert_level"] == "严重" else "warning",
+                            symbol=alert["code"],
+                            value=alert["change_pct"],
+                        )
+                        results.append({"channel": "etf_dive", "sent": ok, "summary": alert["code"]})
+                    except Exception as e:
+                        results.append({"channel": "etf_dive", "sent": False, "summary": f"推送失败: {e}"})
+
+        # 2. 指数风险推送
+        for idx in self.index_risk:
+            if idx.get("risk_level") in ("风险",):
+                if dry_run:
+                    results.append({"channel": "index_risk", "sent": False, "summary": f"[DRY-RUN] {idx['name']}风险"})
+                else:
+                    try:
+                        from factor_lab.notify import notify_risk_event
+                        ok = notify_risk_event(
+                            event_type=f"index_risk_{idx['code']}",
+                            detail=f"{idx['name']} 跌幅 {idx['change_pct']:.1f}%",
+                            severity="warning",
+                            symbol=idx["code"],
+                            value=idx["change_pct"],
+                        )
+                        results.append({"channel": "index_risk", "sent": ok, "summary": idx["code"]})
+                    except Exception as e:
+                        results.append({"channel": "index_risk", "sent": False, "summary": f"推送失败: {e}"})
+
+        # 3. 定期报告推送 (每30分钟)
+        if not dry_run:
+            try:
+                from factor_lab.notify import _send_wecom_markdown
+                md = self.build_markdown_summary()
+                ok = _send_wecom_markdown("盘中低频监测报告", md)
+                results.append({"channel": "periodic_report", "sent": ok, "summary": "低频监测报告"})
+            except Exception as e:
+                results.append({"channel": "periodic_report", "sent": False, "summary": f"推送失败: {e}"})
+        else:
+            results.append({"channel": "periodic_report", "sent": False, "summary": "[DRY-RUN] 低频监测报告"})
+            print(f"\n🔔 [DRY-RUN] 企业微信推送预览:\n{self.build_markdown_summary()}\n")
+
+        self.push_results = results
+        return results
+
+    # ── 辅助方法 ──────────────────────────────────────────
+
+    @staticmethod
+    def _etf_name(code: str) -> str:
+        names = {
+            "512480": "国联安中证全指半导体ETF",
+            "588290": "华安上证科创板芯片ETF",
+            "159516": "国泰中证半导体材料设备ETF",
+        }
+        return names.get(code, code)
+
+    @staticmethod
+    def _fmt_vol(v: float) -> str:
+        if v <= 0:
+            return "--"
+        if v >= 1e12:
+            return f"{v/1e12:.2f}万亿"
+        if v >= 1e8:
+            return f"{v/1e8:.2f}亿"
+        return f"{v/1e4:.2f}万"
+
+
+class LowFreqReport:
+    """低频监测报告对象"""
+
+    def __init__(self, monitor: LowFreqMonitor):
+        self.monitor = monitor
+        self.generated_at = now_str()
+
+    def summary(self) -> str:
+        """打印终端摘要"""
+        m = self.monitor
+        lines = []
+        lines.append("=" * 62)
+        lines.append(f"  📊 盘后低频监测报告 @ {m.report_time.strftime('%Y-%m-%d %H:%M')}")
+        lines.append("=" * 62)
+
+        # ETF
+        lines.append(f"\n📉 半导体ETF跳水预警:")
+        if m.etf_alerts:
+            for a in m.etf_alerts:
+                lines.append(f"  {a['code']} {a.get('name','')}: {a['change_pct']:.1f}% [{a['alert_level']}]")
+        else:
+            lines.append("  ✅ 正常")
+
+        # U3
+        u3 = m.u3_diffusion
+        lines.append(f"\n🏭 U3半导体核心池扩散度:")
+        lines.append(f"  上涨 {u3.get('rising',0)}/{u3.get('total',0)} = {u3.get('ratio_pct',0)}%")
+
+        # 情绪
+        s = m.sentiment
+        lines.append(f"\n📈 全A情绪:")
+        lines.append(f"  上涨 {s.get('advance',0)} 下跌 {s.get('decline',0)} "
+                     f"比 {s.get('ratio',0):.2f} [{s.get('status','')}]")
+
+        # 指数
+        lines.append(f"\n🏛️ 指数风险:")
+        for idx in m.index_risk:
+            cp = idx.get('change_pct', 0)
+            lines.append(f"  {idx.get('name','')}: {cp:+.1f}% [{idx.get('risk_level','')}]")
+
+        # 成交额
+        v = m.volume_anomaly
+        lines.append(f"\n💰 成交额:")
+        if v.get('today_volume', 0) > 0:
+            lines.append(f"  今日 {v.get('volume_label','--')} | "
+                         f"20日均 {v.get('avg_label','--')} | "
+                         f"偏离 {v.get('pct_deviation',0):+.1f}%")
+            if v.get('alert'):
+                lines.append("  ⚠️ 成交额异常!")
+        else:
+            lines.append("  ⏳ 数据加载中")
+
+        lines.append(f"\n{'=' * 62}")
+        return "\n".join(lines)
+
+    def to_dict(self) -> dict:
+        """返回完整数据结构"""
+        m = self.monitor
+        return {
+            "generated_at": self.generated_at,
+            "etf_alerts": m.etf_alerts,
+            "u3_diffusion": m.u3_diffusion,
+            "sentiment": m.sentiment,
+            "index_risk": m.index_risk,
+            "volume_anomaly": m.volume_anomaly,
+            "push_results": m.push_results,
+        }
+
+
+# =============================================================================
+# V4.11 CLI 命令
+# =============================================================================
+
+def cmd_lowfreq_monitor():
+    """intraday:monitor — 执行一次盘中低频监测"""
+    monitor = LowFreqMonitor()
+    report = monitor.run_all()
+    print(report.summary())
+    # 写入日志
+    log_path = PATHS["intraday"] / "lowfreq_events.jsonl"
+    append_jsonl(log_path, report.to_dict())
+    print(f"📝 报告已写入: {log_path}")
+
+
+def cmd_lowfreq_risk():
+    """intraday:risk — 仅显示指数风险和成交额异常"""
+    monitor = LowFreqMonitor()
+    monitor.check_index_risk()
+    monitor.check_volume_anomaly()
+    report = LowFreqReport(monitor)
+    print(report.summary())
+
+
+def cmd_lowfreq_wechat_alert():
+    """intraday:wechat-alert — 执行监测并通过企业微信推送预警"""
+    import sys
+    dry_run = "--live" not in sys.argv
+    if dry_run:
+        print("🔔 DRY-RUN 模式 (企业微信推送仅打印，不实际发送)")
+        print("   使用 --live 参数开启实际发送")
+    else:
+        print("🔴 LIVE 模式 (将实际发送企业微信消息)")
+
+    monitor = LowFreqMonitor()
+    report = monitor.run_all()
+    print(report.summary())
+
+    # 推送
+    results = monitor.send_wechat_alert(dry_run=dry_run)
+    for r in results:
+        icon = "✅" if r["sent"] else ("🔔" if dry_run else "❌")
+        print(f"  {icon} {r['channel']}: {r['summary']}")
+
+    # 写入日志
+    log_path = PATHS["intraday"] / "lowfreq_events.jsonl"
+    append_jsonl(log_path, report.to_dict())
+    print(f"📝 报告已写入: {log_path}")
+
+
+def cmd_lowfreq_watch():
+    """intraday:monitor --watch — 循环监测模式"""
+    import sys
+    import time
+
+    interval = 300  # 默认5分钟
+    if len(sys.argv) > 2 and sys.argv[2].isdigit():
+        interval = int(sys.argv[2])
+
+    print(f"🔄 低频循环监测模式，每 {interval}s 刷新 (Ctrl+C 退出)")
+    try:
+        while True:
+            monitor = LowFreqMonitor()
+            report = monitor.run_all()
+            print(report.summary())
+
+            # 检查是否需要推送预警
+            has_alerts = (
+                len(monitor.etf_alerts) > 0
+                or monitor.volume_anomaly.get("alert", False)
+                or any(r.get("risk_level") == "风险" for r in monitor.index_risk)
+            )
+            if has_alerts:
+                print("⚠️ 检测到预警，推送企业微信...")
+                results = monitor.send_wechat_alert(dry_run=True)
+                for r in results:
+                    print(f"  {r['channel']}: {r['summary']}")
+
+            # 写入日志
+            log_path = PATHS["intraday"] / "lowfreq_events.jsonl"
+            append_jsonl(log_path, report.to_dict())
+
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        print("\n⏹️ 低频监测已停止")
+
+
+# 保留原有 cmd_watch 兼容
 def cmd_watch():
     import sys
     interval = 45
@@ -978,6 +1773,10 @@ if __name__ == "__main__":
         "prepare": cmd_prepare,
         "check-once": cmd_check_once,
         "watch": cmd_watch,
+        "monitor": cmd_lowfreq_monitor,
+        "risk": cmd_lowfreq_risk,
+        "wechat-alert": cmd_lowfreq_wechat_alert,
+        "monitor-watch": cmd_lowfreq_watch,
     }
     if len(sys.argv) > 1 and sys.argv[1] in cmds:
         cmds[sys.argv[1]]()

@@ -152,7 +152,7 @@ class PortfolioBacktestEngine:
                 benchmark_ret = get_benchmark_returns(
                     benchmark_spec,
                     index_dates=portfolio_ret.index,
-                    method="synthetic" if synthetic_benchmark else "etf_proxy",
+                    method="synthetic" if synthetic_benchmark else "api",
                 )
                 # 对齐日期
                 common = portfolio_ret.index.intersection(benchmark_ret.index)
@@ -289,13 +289,13 @@ class PortfolioBacktestEngine:
     def run_with_benchmark(
         self,
         benchmark_name: str = "CSI300",
-        synthetic: bool = True,
+        synthetic: bool = False,
     ) -> PortfolioResult:
         """便捷方法: 带基准对比的回测
 
         Args:
             benchmark_name: 基准名称
-            synthetic: 是否使用 synthetic 数据
+            synthetic: 是否使用 synthetic 降级数据 (默认 False, 使用真实 API 数据)
 
         Returns:
             PortfolioResult

@@ -11,11 +11,45 @@ RSScast MCP — premium 备用 (有额度限制)
 """
 
 import json
+import os
 import time
 import urllib.request
 from typing import Optional
 
 from config import PATHS, now_str, append_jsonl
+
+# ====== 自动绕过 Clash proxy ======
+# 与 rsscast_mcp.py 保持一致的 NO_PROXY 策略
+_EM_DOMAINS = [
+    "eastmoney.com",
+    "push2.eastmoney.com",
+    "push2his.eastmoney.com",
+    "quote.eastmoney.com",
+    "data.eastmoney.com",
+    "www.eastmoney.com",
+]
+_NO_PROXY_INITED = False
+
+
+def _ensure_no_proxy():
+    global _NO_PROXY_INITED
+    if _NO_PROXY_INITED:
+        return
+    existing = set()
+    for val in [os.environ.get("NO_PROXY", ""), os.environ.get("no_proxy", "")]:
+        for d in val.split(","):
+            d = d.strip()
+            if d:
+                existing.add(d)
+    for d in _EM_DOMAINS:
+        existing.add(d)
+    merged = ",".join(sorted(existing))
+    os.environ["NO_PROXY"] = merged
+    os.environ["no_proxy"] = merged
+    _NO_PROXY_INITED = True
+
+
+_ensure_no_proxy()
 
 
 def log(provider, action, status, records=0, symbols=None, error=""):
@@ -34,40 +68,47 @@ class EastmoneyProvider:
 
     def get_quotes(self, codes: list[str]) -> dict[str, dict]:
         """获取实时行情，使用直接可用的 /api/qt/stock/get 端点"""
+        # socks5 不尊重 NO_PROXY，请求前临时清除 ALL_PROXY
+        saved_all = os.environ.pop("ALL_PROXY", None)
+        saved_all_lower = os.environ.pop("all_proxy", None)
+
         t0 = time.time()
         result = {}
-        for code in codes:
-            # secid: 1=上交所, 0=深交所
-            secid = f"1.{code}" if code.startswith(("6", "5", "9")) else f"0.{code}"
-            url = ("https://push2.eastmoney.com/api/qt/stock/get"
-                   f"?secid={secid}&fields=f43,f44,f45,f46,f47,f48,f50,f57,f58,f170,f171,f843")
-            try:
-                req = urllib.request.Request(url, headers={
-                    "User-Agent": "Mozilla/5.0",
-                    "Referer": "https://quote.eastmoney.com/",
-                })
-                resp = urllib.request.urlopen(req, timeout=8)
-                data = json.loads(resp.read().decode())
-                if data.get("rc") == 0 and data.get("data"):
-                    d = data["data"]
-                    change_pct = d.get("f170")
-                    change_amount = d.get("f171")
-                    result[code] = {
-                        "code": code,
-                        "name": d.get("f58", ""),
-                        "price": d.get("f43") / 100 if d.get("f43") else None,
-                        "high": d.get("f44") / 100 if d.get("f44") else None,
-                        "low": d.get("f45") / 100 if d.get("f45") else None,
-                        "open": d.get("f46") / 100 if d.get("f46") else None,
-                        "volume": d.get("f47"),
-                        "amount": d.get("f48"),
-                        "change_pct": d.get("f170") / 100 if d.get("f170") is not None else None,
-                        "change_amount": d.get("f171") / 100 if d.get("f171") else None,
-                        "provider": self.name,
-                    }
-            except Exception:
-                pass
-            time.sleep(0.05)  # 避免频率限制
+        try:
+            for code in codes:
+                secid = f"1.{code}" if code.startswith(("6", "5", "9")) else f"0.{code}"
+                url = ("https://push2.eastmoney.com/api/qt/stock/get"
+                       f"?secid={secid}&fields=f43,f44,f45,f46,f47,f48,f50,f57,f58,f170,f171,f843")
+                try:
+                    req = urllib.request.Request(url, headers={
+                        "User-Agent": "Mozilla/5.0",
+                        "Referer": "https://quote.eastmoney.com/",
+                    })
+                    resp = urllib.request.urlopen(req, timeout=8)
+                    data = json.loads(resp.read().decode())
+                    if data.get("rc") == 0 and data.get("data"):
+                        d = data["data"]
+                        result[code] = {
+                            "code": code,
+                            "name": d.get("f58", ""),
+                            "price": d.get("f43") / 100 if d.get("f43") else None,
+                            "high": d.get("f44") / 100 if d.get("f44") else None,
+                            "low": d.get("f45") / 100 if d.get("f45") else None,
+                            "open": d.get("f46") / 100 if d.get("f46") else None,
+                            "volume": d.get("f47"),
+                            "amount": d.get("f48"),
+                            "change_pct": d.get("f170") / 100 if d.get("f170") is not None else None,
+                            "change_amount": d.get("f171") / 100 if d.get("f171") else None,
+                            "provider": self.name,
+                        }
+                except Exception:
+                    pass
+                time.sleep(0.05)
+        finally:
+            if saved_all is not None:
+                os.environ["ALL_PROXY"] = saved_all
+            if saved_all_lower is not None:
+                os.environ["all_proxy"] = saved_all_lower
         log(self.name, "get_quotes", "ok" if result else "empty",
             len(result), codes)
         return result

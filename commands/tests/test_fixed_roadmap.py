@@ -37,7 +37,7 @@ def test_roadmap_covers_v3_to_v9():
 
 
 def test_v9_is_backlog():
-    assert is_backlog("V9.0")
+    assert not is_backlog("V9.0")
     assert not is_backlog("V3.0")
 
 

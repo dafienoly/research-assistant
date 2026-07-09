@@ -52,6 +52,7 @@ from factor_lab.portfolio.metrics import (
 from factor_lab.portfolio.benchmark import (
     get_benchmark_returns,
     get_benchmark_meta,
+    fetch_index_kline,
     list_benchmarks,
     make_benchmark_spec,
     VALID_BENCHMARK_NAMES,
@@ -80,6 +81,7 @@ __all__ = [
     # benchmark
     "get_benchmark_returns",
     "get_benchmark_meta",
+    "fetch_index_kline",
     "list_benchmarks",
     "make_benchmark_spec",
     "VALID_BENCHMARK_NAMES",

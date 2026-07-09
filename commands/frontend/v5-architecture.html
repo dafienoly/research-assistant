@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hermes V5 系统架构</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #020617;
+      color: #E2E8F0;
+      -webkit-font-smoothing: antialiased;
+      padding: 40px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+    .header h1 {
+      font-size: 32px;
+      font-weight: 600;
+      color: #F8FAFC;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+    .header .subtitle {
+      font-size: 14px;
+      color: #64748B;
+      font-weight: 400;
+    }
+    .header .pulse-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      background: #22d3ee;
+      border-radius: 50%;
+      margin-right: 8px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .diagram-card {
+      background: #0F172A;
+      border: 1px solid #1E293B;
+      border-radius: 16px;
+      padding: 40px;
+      margin-bottom: 32px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    .diagram-card svg {
+      width: 100%;
+      height: auto;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+    .info-card {
+      background: #0F172A;
+      border: 1px solid #1E293B;
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .info-card .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .info-card .card-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .info-card .card-dot.cyan { background: #22d3ee; }
+    .info-card .card-dot.emerald { background: #34d399; }
+    .info-card .card-dot.violet { background: #a78bfa; }
+    .info-card h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #F8FAFC;
+    }
+    .info-card ul {
+      list-style: none;
+      padding: 0;
+    }
+    .info-card li {
+      font-size: 13px;
+      color: #94A3B8;
+      padding: 4px 0;
+      line-height: 1.5;
+    }
+    .info-card li::before {
+      content: '•';
+      color: #475569;
+      margin-right: 8px;
+    }
+    .footer {
+      text-align: center;
+      padding: 24px 0;
+      font-size: 12px;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1><span class="pulse-dot"></span>Hermes V5 投研系统架构</h1>
+      <div class="subtitle">React + Vite + TypeScript 前端 · FastAPI + Python 后端 · Quant Research Platform</div>
+    </div>
+
+    <div class="diagram-card">
+      <svg viewBox="0 0 1100 700" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+          <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+          </marker>
+          <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#34d399" />
+          </marker>
+          <marker id="arrow-amber" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24" />
+          </marker>
+          <linearGradient id="card-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#1e293b;stop-opacity:0.8" />
+            <stop offset="100%" style="stop-color:#0f172a;stop-opacity:0.8" />
+          </linearGradient>
+        </defs>
+
+        <!-- Grid Background -->
+        <rect width="1100" height="700" fill="url(#grid)" />
+
+        <!-- === Connection Arrows === -->
+        <!-- Browser → Vite Dev Server -->
+        <path d="M 100 280 L 320 280" stroke="#22d3ee" stroke-width="1.5" fill="none" marker-end="url(#arrow-cyan)"/>
+        <text x="210" y="270" fill="#64748B" font-size="9" text-anchor="middle">HTTP (dev)</text>
+
+        <!-- FastAPI → Data Sources -->
+        <path d="M 680 380 L 830 380" stroke="#34d399" stroke-width="1.5" fill="none" stroke-dasharray="4,3" marker-end="url(#arrow-emerald)"/>
+        <text x="755" y="370" fill="#64748B" font-size="8" text-anchor="middle">HTTP</text>
+
+        <!-- QMT Connection -->
+        <path d="M 680 440 L 830 440" stroke="#fbbf24" stroke-width="1.5" fill="none" stroke-dasharray="4,3" marker-end="url(#arrow-amber)"/>
+        <text x="755" y="430" fill="#64748B" font-size="8" text-anchor="middle">TCP/IP</text>
+
+        <!-- Vite Proxy to FastAPI -->
+        <path d="M 420 320 L 600 320" stroke="#22d3ee" stroke-width="1.5" fill="none" stroke-dasharray="6,3" marker-end="url(#arrow-cyan)"/>
+        <text x="510" y="310" fill="#64748B" font-size="9" text-anchor="middle">Vite Proxy → /api/*</text>
+
+        <!-- Vite → Browser (SSE) -->
+        <path d="M 320 340 L 100 340" stroke="#22d3ee" stroke-width="1.5" fill="none" stroke-dasharray="3,3" marker-end="url(#arrow-cyan)"/>
+        <text x="210" y="355" fill="#64748B" font-size="9" text-anchor="middle">SSE Stream</text>
+
+        <!-- ============ Zone 1: 前端 ============ -->
+        <text x="30" y="50" fill="#22d3ee" font-size="12" font-weight="600" font-family="'JetBrains Mono', monospace">FRONTEND</text>
+
+        <!-- Browser -->
+        <rect x="40" y="65" width="120" height="70" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="100" y="90" fill="#F8FAFC" font-size="12" text-anchor="middle" font-weight="600">🌐 浏览器</text>
+        <text x="100" y="108" fill="#94A3B8" font-size="9" text-anchor="middle">Vite :5173</text>
+        <text x="100" y="122" fill="#94A3B8" font-size="9" text-anchor="middle">React SPA</text>
+
+        <!-- Vite Dev Server -->
+        <rect x="280" y="65" width="120" height="70" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="340" y="90" fill="#F8FAFC" font-size="12" text-anchor="middle" font-weight="600">⚡ Vite</text>
+        <text x="340" y="108" fill="#94A3B8" font-size="9" text-anchor="middle">Dev Server</text>
+        <text x="340" y="122" fill="#94A3B8" font-size="9" text-anchor="middle">port :5173</text>
+
+        <!-- React SPA Components -->
+        <rect x="180" y="170" width="120" height="55" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="240" y="192" fill="#F8FAFC" font-size="11" text-anchor="middle" font-weight="500">React SPA</text>
+        <text x="240" y="208" fill="#94A3B8" font-size="9" text-anchor="middle">TanStack Query · Antd 5</text>
+
+        <rect x="320" y="170" width="120" height="55" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="380" y="192" fill="#F8FAFC" font-size="11" text-anchor="middle" font-weight="500">14 个页面模块</text>
+        <text x="380" y="208" fill="#94A3B8" font-size="9" text-anchor="middle">驾驶舱·因子·回测·Gate</text>
+
+        <!-- ============ Zone 2: 后端 ============ -->
+        <text x="590" y="50" fill="#34d399" font-size="12" font-weight="600" font-family="'JetBrains Mono', monospace">BACKEND</text>
+
+        <!-- FastAPI -->
+        <rect x="590" y="65" width="150" height="75" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="665" y="90" fill="#F8FAFC" font-size="12" text-anchor="middle" font-weight="600">🐍 FastAPI</text>
+        <text x="665" y="108" fill="#94A3B8" font-size="9" text-anchor="middle">API 服务器 :8766</text>
+        <text x="665" y="122" fill="#94A3B8" font-size="9" text-anchor="middle">22 个路由模块</text>
+        <text x="665" y="136" fill="#94A3B8" font-size="9" text-anchor="middle">Auth · CORS · Middleware</text>
+
+        <!-- API Layers -->
+        <rect x="590" y="165" width="150" height="50" rx="6" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1"/>
+        <text x="665" y="184" fill="#F8FAFC" font-size="11" text-anchor="middle">API 端点层</text>
+        <text x="665" y="200" fill="#94A3B8" font-size="9" text-anchor="middle">V5 统一 {ok,data,error,meta}</text>
+
+        <!-- ============ Zone 3: 数据源 / 外部 ============ -->
+        <text x="820" y="240" fill="#fbbf24" font-size="12" font-weight="600" font-family="'JetBrains Mono', monospace">DATA SOURCES</text>
+
+        <!-- Tushare -->
+        <rect x="820" y="260" width="130" height="55" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="885" y="282" fill="#F8FAFC" font-size="11" text-anchor="middle" font-weight="500">📊 Tushare</text>
+        <text x="885" y="298" fill="#94A3B8" font-size="9" text-anchor="middle">日线·财务·概念</text>
+
+        <!-- Tencent -->
+        <rect x="820" y="325" width="130" height="55" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="885" y="347" fill="#F8FAFC" font-size="11" text-anchor="middle" font-weight="500">⚡ 腾讯行情</text>
+        <text x="885" y="363" fill="#94A3B8" font-size="9" text-anchor="middle">实时价格 &lt;1s</text>
+
+        <!-- QMT -->
+        <rect x="820" y="395" width="130" height="55" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="885" y="417" fill="#F8FAFC" font-size="11" text-anchor="middle" font-weight="500">💰 QMT</text>
+        <text x="885" y="433" fill="#94A3B8" font-size="9" text-anchor="middle">实盘交易接口</text>
+
+        <!-- HermesDB -->
+        <rect x="820" y="460" width="130" height="55" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="885" y="482" fill="#F8FAFC" font-size="11" text-anchor="middle" font-weight="500">🗄️ HermesDB</text>
+        <text x="885" y="498" fill="#94A3B8" font-size="9" text-anchor="middle">本地因子数据库</text>
+
+        <!-- ============ Zone 4: 业务模块 (后端下方) ============ -->
+        <text x="30" y="240" fill="#a78bfa" font-size="12" font-weight="600" font-family="'JetBrains Mono', monospace">QUANT MODULES</text>
+
+        <!-- Factor Lab -->
+        <rect x="40" y="260" width="145" height="60" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="112" y="282" fill="#F8FAFC" font-size="11" text-anchor="middle" font-weight="500">🔬 因子实验室</text>
+        <text x="112" y="298" fill="#94A3B8" font-size="9" text-anchor="middle">挖掘·验证·排序·归因</text>
+
+        <!-- Backtest -->
+        <rect x="210" y="260" width="145" height="60" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="282" y="282" fill="#F8FAFC" font-size="11" text-anchor="middle" font-weight="500">📈 回测实验室</text>
+        <text x="282" y="298" fill="#94A3B8" font-size="9" text-anchor="middle">策略回测·组合优化</text>
+
+        <!-- Universe -->
+        <rect x="380" y="260" width="145" height="60" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="452" y="282" fill="#F8FAFC" font-size="11" text-anchor="middle" font-weight="500">🏛️ 股票池引擎</text>
+        <text x="452" y="298" fill="#94A3B8" font-size="9" text-anchor="middle">U0-U4 · ETF 替代</text>
+
+        <!-- Live Gate -->
+        <rect x="40" y="340" width="145" height="60" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="112" y="362" fill="#F8FAFC" font-size="11" text-anchor="middle" font-weight="500">🚦 Live Gate</text>
+        <text x="112" y="378" fill="#94A3B8" font-size="9" text-anchor="middle">14 道门禁检查</text>
+
+        <!-- Semi Theme -->
+        <rect x="210" y="340" width="145" height="60" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="282" y="362" fill="#F8FAFC" font-size="11" text-anchor="middle" font-weight="500">🔋 半导体主题</text>
+        <text x="282" y="378" fill="#94A3B8" font-size="9" text-anchor="middle">情绪·权重股·北向</text>
+
+        <!-- Risk -->
+        <rect x="380" y="340" width="145" height="60" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="452" y="362" fill="#F8FAFC" font-size="11" text-anchor="middle" font-weight="500">⚠️ 风险引擎</text>
+        <text x="452" y="378" fill="#94A3B8" font-size="9" text-anchor="middle">预警·归因·审计</text>
+
+        <!-- ============ Arrows: Quant → API ============ -->
+        <path d="M 112 320 L 590 215" stroke="#a78bfa" stroke-width="1" fill="none" stroke-dasharray="4,4" marker-end="url(#arrow-cyan)" opacity="0.6"/>
+        <path d="M 282 320 L 620 215" stroke="#a78bfa" stroke-width="1" fill="none" stroke-dasharray="4,4" marker-end="url(#arrow-cyan)" opacity="0.6"/>
+        <path d="M 452 320 L 650 215" stroke="#a78bfa" stroke-width="1" fill="none" stroke-dasharray="4,4" marker-end="url(#arrow-cyan)" opacity="0.6"/>
+
+        <!-- ============ Legend ============ -->
+        <line x1="40" y1="500" x2="1060" y2="500" stroke="#1e293b" stroke-width="1" />
+
+        <rect x="40" y="520" width="14" height="14" rx="3" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="65" y="532" fill="#94A3B8" font-size="12">前端</text>
+
+        <rect x="140" y="520" width="14" height="14" rx="3" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="165" y="532" fill="#94A3B8" font-size="12">后端</text>
+
+        <rect x="240" y="520" width="14" height="14" rx="3" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="265" y="532" fill="#94A3B8" font-size="12">量化模块</text>
+
+        <rect x="360" y="520" width="14" height="14" rx="3" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="385" y="532" fill="#94A3B8" font-size="12">外部数据源</text>
+
+        <line x1="490" y1="527" x2="540" y2="527" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+        <text x="550" y="532" fill="#94A3B8" font-size="12">HTTP</text>
+
+        <line x1="610" y1="527" x2="660" y2="527" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-cyan)"/>
+        <text x="670" y="532" fill="#94A3B8" font-size="12">SSE / Proxy</text>
+      </svg>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="card-header">
+          <div class="card-dot cyan"></div>
+          <h3>前端架构</h3>
+        </div>
+        <ul>
+          <li>React 18 + Vite 8 + TypeScript</li>
+          <li>Ant Design 5 组件库</li>
+          <li>TanStack Query 数据管理</li>
+          <li>14 个页面，8 个通用组件</li>
+          <li>Vite Proxy 到 FastAPI :8766</li>
+          <li>SSE 流式任务日志</li>
+        </ul>
+      </div>
+
+      <div class="info-card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>后端服务</h3>
+        </div>
+        <ul>
+          <li>FastAPI + Python 3.11</li>
+          <li>22 个 API 路由模块</li>
+          <li>统一响应格式 {ok, data, error, meta}</li>
+          <li>Auth + CORS + Logging 中间件</li>
+          <li>SSE 端点支持任务流</li>
+          <li>角色配置 datahub/data-writer</li>
+        </ul>
+      </div>
+
+      <div class="info-card">
+        <div class="card-header">
+          <div class="card-dot violet"></div>
+          <h3>量化核心模块</h3>
+        </div>
+        <ul>
+          <li>股票池引擎 — U0~U4 + ETF</li>
+          <li>因子实验室 — 挖掘/验证/排序/归因</li>
+          <li>回测实验室 — 策略回测 + 组合优化</li>
+          <li>Live Gate — 14 道门禁实盘检查</li>
+          <li>半导体主题看板 — 实时监测</li>
+          <li>风险引擎 — 预警 + 审计追踪</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer">
+      Hermes V5 Architecture · Generated 2026-07-09 · Hermes Agent
+    </div>
+  </div>
+</body>
+</html>

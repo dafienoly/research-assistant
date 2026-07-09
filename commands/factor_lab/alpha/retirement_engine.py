@@ -25,6 +25,9 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict
 
+# V3.6.1: 因子失败归因数据库 (append-only)
+from factor_lab.alpha.failure_db import FailureDatabase
+
 CST = timezone(timedelta(hours=8))
 BASE = Path("/mnt/d/HermesReports")
 RETIREMENT_ROOT = BASE / "alpha_retirement"
@@ -249,6 +252,28 @@ class RetirementEngine:
 
         # 4. 追加到历史
         self._append_history(retirement_record)
+
+        # V3.6.1: 记录失败归因到 FailureDatabase
+        try:
+            db = FailureDatabase()
+            # 从 spec 提取 IC 曲线
+            ic_history = spec.get("ic_mean_history", [])
+            ic_data = {}
+            if ic_history and isinstance(ic_history, list):
+                for entry in ic_history:
+                    if isinstance(entry, dict):
+                        for k, v in entry.items():
+                            if isinstance(v, (int, float)):
+                                ic_data[k] = v
+            failure_id = db.record_from_retirement(
+                alpha_id=alpha_id,
+                spec=spec,
+                reason=reason or retirement_record.get("reason", ""),
+                ic_data=ic_data,
+            )
+            print(f"  🗂️ Failure recorded: {failure_id}")
+        except Exception as e:
+            print(f"  ⚠️ Failure recording skipped: {e}")
 
         self.result = retirement_record
         return retirement_record

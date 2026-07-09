@@ -169,9 +169,12 @@ def _run_claude(sid: str, prompt: str):
                         if chunk:
                             output += chunk
                             clean = _strip_ansi(chunk)
-                            if clean.strip():
+                            # 跳过太短或无意义的 PTY 碎片（控制序列残余）
+                            if len(clean.strip()) >= 15 and (' ' in clean or '\n' in clean or '\t' in clean):
                                 append_event(sid, AgentEvent("answer_delta", sid, data=clean, status="running"))
-                            append_event(sid, AgentEvent("diagnostic", sid, data="[PTY chunk]"))
+                            else:
+                                _r = clean.strip()[:30]
+                                append_event(sid, AgentEvent("diagnostic", sid, data="[PTY residue: " + _r + "]"))
                     else:
                         if proc.poll() is not None:
                             break

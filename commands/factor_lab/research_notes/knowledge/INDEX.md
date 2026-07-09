@@ -18,6 +18,8 @@
 - [发现: vwap_close_divergence_reversal] — 评分=51.1, IC=-0.0233
 - [发现: rsi_slope_volume_surge] — 评分=24.2, IC=-0.0091
 - [发现: rsi_slope_vol_decay] — 评分=28.9, IC=-0.0108
+- [发现: vwap_bb_squeeze_reversal] — 评分=82.3, IC=-0.0743
+- [发现: gen_4] — 评分=80.9, IC=-0.0698
 
 ## Failures (已证伪路径)
 

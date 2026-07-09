@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from factor_lab.agent_console.sessions import create_session, get_session, stream_events, SESSIONS_DIR, write_lifecycle
 from factor_lab.agent_console.adapters import start_session
 from factor_lab.agent_console.adapters import get_adapters
+from factor_lab.api_server.response import api_success, api_error
 
 router = APIRouter()
 
@@ -106,27 +107,40 @@ async def backup_session(sid: str):
 @router.get("/versions/report/detail")
 async def version_report_detail():
     """详细版本报告，含 Agent 输出摘要和 git 变更记录"""
-    from factor_lab.leader.version_report import generate_report
-    report = generate_report()
-    # 附上版本完成详情
-    from factor_lab.leader.version_detail import get_completion_detail
-    detail = get_completion_detail()
-    if "error" not in detail:
-        report["completion_detail"] = detail
-    # 附上最近的 agent_logs 输出
-    log_dir = Path("/home/ly/.hermes/research-assistant/agent_tasks/agent_logs")
-    logs = []
-    if log_dir.exists():
-        for f in sorted(log_dir.iterdir(), reverse=True)[:5]:
-            if f.is_file():
-                logs.append({
-                    "file": f.name,
-                    "size": f.stat().st_size,
-                    "mtime": datetime.fromtimestamp(f.stat().st_mtime, tz=CST).isoformat(),
-                    "preview": f.read_text()[:500] if f.stat().st_size < 50000 else "(large)",
-                })
-    report["agent_outputs"] = logs
-    return report
+    try:
+        from factor_lab.leader.version_report import generate_report
+        report = generate_report()
+        # 附上版本完成详情
+        from factor_lab.leader.version_detail import get_completion_detail
+        detail = get_completion_detail()
+        if "error" not in detail:
+            report["completion_detail"] = detail
+        # 附上最近的 agent_logs 输出（使用环境变量或空目录）
+        import os
+        log_dir_str = os.environ.get(
+            "HERMES_AGENT_LOG_DIR",
+            str(Path.home() / ".hermes" / "research-assistant" / "agent_tasks" / "agent_logs")
+        )
+        log_dir = Path(log_dir_str)
+        logs = []
+        if log_dir.exists():
+            CST = timezone(timedelta(hours=8))
+            for f in sorted(log_dir.iterdir(), reverse=True)[:5]:
+                if f.is_file():
+                    logs.append({
+                        "file": f.name,
+                        "size": f.stat().st_size,
+                        "mtime": datetime.fromtimestamp(f.stat().st_mtime, tz=CST).isoformat(),
+                        "preview": f.read_text()[:500] if f.stat().st_size < 50000 else "(large)",
+                    })
+        report["agent_outputs"] = logs
+        return api_success(data=report)
+    except Exception as e:
+        return api_error(
+            "VERSION_REPORT_ERROR",
+            f"版本报告加载失败: {type(e).__name__}",
+            status_code=500,
+        )
 
 
 @router.post("/agent-console/cleanup")

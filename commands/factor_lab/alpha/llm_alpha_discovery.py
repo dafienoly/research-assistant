@@ -81,6 +81,7 @@ Each candidate must be a valid JSON object with these **required** fields:
 | risk_constraints | object | Dict with max_position_weight (default 0.25) and max_drawdown (default 0.15) |
 | risk_notes | string | Potential risks: overfitting, regime dependency, capacity, etc. |
 | evidence | string | Supporting evidence: academic paper, empirical observation, financial theory |
+| industry_hypothesis | string | **REQUIRED** Explain which industry/sector this factor works best in and why |
 
 ## Available Operators
 - **Cross-sectional**: rank(x), zscore(x), scale(x), winsorize(x)
@@ -95,7 +96,51 @@ Each candidate must be a valid JSON object with these **required** fields:
 Window parameter w is always a positive integer (number of trading days).
 
 ## Available Data Fields
+
+### Price & Volume (8 fields)
 close, open, high, low, volume, amount, returns, vwap
+
+### Valuation (5 fields)
+pe_ttm — 滚动市盈率 (Price-to-Earnings TTM)
+pb_lf — 市净率 (Price-to-Book, Latest Fiscal)
+ps_ttm — 市销率 (Price-to-Sales TTM)
+pcf_ttm — 市现率 (Price-to-Cash-Flow TTM)
+dv_ratio — 股息率 (Dividend Yield)
+
+### Fundamentals (6 fields)
+roe — 净资产收益率 (Return on Equity)
+gross_margin — 毛利率 (Gross Profit Margin)
+net_margin — 净利率 (Net Profit Margin)
+debt_ratio — 资产负债率 (Debt Ratio)
+eps — 每股收益 (Earnings Per Share)
+bps — 每股净资产 (Book Value Per Share)
+
+### Growth (3 fields)
+revenue_growth_q — 营业收入同比增长 (Quarterly Revenue YoY Growth)
+profit_growth_q — 净利润同比增长 (Quarterly Profit YoY Growth)
+roe_yoy — ROE 同比变化 (ROE YoY Change)
+
+### Capital Flow (4 fields)
+net_main_force — 主力净流入 (Main Force Net Inflow)
+net_super_large — 超大单净流入 (Super Large Order Net)
+net_small — 小单净流入 (Small Order Net)
+nb_net_flow — 北向资金净流入 (Northbound Net Flow)
+
+### Margin & Short (2 fields)
+margin_balance — 融资余额 (Margin Balance)
+margin_buy — 融资买入额 (Margin Buy Amount)
+
+### Industry Chain (3 fields)
+semiconductor_subsector — 半导体细分赛道分类 (Semiconductor Sub-sector)
+core_score — 产业链核心度评分 (Supply Chain Core Score)
+domestic_substitution_score — 国产替代评分 (Domestic Substitution Score)
+
+### Benchmarks (2 fields)
+semi_ew_return — 半导体等权基准收益 (Semiconductor Equal-Weight Return)
+csi300_return — 沪深300基准收益 (CSI 300 Return)
+
+## Recent Failure Patterns
+{failure_summary}
 
 ## CRITICAL RULES (violations will be rejected)
 1. Output ONLY valid JSON wrapped in ```json ... ``` blocks — no extra commentary outside.
@@ -105,7 +150,71 @@ close, open, high, low, volume, amount, returns, vwap
 5. Each name must be unique within this response.
 6. Do NOT include any strategy config, paper config, or live trading parameters.
 7. Output nothing outside the JSON code block.
+8. **FACTOR_EXPRESSION MUST INCLUDE AT LEAST ONE NON-PRICE-VOLUME FIELD** — Do NOT create factors using only close/open/high/low/volume/amount/returns/vwap. At least one field from (Valuation / Fundamentals / Growth / Capital Flow / Margin / Industry Chain / Benchmarks) categories must appear in the expression.
+9. **EVERY FACTOR MUST HAVE AN industry_hypothesis FIELD** explaining which sector/industry it works best in and why.
 """
+
+
+# ─── 失败记录上下文注入 ───────────────────────────────
+
+
+def _get_recent_failures_summary(n: int = 10) -> str:
+    """获取最近 N 条因子失败记录，格式化为 prompt 可用的文本
+
+    从 FailureDatabase 获取最近的失败因子，输出结构化的失败摘要。
+    摘要包含：因子名、原因分类、市场环境。
+
+    Returns:
+        格式化字符串，如：
+        "
+        ## Recent Failure Patterns (for reference)
+
+        最近 10 个被淘汰的因子:
+        | # | 因子名 | 淘汰原因 | 市场环境 |
+        |---|--------|----------|----------|
+        | 1 | mom_vol | ic_decay | oscillating |
+        | 2 | gap_reversal | not_beat_peer | bullish |
+
+        Lesson: ic_decay 是最常见的失败原因 (40%)。
+        "
+
+        当数据库为空时返回空字符串。
+    """
+    try:
+        from factor_lab.alpha.failure_db import FailureDatabase
+
+        db = FailureDatabase()
+        recent = db.get_recent_failures(n)
+        summary = db.get_summary()
+    except Exception:
+        return ""
+
+    if not recent:
+        return ""
+
+    lines = ["## Recent Failure Patterns (for reference)", ""]
+    lines.append(f"最近 {len(recent)} 个被淘汰/失败的因子，避免重复犯完全相同的错误:")
+    lines.append("")
+    lines.append("| # | 因子名 | 淘汰原因 | 市场环境 |")
+    lines.append("|---|---|---|---|")
+
+    for i, f in enumerate(recent, 1):
+        name = (f.get("factor_name", "?") or "?")[:20]
+        reason = f.get("rejection_reason", "?") or "?"
+        regime = f.get("market_regime", "?") or "?"
+        lines.append(f"| {i} | {name} | {reason} | {regime} |")
+
+    # 统计最常见失败原因
+    by_reason = summary.get("by_reason", {})
+    total = summary.get("total_failures", 0)
+    if by_reason and total > 0:
+        most_common = max(by_reason, key=by_reason.get)
+        pct = by_reason[most_common] / total * 100
+        lines.append("")
+        lines.append(f"**Lesson**: '{most_common}' 是最常见的失败原因 ({pct:.0f}%)。")
+        lines.append("生成新因子时请避免与以上失败模式相同的缺陷。")
+
+    return "\n".join(lines)
 
 
 # ─── AlphaSpec Validator ─────────────────────────────────
@@ -113,8 +222,13 @@ close, open, high, low, volume, amount, returns, vwap
 REQUIRED_FIELDS = [
     "name", "description", "hypothesis", "factor_expression",
     "signal_direction", "universe", "data_requirements",
-    "risk_notes", "evidence",
+    "risk_notes", "evidence", "industry_hypothesis",
 ]
+
+# 价量字段集 — 用于检测因子是否仅使用价量数据
+PRICE_VOLUME_FIELDS = {
+    "close", "open", "high", "low", "volume", "amount", "returns", "vwap",
+}
 
 VALID_SIGNAL_DIRECTIONS = {"long", "short", "long_short"}
 VALID_REBALANCE_FREQUENCIES = {"daily", "weekly", "monthly"}
@@ -151,6 +265,8 @@ class AlphaSpecValidator:
         self._check_data_requirements(candidate)
         self._check_expression_computable(candidate.get("factor_expression", ""))
         self._check_future_function(candidate.get("factor_expression", ""))
+        self._check_non_price_volume_fields(candidate)
+        self._check_industry_hypothesis(candidate)
         return len(self.errors) == 0
 
     def _check_required_fields(self, candidate: dict):
@@ -218,10 +334,21 @@ class AlphaSpecValidator:
             self.errors.append(f"factor_expression 解析异常: {e}")
 
     def _check_future_function(self, expression: str):
-        """检测未来函数: 负 window、零 window、window=1"""
+        """检测未来函数: 负 window、零 window、window=1
+        集成了 FutureLeakageGate 进行更全面的静态分析
+        """
         if not expression:
             return
-        # 检查负 window 参数: ts_mean(x, -5) 等
+        # 使用 FutureLeakageGate 进行全面检查
+        from factor_lab.alpha.future_leakage_gate import FutureLeakageGate, LeakageSeverity
+        gate = FutureLeakageGate(check_level="static")
+        report = gate.check(expression)
+        if not report.passed:
+            for issue in report.issues:
+                self.errors.append(f"未来函数 ({report.severity.value}): {issue}")
+            return
+
+        # 兼容原有检查: 检查负 window 参数
         neg_windows = re.findall(r'(ts_mean|ts_std|ts_min|ts_max|ts_rank|ts_sum|'
                                  r'ts_corr|ts_cov|ts_decay_linear|ts_delta|ts_av_diff|'
                                  r'ema|sma|rsi)\(\s*\w+\s*,\s*(-?\d+)', expression)
@@ -237,6 +364,40 @@ class AlphaSpecValidator:
             for match in zero_deltas:
                 self.errors.append(f"未来函数/无意义: {match}")
 
+    def _check_non_price_volume_fields(self, candidate: dict):
+        """检查 factor_expression 是否包含至少一个非价量字段"""
+        expression = candidate.get("factor_expression", "")
+        if not expression:
+            return
+        # 提取表达式中所有字段名（函数参数中符合字母下划线模式的词汇）
+        field_candidates = re.findall(r'[a-z_]+[a-z]', expression)
+        used_non_pv = set()
+        for token in field_candidates:
+            if token not in PRICE_VOLUME_FIELDS and token not in {
+                # 算子名 — 忽略
+                "rank", "zscore", "scale", "winsorize",
+                "ts_mean", "ts_std", "ts_min", "ts_max", "ts_rank", "ts_sum",
+                "ts_corr", "ts_cov", "ts_decay_linear", "ts_delta", "ts_av_diff",
+                "ema", "sma", "rsi", "macd", "atr", "bb_width",
+                "sigmoid", "tanh", "sign", "abs", "clip", "sign_power",
+                "where", "max", "min", "power", "sqrt", "exp", "log",
+                "ts_shift", "ts_argmax", "ts_argmin", "ts_product", "ts_zscore",
+                "boll_upper", "boll_lower", "boll_mid",
+                "ts_regression_slope", "delay", "delta", "correlation", "stddev",
+            }:
+                used_non_pv.add(token)
+        if not used_non_pv:
+            self.errors.append(
+                "因子表达式仅使用了价量字段 (close/open/high/low/volume/amount/returns/vwap)，"
+                "必须包含至少一个来自估值/基本面/成长/资金/两融/产业链/基准类别的字段"
+            )
+
+    def _check_industry_hypothesis(self, candidate: dict):
+        """检查是否存在 industry_hypothesis 字段且不为空"""
+        ih = candidate.get("industry_hypothesis", "")
+        if not ih or (isinstance(ih, str) and not ih.strip()):
+            self.errors.append("缺少必需字段或值为空: industry_hypothesis")
+
     def get_report(self) -> dict:
         """返回验证报告"""
         return {
@@ -244,6 +405,20 @@ class AlphaSpecValidator:
             "errors": self.errors,
             "warnings": self.warnings,
         }
+
+    @staticmethod
+    def adjust_threshold_for_multiple_tests(n_factors: int, alpha: float = 0.05) -> float:
+        """当同时检验多个因子时调整显著性阈值 (Bonferroni)
+
+        Args:
+            n_factors: 同时检验的因子数量
+            alpha: 原始显著性水平 (默认 0.05)
+
+        Returns:
+            float: 调整后的显著性阈值
+        """
+        from factor_lab.alpha.multiple_testing import adjust_significance_threshold
+        return adjust_significance_threshold(n_factors, alpha, method="bonferroni")
 
 
 # ─── 重复检测 ─────────────────────────────────────────────
@@ -408,6 +583,7 @@ def submit_candidate(candidate: dict, source: str = "llm") -> dict:
             }),
             "risk_notes": candidate.get("risk_notes", ""),
             "evidence": candidate.get("evidence", ""),
+            "industry_hypothesis": candidate.get("industry_hypothesis", ""),
             "created_at": now_iso,
             "source": source,
             "enabled": False,
@@ -456,7 +632,7 @@ def _write_submission_report(candidate: dict, result: dict):
 
     report = {
         "run_id": sid,
-        "version": "V3.7",
+        "version": "V4.6",
         "source": "llm_alpha_discovery",
         "submitted_at": datetime.now(CST).isoformat(),
         "candidate": {
@@ -769,9 +945,13 @@ def generate_candidate_spec(prompt_context: str, num_candidates: int = 3) -> lis
     返回:
         list[dict]: 每个候选的提交结果
     """
+    # 获取最近失败记录作为 prompt 参考
+    failure_summary = _get_recent_failures_summary(n=10)
+
     prompt = LLM_ALPHA_PROMPT_TEMPLATE.format(
         context=prompt_context,
         num_candidates=num_candidates,
+        failure_summary=failure_summary,
     )
 
     # 调用 LLM
@@ -896,6 +1076,166 @@ def cmd_rejected_report() -> None:
     for reason, count in sorted(report.get("reason_counts", {}).items(), key=lambda x: -x[1]):
         print(f"    - {reason}: {count}")
     print(f"{'='*60}\n")
+
+
+# ─── V3.6.3 LLM 因子诊断 ──────────────────────────────────
+
+FACTOR_DIAGNOSIS_PROMPT_TEMPLATE = """You are a quantitative alpha research reviewer for A-share market.
+Analyze the following factor validation report and provide a structured diagnosis.
+
+## Factor Information
+{factor_info}
+
+## Validation Results
+{validation_results}
+
+## Diagnosis Requirements
+Please analyze:
+
+1. **Why does this factor work (or fail)?**
+   - Is the IC positive/negative/stable?
+   - Does it beat the peer equal-weight benchmark?
+   - What is the exposure (industry, size, volatility)?
+
+2. **What market regime does this factor favor?**
+   - Bullish / Bearish / Oscillating / Structural market?
+   - Based on IC stability across sub-periods
+
+3. **What are the failure risks?**
+   - IC decay speed (half-life)
+   - Placebo test significance
+   - Walk-forward OOS performance
+   - Overfitting risk
+
+4. **Improvement suggestions** (be specific)
+   - What orthogonal factor could complement it?
+   - What filter could reduce drawdown?
+   - What parameter range to test?
+
+## Output Format (JSON only)
+```json
+{{
+  "factor_name": "...",
+  "overall_assessment": "strong / moderate / weak / failed",
+  "strengths": [...],
+  "weaknesses": [...],
+  "favored_market_regime": "bullish/bearish/oscillating/structural",
+  "failure_risks": {{
+    "ic_decay_speed": "fast/moderate/slow",
+    "overfitting_risk": "high/medium/low",
+    "placebo_significant": true/false
+  }},
+  "improvement_suggestions": [
+    {{
+      "type": "orthogonal_factor / filter / parameter_tuning",
+      "description": "...",
+      "expected_impact": "..."
+    }}
+  ],
+  "verdict": "promote/watch/retire"
+}}
+```
+"""
+
+
+def diagnose_factor(validation_path: str, factor_expression: str = "") -> dict:
+    """LLM 因子诊断 - 分析 V3.1.2 验证结果并给出结构化诊断
+
+    Args:
+        validation_path: 因子验证报告路径（来自 V3.1.2 report.json）
+        factor_expression: 因子表达式（可选，默认从报告提取）
+
+    Returns:
+        dict: LLM 诊断结果（strengths, weaknesses, improvement_suggestions 等）
+    """
+    val_path = Path(validation_path)
+    if not val_path.exists():
+        return {"error": f"验证报告不存在: {validation_path}"}
+
+    with open(val_path) as f:
+        data = json.load(f)
+
+    # 构造 factor_info
+    factor_info = json.dumps({
+        "factor_name": data.get("factor_name", ""),
+        "factor_family": data.get("factor_family", ""),
+        "expression": factor_expression or data.get("factor_name", ""),
+    }, indent=2, ensure_ascii=False)
+
+    # 提取关键验证结果
+    ic = data.get("ic_analysis", {})
+    peer = data.get("anti_overfit", {}).get("peer_benchmark", {})
+    wf = data.get("walk_forward", {})
+    placebo = data.get("anti_overfit", {}).get("placebo", {})
+    scoring = data.get("scoring", {})
+    derived = data.get("derived", {})
+
+    validation_results = json.dumps({
+        "ic_mean": ic.get("ic_mean", "N/A"),
+        "ic_ir": ic.get("ic_ir", "N/A"),
+        "pos_ratio": ic.get("pos_ratio", "N/A"),
+        "layer_long_short_sharpe": ic.get("layer_test", {}).get("long_short_sharpe", "N/A"),
+        "beats_peer": peer.get("beats_peer", "N/A"),
+        "strategy_cumulative_pct": peer.get("strategy_cumulative_pct", "N/A"),
+        "peer_ew_cumulative_pct": peer.get("peer_ew_cumulative_pct", "N/A"),
+        "excess_return_pct": peer.get("excess_return_pct", "N/A"),
+        "walk_forward_verdict": wf.get("overall_verdict", "N/A"),
+        "oos_positive_ratio": wf.get("oos_positive_ratio", "N/A"),
+        "avg_test_sharpe": wf.get("avg_test_sharpe", "N/A"),
+        "placebo_verdict": placebo.get("verdict", "N/A"),
+        "placebo_percentile": placebo.get("factor_score_percentile", "N/A"),
+        "half_life_days": derived.get("ic_half_life_days", "N/A"),
+        "monotonicity": derived.get("monotonicity", "N/A"),
+        "overall_grade": scoring.get("grade", "N/A"),
+        "overall_score": scoring.get("overall_score", "N/A"),
+        "pass_gate": scoring.get("pass_gate", False),
+        "reject_reasons": scoring.get("reject_reasons", []),
+    }, indent=2, ensure_ascii=False)
+
+    # 构造 prompt
+    prompt = FACTOR_DIAGNOSIS_PROMPT_TEMPLATE.format(
+        factor_info=factor_info,
+        validation_results=validation_results,
+    )
+
+    # 调用 LLM（复用同一模块的 _call_llm）
+    response = _call_llm(prompt)
+
+    # 解析 JSON
+    try:
+        json_match = re.search(r'```json\s*(.*?)\s*```', response, re.DOTALL)
+        if json_match:
+            diagnosis = json.loads(json_match.group(1))
+        else:
+            diagnosis = json.loads(response)
+    except Exception as e:
+        diagnosis = {
+            "error": f"LLM 响应解析失败: {e}",
+            "raw_response": response[:500],
+        }
+
+    return diagnosis
+
+
+def diagnose_multiple_factors(validation_dir: str, factor_names: list = None) -> list[dict]:
+    """批量诊断多个因子（遍历目录下的所有 report.json）
+
+    Args:
+        validation_dir: 验证结果根目录，遍历其下 factor_name/report.json
+        factor_names: 可选过滤，只诊断指定因子名
+
+    Returns:
+        list[dict]: 各因子诊断结果
+    """
+    results = []
+    for report_path in sorted(Path(validation_dir).glob("*/report.json")):
+        name = report_path.parent.name
+        if factor_names and name not in factor_names:
+            continue
+        diagnosis = diagnose_factor(str(report_path))
+        diagnosis["factor_name"] = name
+        results.append(diagnosis)
+    return results
 
 
 if __name__ == "__main__":

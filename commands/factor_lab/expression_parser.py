@@ -115,7 +115,14 @@ def op_rank(df, args):
 @register_op("zscore")
 def op_zscore(df, args):
     def _z(x):
-        return (x - x.mean()) / x.std().replace(0, np.nan)
+        s = x.std()
+        if isinstance(s, pd.Series):
+            s = s.replace(0, np.nan)
+        elif hasattr(s, 'shape') and s.ndim > 0:
+            s[s == 0] = np.nan
+        elif s == 0:
+            s = np.nan
+        return (x - x.mean()) / s
     return _cs_apply(df, args, _z)
 
 @register_op("scale")
@@ -189,13 +196,13 @@ def op_ts_decay_linear(df, args):
 
 @register_op("ts_corr")
 def op_ts_corr(df, args):
-    w = _get_window(args) if len(args) > 2 else 20
+    w = _get_window(args, idx=2) if len(args) > 2 else 20
     a = args[0].eval(df); b = args[1].eval(df)
     return a.groupby(df["symbol"]).transform(lambda x: x.rolling(w).corr(b))
 
 @register_op("ts_cov")
 def op_ts_cov(df, args):
-    w = _get_window(args) if len(args) > 2 else 20
+    w = _get_window(args, idx=2) if len(args) > 2 else 20
     a = args[0].eval(df); b = args[1].eval(df)
     return a.groupby(df["symbol"]).transform(lambda x: x.rolling(w).cov(b))
 

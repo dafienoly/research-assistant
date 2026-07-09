@@ -232,3 +232,32 @@ def _float(v):
         return float(v)
     except (TypeError, ValueError):
         return 0.0
+
+
+# ═══════════════════════════════════════════════════════════
+# ETF 替代入口 — 个股→ETF 匹配
+# ═══════════════════════════════════════════════════════════
+
+def find_etf_substitute(
+    symbol: str,
+    etf_universe: list = None,
+    theme_map: dict = None,
+) -> list[dict]:
+    """为不可交易的股票寻找最佳替代 ETF
+
+    匹配优先级: 同主题 > 同行业 > 宽基指数
+    委托给 etf_universe.find_etf_substitute() 实现。
+
+    Args:
+        symbol: 股票代码 (如 "688012" 或 "688012.SH")
+        etf_universe: ETF 数据库 (list of dicts), 默认 load_etf_registry()
+        theme_map: {symbol: [theme_tags]}, 可选的外部主题映射
+
+    Returns:
+        [{etf_code, etf_name, match_reason, weight, score}, ...]
+        按匹配度降序排列, 最多返回 5 个
+    """
+    from factor_lab.etf.etf_universe import (
+        find_etf_substitute as _find_sub,
+    )
+    return _find_sub(symbol, etf_universe=etf_universe, theme_map=theme_map)

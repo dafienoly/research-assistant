@@ -1,58 +1,23 @@
-"""Gate 1 — 需求→代码追溯矩阵
+"""Gate 1 — 需求→代码追溯 + 调用链追溯
 
-检测目标:
-  1. 解析 plan markdown 提取每个 Task 的期望产出（文件路径、函数名、API 端点）
-  2. 对比 git diff + 文件系统，逐条验证
-  3. 输出缺失清单
-
-自动检测计划文件: 扫描 .hermes/plans/ 取最新的，或接受显式路径。
+继承原有功能（检查文件/函数是否存在），新增：
+  4. 检查新增模块是否接入对应 registry
+  5. 检查新增 CLI command 是否挂到 CommandRegistry
+  6. 检查新增 Alpha 是否挂到 AlphaRegistry
+  7. 检查新增 DataProvider 是否挂到 DataProviderRegistry
+  8. 检查新增 Gate 是否挂到 GateEngine
 """
 
 from __future__ import annotations
 import os, re, subprocess, json
 from pathlib import Path
 from typing import Optional
-
 from dataclasses import dataclass, field
+
 from .base import AuditFinding, AuditReport, Severity
+from .git_utils import get_all_changed_files, BASE, COMMANDS, GIT_DIR
 
-BASE = Path(os.environ.get("RESEARCH_ASSISTANT_ROOT",
-                           "/home/ly/.hermes/research-assistant"))
-COMMANDS = BASE / "commands"
-GIT_DIR = str(BASE)
-
-
-# ─── Git 辅助 ───────────────────────────────────────────────────
-
-def _git_diff_files() -> list[str]:
-    """返回当前未暂存 + 已暂存的变更文件列表"""
-    files: set[str] = set()
-    for cmd in [["git", "diff", "--name-only"], ["git", "diff", "--cached", "--name-only"]]:
-        try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=10, cwd=GIT_DIR)
-            if r.returncode == 0:
-                files.update(r.stdout.strip().splitlines())
-        except Exception:
-            pass
-    return sorted(f for f in files if f.strip())
-
-
-def _git_committed_files_since(tag: str = "HEAD~5") -> list[str]:
-    """最近 N 个提交中变更的文件（用于无未提交变更时的追溯）"""
-    try:
-        r = subprocess.run(
-            ["git", "diff", "--name-only", tag, "HEAD"],
-            capture_output=True, text=True, timeout=10, cwd=GIT_DIR
-        )
-        if r.returncode == 0:
-            return [f for f in r.stdout.strip().splitlines() if f.strip()]
-    except Exception:
-        pass
-    return []
-
-
-# ─── Plan 解析 ───────────────────────────────────────────────────
-
+# ─── Plan 解析 ────────────────────────────────────────────────
 TASK_HEADER_RE = re.compile(r"^###\s+Task\s+\d+", re.MULTILINE | re.IGNORECASE)
 FILE_CREATE_RE = re.compile(r"- \*\*Create:\*\*\s+`([^`]+)`", re.IGNORECASE)
 FILE_MODIFY_RE = re.compile(r"- \*\*Modify:\*\*\s+`([^`]+)`", re.IGNORECASE)
@@ -60,13 +25,21 @@ FUNC_DEF_RE = re.compile(r"^def\s+(test_)?(\w+)", re.MULTILINE)
 CLASS_DEF_RE = re.compile(r"^class\s+(\w+)", re.MULTILINE)
 ENDPOINT_RE = re.compile(r"@app\.(get|post|put|delete|patch)\s*\(\s*['\"]([^'\"]+)['\"]")
 
-# 常见偷懒词 — 函数名暗示应该复杂但可能被简化
 STUB_SUSPECT_NAMES = re.compile(
     r"^(compute_?|calculate_?|fetch_?|load_?|parse_?|validate_?|"
     r"transform_?|build_?|generate_?|resolve_?|process_?|score_?|rank_?|"
     r"predict_?|evaluate_?|backtest_?|run_?|sync_?|migrate_?|convert_?)",
     re.IGNORECASE,
 )
+
+# ── Registry 检测模式 ─────────────────────────────────────────
+REGISTRY_PATTERNS = {
+    "CommandRegistry": r"CommandRegistry\(\)|\.register\(.*command|hermes_cli\.register\(|commands\[|COMMAND_REGISTRY",
+    "AlphaRegistry": r"AlphaRegistry|alpha_registry\.register|register_alpha|ALPHA_REGISTRY",
+    "DataProviderRegistry": r"DataProviderRegistry|data_provider_registry|register_provider|DataProvider",
+    "GateEngine": r"GateEngine|gate_engine\.register|GATE_ENGINE",
+    "ReportBuilder": r"ReportBuilder|report_builder\.register|REPORT_BUILDER|ReportManifest",
+}
 
 
 @dataclass
@@ -77,53 +50,39 @@ class PlanTask:
 
 
 def _find_plan_files() -> list[Path]:
-    """找 .hermes/plans/ 下的最新计划文件"""
     plans_dir = BASE / ".hermes" / "plans"
     if not plans_dir.is_dir():
         return []
-    # 按修改时间排序，取最新的 3 个
     candidates = sorted(plans_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
     return candidates[:3]
 
 
 def _parse_plan_md(text: str) -> list[PlanTask]:
-    """解析 plan markdown 提取 Task 清单"""
     tasks: list[PlanTask] = []
     current: Optional[PlanTask] = None
-    header_match = None
-
     for line in text.splitlines():
-        # 检测 Task 标题
         m = re.match(r"^###\s+(Task\s+\d+.*)", line, re.IGNORECASE)
         if m:
             if current:
                 tasks.append(current)
             current = PlanTask(title=m.group(1).strip())
             continue
-
         if current is None:
             continue
-
-        # 创建文件
         m = re.search(r"- \*\*Create:\*\*\s+`([^`]+)`", line, re.IGNORECASE)
         if m:
             current.expected_creates.append(m.group(1))
             continue
-
-        # 修改文件
         m = re.search(r"- \*\*Modify:\*\*\s+`([^`]+)`", line, re.IGNORECASE)
         if m:
             current.expected_modifies.append(m.group(1))
             continue
-
     if current:
         tasks.append(current)
-
     return tasks
 
 
 def _extract_functions_from_code(file_path: str) -> list[str]:
-    """从代码文件中提取函数名"""
     full_path = Path(file_path)
     if not full_path.is_file():
         return []
@@ -136,62 +95,129 @@ def _extract_functions_from_code(file_path: str) -> list[str]:
     return list(set(funcs + classes))
 
 
-def _extract_functions_from_diff(diff_output: str) -> list[str]:
-    """从 git diff 输出中提取新增的函数定义"""
-    funcs = []
-    in_hunk = False
-    for line in diff_output.splitlines():
-        if line.startswith("@@"):
-            in_hunk = True
+# ─── 新增: Registry 检查 ─────────────────────────────────────
+
+def _check_registration(file_paths: list[str]) -> list[AuditFinding]:
+    """检查新增文件是否应该在 registry 中注册但未注册。
+    
+    只在文件是**新增**（非修改）且文件名/内容暗示需要注册时检查。
+    """
+    findings: list[AuditFinding] = []
+    # 检查哪些文件是新增的（不在 git 历史中）
+    import subprocess
+    new_files = set()
+    try:
+        r = subprocess.run(
+            ["git", "diff", "--name-only", "--diff-filter=A"],
+            capture_output=True, text=True, timeout=5, cwd=str(BASE),
+        )
+        if r.returncode == 0:
+            new_files = set(r.stdout.strip().splitlines())
+    except Exception:
+        pass
+    # 也包含未跟踪的文件
+    try:
+        r = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            capture_output=True, text=True, timeout=5, cwd=str(BASE),
+        )
+        if r.returncode == 0:
+            new_files.update(r.stdout.strip().splitlines())
+    except Exception:
+        pass
+
+    for fp in file_paths:
+        if not fp.endswith(".py"):
             continue
-        if not in_hunk:
+        if "/tests/" in fp or fp.startswith("tests/"):
             continue
-        # 只关注新增行（+ 开头，不包括 +++）
-        if line.startswith("+") and not line.startswith("+++"):
-            clean = line[1:].strip()
-            m = FUNC_DEF_RE.match(clean)
-            if m and m.group(2):
-                funcs.append(m.group(2))
-    return funcs
+        # 只检查新增文件或名明确涉及 registry 的文件
+        is_new = fp in new_files
+        candidates = [BASE / fp, COMMANDS / fp, Path(fp)]
+        full = None
+        for c in candidates:
+            if c.is_file():
+                full = c
+                break
+        if not full:
+            continue
+        try:
+            src = full.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+
+        # 根据文件内容判断是否需要注册
+        needs_registry = False
+        registry_type = ""
+        if is_new and re.search(r"class\s+\w+Command|class\s+\w+CLI|CommandRegistry", src):
+            needs_registry = True
+            registry_type = "CommandRegistry"
+        elif is_new and re.search(r"class\s+\w+Alpha|AlphaRegistry|def\s+compute_alpha", src):
+            needs_registry = True
+            registry_type = "AlphaRegistry"
+        elif is_new and re.search(r"class\s+\w+Provider|ProviderRegistry|class\s+\w+DataSource", src):
+            needs_registry = True
+            registry_type = "DataProviderRegistry"
+        elif is_new and re.search(r"class\s+\w+Gate|GateEngine", src):
+            needs_registry = True
+            registry_type = "GateEngine"
+        elif not is_new:
+            # 修改文件只检查 registry 模式新增
+            reg_pat = REGISTRY_PATTERNS.get("CommandRegistry", "")
+            if reg_pat and re.search(r"@app\.|router\.|route\(", src):
+                needs_registry = True
+                registry_type = "CommandRegistry"
+
+        if needs_registry:
+            pat = REGISTRY_PATTERNS.get(registry_type, registry_type)
+            if not re.search(pat, src):
+                findings.append(AuditFinding(
+                    gate="gate1", severity="WARN", category="SYMBOL_NOT_REGISTERED",
+                    file=fp,
+                    message=f"新增 {registry_type} 组件但未发现注册代码: {Path(fp).name}",
+                ))
+
+    return findings
 
 
-# ─── 核心检测 ───────────────────────────────────────────────────
+def _check_registry_for_file(fp: str, registry_name: str, src: str,
+                              findings: list[AuditFinding]):
+    """如果文件是新增的且包含某类组件，检查是否引用了对应的 registry。"""
+    pat = REGISTRY_PATTERNS.get(registry_name, registry_name)
+    if not re.search(pat, src):
+        findings.append(AuditFinding(
+            gate="gate1", severity="WARN", category="SYMBOL_NOT_REGISTERED",
+            file=fp, message=f"疑似 {registry_name} 组件但未发现注册代码: {Path(fp).name}",
+            detail=f"该文件看起来应该注册到 {registry_name}，但源码中未找到注册调用",
+        ))
+
+
+# ─── 核心检测 ─────────────────────────────────────────────────
 
 def _check_files_exist(files: list[str], rel_root: str = "") -> list[AuditFinding]:
-    """检查文件是否存在"""
     findings: list[AuditFinding] = []
     for f in files:
-        # 尝试相对路径
         full = Path(rel_root, f) if rel_root else Path(f)
         checked = str(full)
         if not full.is_absolute():
-            # 同时检查 commands/ 下和根目录
-            candidates = [
-                BASE / f,
-                COMMANDS / f,
-                BASE / f.replace("commands/", "", 1),
-            ]
+            candidates = [BASE / f, COMMANDS / f, BASE / f.replace("commands/", "", 1)]
             checked = str([str(c) for c in candidates])
             exists = any(c.is_file() for c in candidates)
         else:
             exists = full.is_file()
-
-        if not exists:
-            findings.append(AuditFinding(
-                gate="gate1", severity="FAIL", category="MISSING_FILE",
-                file=f, message=f"计划中标记为创建/修改的文件不存在: {f}",
-                detail=f"检查路径: {checked}",
-            ))
-        else:
-            findings.append(AuditFinding(
-                gate="gate1", severity="INFO", category="FILE_EXISTS",
-                file=f, message=f"文件已存在: {f}",
-            ))
+        findings.append(AuditFinding(
+            gate="gate1",
+            severity="INFO" if exists else "FAIL",
+            category="FILE_EXISTS" if exists else "MISSING_FILE",
+            file=f, message=f"{'文件已存在' if exists else '文件不存在'}: {f}",
+            detail="" if exists else f"检查路径: {checked}",
+        ))
     return findings
 
 
+# ─── 主入口 ───────────────────────────────────────────────────
+
 def run_gate1(report: AuditReport, plan_path: Optional[str] = None) -> AuditReport:
-    """执行 Gate 1: 需求→代码追溯"""
     report.gates_run.append("gate1")
 
     # 1. 找 plan 文件
@@ -206,22 +232,18 @@ def run_gate1(report: AuditReport, plan_path: Optional[str] = None) -> AuditRepo
     if not plans:
         report.add(AuditFinding(
             gate="gate1", severity="WARN", category="NO_PLAN",
-            file="", message="未找到计划文件 (.hermes/plans/*.md)，跳过需求追溯",
+            file="", message="未找到计划文件，跳过需求追溯",
         ))
-        # 降级: 只报告变更文件中的新函数
-        report.add(AuditFinding(
-            gate="gate1", severity="INFO", category="NO_PLAN",
-            file="", message="降级模式: 仅扫描 git diff 中的新增函数",
-        ))
-        diff_files = _git_diff_files()
-        if not diff_files:
-            diff_files = _git_committed_files_since()
+        diff_files = get_all_changed_files()
         if diff_files:
             report.add(AuditFinding(
                 gate="gate1", severity="INFO", category="CHANGED_FILES",
                 file="", message=f"发现 {len(diff_files)} 个变更文件",
                 detail="\n".join(diff_files[:20]),
             ))
+        # 降级模式下仍检查 registry
+        reg_findings = _check_registration(diff_files)
+        report.extend(reg_findings)
         return report
 
     # 2. 解析计划
@@ -234,16 +256,15 @@ def run_gate1(report: AuditReport, plan_path: Optional[str] = None) -> AuditRepo
             gate="gate1", severity="WARN", category="NO_TASKS",
             file="", message="Plan 文件中未解析到 Task 定义（格式: ### Task N）",
         ))
-        # 降级: 对每个文件扫描函数
-        diff_files = _git_diff_files()
-        if not diff_files:
-            diff_files = _git_committed_files_since()
+        diff_files = get_all_changed_files()
         if diff_files:
             report.add(AuditFinding(
                 gate="gate1", severity="INFO", category="CHANGED_FILES",
                 file="", message=f"发现 {len(diff_files)} 个变更文件（无 Task 解析）",
                 detail="\n".join(diff_files[:20]),
             ))
+        reg_findings = _check_registration(diff_files)
+        report.extend(reg_findings)
         return report
 
     report.add(AuditFinding(
@@ -252,36 +273,29 @@ def run_gate1(report: AuditReport, plan_path: Optional[str] = None) -> AuditRepo
         detail="\n".join(f"  {t.title}" for t in tasks),
     ))
 
-    # 3. 逐 Task 检查
+    # 3. 逐 Task 检查文件
+    all_creates = list(set(t.expected_creates for t in tasks for _ in [1]))
     all_creates = []
     all_modifies = []
     for t in tasks:
         all_creates.extend(t.expected_creates)
         all_modifies.extend(t.expected_modifies)
-
-    # 去重
     all_creates = list(set(all_creates))
     all_modifies = list(set(all_modifies))
 
-    # 3a. 检查创建文件
     create_findings = _check_files_exist(all_creates, str(BASE))
     report.extend(create_findings)
-
-    # 3b. 检查修改文件
     modify_findings = _check_files_exist(all_modifies, str(BASE))
     report.extend(modify_findings)
 
-    # 3c. 额外: 检查 git diff 中是否有新增函数
-    diff_files = _git_diff_files()
-    if not diff_files:
-        diff_files = _git_committed_files_since()
+    # 4. 扫描 git diff 中的新增函数
+    diff_files = get_all_changed_files()
     if diff_files:
         report.add(AuditFinding(
             gate="gate1", severity="INFO", category="GIT_DIFF",
             file="", message=f"git diff 发现 {len(diff_files)} 个变更文件",
             detail="\n".join(diff_files[:15]),
         ))
-        # 扫描变更文件中的函数
         for df in diff_files[:20]:
             full = Path(BASE, df)
             if full.is_file():
@@ -291,5 +305,9 @@ def run_gate1(report: AuditReport, plan_path: Optional[str] = None) -> AuditRepo
                         gate="gate1", severity="INFO", category="FUNCTIONS",
                         file=df, message=f"定义函数: {', '.join(funcs[:10])}",
                     ))
+
+    # 5. Registry 检查 (新增)
+    reg_findings = _check_registration(diff_files)
+    report.extend(reg_findings)
 
     return report

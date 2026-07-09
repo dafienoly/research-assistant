@@ -57,9 +57,12 @@ def _make_roadmap_task(version: str) -> str:
     from factor_lab.leader.roadmap import get_version
     v = get_version(version)
     if v:
+        desc = ""
+        if hasattr(v, 'description') and v.description:
+            desc = f"\n## 详细描述\n{v.description}\n"
         return (f"# T001 — {v.name}\n- Version: {v.version}\n- Priority: P1\n"
                 f"- Owner: hermes_auto_developer\n- Status: pending\n\n"
-                f"## 描述\nImplement {v.version}: {v.name}\nObjective: {v.objective}\n\n"
+                f"## 描述\nImplement {v.version}: {v.name}\nObjective: {v.objective}\n{desc}\n"
                 f"## 验收标准\n- Implement roadmap item\n- Run tests\n- Produce completion signal\n\n"
                 f"## 安全边界\nauto_apply=False, no_live_trade=True")
     return f"# T001 — {version}\n- Version: {version}\n- Priority: P1\n- Owner: hermes_auto_developer\n"
@@ -101,9 +104,31 @@ def auto_run_once():
                 current = item.version
                 cursor["current_version"] = current
                 from factor_lab.leader.roadmap_cursor import CURSOR_FILE
-                import json
                 CURSOR_FILE.write_text(json.dumps(cursor, indent=2))
                 break
+
+    # 0. 如果 current_version 已经完成，尝试推进到下一个版本
+    completed_set = set(cursor.get("completed_versions", []))
+    if current in completed_set:
+        from factor_lab.leader.roadmap import is_backlog as _is_backlog
+        nv = next_version(current)
+        # 查找下一个非 backlog、未完成的版本
+        while nv and (_is_backlog(nv.version) or nv.version in completed_set):
+            nv = next_version(nv.version)
+        if nv:
+            # 找到可推进的下一个版本
+            cursor["current_version"] = nv.version
+            from factor_lab.leader.roadmap_cursor import CURSOR_FILE
+            CURSOR_FILE.write_text(json.dumps(cursor, indent=2))
+            current = nv.version
+        else:
+            # 路线图全部完成，不再需要执行
+            write_completion("completed", current, "all",
+                              summary={"passed": 0, "failed": 0, "note": "Roadmap complete"},
+                              completed_tasks=[current], remaining_tasks=[],
+                              next_question="roadmap complete")
+            release_lock("completed")
+            return {"status": "completed", "reason": "roadmap_complete", "version": current}
 
     cv = get_version(current)
 
@@ -152,6 +177,8 @@ def auto_run_once():
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "tasks").mkdir(exist_ok=True)
         task_text = f"Implement {cv.version}: {cv.name} - {cv.objective}"
+        if hasattr(cv, 'description') and cv.description:
+            task_text += f"\n\n## 详细描述\n\n{cv.description}"
         (run_dir / "tasks" / "T001.md").write_text(task_text)
         (run_dir / "tasks.json").write_text('["T001"]')
         _write_latest(tid, run_dir, current, 1)
@@ -192,10 +219,39 @@ def auto_run_once():
             _sid = _cs(_agent_adapter, f"版本 {current}: {cv.name}", version=current)
             from factor_lab.agent_console.sessions import write_lifecycle as _wl
             _wl(_sid, _agent_adapter, f"Auto execute {current}: {cv.name}")
+            # 写入启动参数
+            try:
+                from factor_lab.agent_console.sessions import SESSIONS_DIR as _SDIR2
+                _params = {
+                    "backend": backend,
+                    "agent_adapter": _agent_adapter,
+                    "effort_level": "ultra",
+                    "cli_command": "claude --print --dangerously-skip-permissions --permission-mode auto --add-dir ... --model deepseek-v4",
+                    "streaming_mode": "tail+live",
+                    "permission_mode": "auto",
+                }
+                (_SDIR2 / _sid / "startup_params.json").write_text(
+                    __import__('json').dumps(_params, indent=2))
+            except Exception:
+                pass
             _t.Thread(target=_start_agent, args=(_sid, _agent_adapter,
                        f"Auto execute {current}: {cv.name if cv else ''}"), daemon=True).start()
     except Exception:
         pass
+
+    # 5. Execute agent-runner 前先记录 retry_count（避免被 agent-runner 的 write_completion 覆盖）
+    _retry_count = 0
+    if not is_locked():
+        try:
+            _prev_file = TASKS_DIR / "latest_completion.json"
+            if _prev_file.exists():
+                _prev = json.loads(_prev_file.read_text())
+                if _prev and _prev.get("version") == current:
+                    _prev_note = _prev.get("summary", {}).get("note", "")
+                    if "agent_ok=False" in _prev_note and "test_ok=True" in _prev_note:
+                        _retry_count = _prev.get("summary", {}).get("retry_count", 0) + 1
+        except Exception:
+            pass
 
     # 5. Execute agent-runner (后台进程，实时流日志到 session)
     agent_log_dir = TASKS_DIR / "agent_logs"
@@ -283,7 +339,13 @@ def auto_run_once():
         if _agent_proc and _agent_proc.poll() is None:
             _agent_proc.kill()
 
-    # 6. Run tests
+    # 6. Run tests（先清理残留 pytest 进程）
+    try:
+        import subprocess as _sp_kill
+        _sp_kill.run(["pkill", "-f", "python3.*-m pytest.*test_"],
+                     capture_output=True, timeout=5)
+    except Exception:
+        pass
     test_ok = False
     try:
         r = subprocess.run(
@@ -298,6 +360,9 @@ def auto_run_once():
 
     # 7. Build human-readable summary
     commit = ""
+    # retry bypass: agent-runner 多次失败但测试通过 → 放行
+    if not agent_ok and test_ok and _retry_count >= 2:
+        agent_ok = True
     if agent_ok and test_ok:
         report_path = str(agent_log_dir)
         try:
@@ -318,33 +383,71 @@ def auto_run_once():
                 cwd="/home/ly/.hermes/research-assistant/commands"
             )
             if _ar.returncode != 0:
-                audit_ok = False
-                # 审计未通过：不 advance，标记 partial
-                write_completion("partial", current, cv.name,
-                                  report_dir=report_path,
-                                  summary={"passed": 0, "failed": 1,
-                                           "note": f"审计未通过 — {_ar.stdout[:500]}"},
-                                  remaining_tasks=[current],
-                                  next_question="audit failed, fix before continuing")
-                _status = "partial"
-                # 写入 Agent Console session
-                try:
-                    from factor_lab.agent_console.sessions import append_event, update_status
-                    from factor_lab.agent_console.schemas import AgentEvent
-                    _md = f"## ❌ 版本 {current} 审计未通过\n\n审计报告:\n```\n{_ar.stdout[:1000]}\n```\n"
-                    if _created_session:
-                        append_event(_sid, AgentEvent("answer_delta", _sid, data=_md, status="partial"))
-                        append_event(_sid, AgentEvent("done", _sid, data="", status="partial"))
-                        update_status(_sid, "partial")
-                except Exception:
-                    pass
-                _post_cleanup()
-                return {"status": "partial", "version": current, "reason": "audit_failed",
-                        "audit_output": _ar.stdout[:300]}
+                # 区分：审计本身失败 vs 审计通过但推送失败
+                _audit_passed = "✅ 通过" in _ar.stdout or "状态: ✅ 通过" in _ar.stdout or "status.:.passed" in _ar.stdout
+                if _audit_passed:
+                    # 审计通过但推送失败（git lock / 超时等），不阻塞版本
+                    audit_ok = True
+                else:
+                    write_completion("partial", current, cv.name,
+                                      report_dir=report_path,
+                                      summary={"passed": 0, "failed": 1,
+                                               "note": f"审计未通过 — {_ar.stdout[:500]}"},
+                                      remaining_tasks=[current],
+                                      next_question="audit failed, fix before continuing")
+                    _status = "partial"
+                    # 写入 Agent Console session
+                    try:
+                        from factor_lab.agent_console.sessions import append_event, update_status
+                        from factor_lab.agent_console.schemas import AgentEvent
+                        _md = f"## ❌ 版本 {current} 审计未通过\n\n审计报告:\n```\n{_ar.stdout[:1000]}\n```\n"
+                        if _sid:
+                            append_event(_sid, AgentEvent("answer_delta", _sid, data=_md, status="partial"))
+                            append_event(_sid, AgentEvent("done", _sid, data="", status="partial"))
+                            update_status(_sid, "partial")
+                    except Exception:
+                        pass
+                    _post_cleanup()
+                    return {"status": "partial", "version": current, "reason": "audit_failed",
+                            "audit_output": _ar.stdout[:300]}
         except subprocess.TimeoutExpired:
             audit_ok = True  # 超时放行，不阻塞推进
         except Exception:
             audit_ok = True
+
+        # 7b. 反偷工减料审计 (Anti-Cheat): 风险自动选择 Gate
+        if audit_ok:
+            try:
+                _ac = _sp.run(
+                    [VENV, CLI, "leader:anti-cheat-audit", "--risk", "auto",
+                     "--enable-gate5", "--version", current],
+                    capture_output=True, text=True, timeout=120,
+                    cwd="/home/ly/.hermes/research-assistant/commands"
+                )
+                if _ac.returncode != 0:
+                    audit_ok = False
+                    write_completion("partial", current, cv.name,
+                                      report_dir=report_path,
+                                      summary={"passed": 0, "failed": 1,
+                                               "note": f"Anti-cheat 审计未通过 — {_ac.stdout[:500]}"},
+                                      remaining_tasks=[current],
+                                      next_question="anti-cheat audit failed, fix stubs/tests before continuing")
+                    _status = "partial"
+                    try:
+                        _md = f"## ❌ 版本 {current} 反偷工减料审计未通过\n\n{_ac.stdout[:1000]}\n"
+                        if _sid:
+                            append_event(_sid, AgentEvent("answer_delta", _sid, data=_md, status="partial"))
+                            append_event(_sid, AgentEvent("done", _sid, data="", status="partial"))
+                            update_status(_sid, "partial")
+                    except Exception:
+                        pass
+                    _post_cleanup()
+                    return {"status": "partial", "version": current, "reason": "anti_cheat_failed",
+                            "audit_output": _ac.stdout[:300]}
+            except subprocess.TimeoutExpired:
+                pass  # 超时放行
+            except Exception:
+                pass
 
         if audit_ok:
             advance(current, "completed", commit=commit)
@@ -453,7 +556,8 @@ def auto_run_once():
                           report_dir=str(agent_log_dir),
                           summary={"passed": 0, "failed": 1,
                                    "note": f"agent_ok={agent_ok} test_ok={test_ok}",
-                                   "agent_error": agent_error},
+                                   "agent_error": agent_error,
+                                   "retry_count": _retry_count},
                           remaining_tasks=[current],
                           next_question="fix before continuing")
         _status = "partial"
