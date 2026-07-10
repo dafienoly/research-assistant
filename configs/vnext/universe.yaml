@@ -1,0 +1,37 @@
+version: 1
+account_profile:
+  allow_mainboard: true
+  allow_chinext_stocks: false
+  allow_star_stocks: false
+  allow_bse_stocks: false
+  allow_a_share_etf: true
+assets:
+  - {symbol: 600183.SH, name: 生益科技, market: A_SHARE, asset_class: stock, role: core_attack, board: MAINBOARD, tradability: tradable, data_source: tushare}
+  - {symbol: 002371.SZ, name: 北方华创, market: A_SHARE, asset_class: stock, role: core_attack, board: MAINBOARD, tradability: tradable, data_source: tushare}
+  - {symbol: 688012.SH, name: 中微公司, market: A_SHARE, asset_class: stock, role: anchor, board: STAR, tradability: restricted, substitute_symbol: 512480.SH, data_source: tushare}
+  - {symbol: 688256.SH, name: 寒武纪, market: A_SHARE, asset_class: stock, role: anchor, board: STAR, tradability: restricted, substitute_symbol: 588200.SH, data_source: tushare}
+  - {symbol: 688041.SH, name: 海光信息, market: A_SHARE, asset_class: stock, role: anchor, board: STAR, tradability: restricted, substitute_symbol: 588200.SH, data_source: tushare}
+  - {symbol: 688126.SH, name: 沪硅产业, market: A_SHARE, asset_class: stock, role: anchor, board: STAR, tradability: restricted, substitute_symbol: 512480.SH, data_source: tushare}
+  - {symbol: 512480.SH, name: 半导体ETF, market: A_SHARE, asset_class: etf, role: core_tool, board: ETF, tradability: ETF_substitution, data_source: tushare_fund_daily}
+  - {symbol: 515000.SH, name: 科技ETF, market: A_SHARE, asset_class: etf, role: core_tool, board: ETF, tradability: ETF_substitution, data_source: tushare_fund_daily}
+  - {symbol: 588200.SH, name: 科创芯片ETF, market: A_SHARE, asset_class: etf, role: permission_substitute, board: ETF, tradability: ETF_substitution, data_source: tushare_fund_daily}
+  - {symbol: 513180.SH, name: 恒生科技ETF, market: A_SHARE, asset_class: etf, role: hong_kong_extension, board: ETF, tradability: watch_only, data_source: tushare_fund_daily}
+  - {symbol: 510880.SH, name: 红利ETF, market: A_SHARE, asset_class: etf, role: risk_hedge, board: ETF, tradability: risk_hedge, data_source: tushare_fund_daily}
+  - {symbol: 510230.SH, name: 金融ETF, market: A_SHARE, asset_class: etf, role: style_proxy, board: ETF, tradability: proxy_signal, data_source: tushare_fund_daily}
+  - {symbol: 159928.SZ, name: 主要消费ETF, market: A_SHARE, asset_class: etf, role: style_proxy, board: ETF, tradability: proxy_signal, data_source: tushare_fund_daily}
+  - {symbol: 512400.SH, name: 有色金属ETF, market: A_SHARE, asset_class: etf, role: cyclical_proxy, board: ETF, tradability: proxy_signal, data_source: tushare_fund_daily}
+  - {symbol: 512660.SH, name: 军工ETF, market: A_SHARE, asset_class: etf, role: style_proxy, board: ETF, tradability: proxy_signal, data_source: tushare_fund_daily}
+  - {symbol: 515070.SH, name: 人工智能ETF, market: A_SHARE, asset_class: etf, role: ai_compute_proxy, board: ETF, tradability: proxy_signal, data_source: tushare_fund_daily}
+  - {symbol: 518880.SH, name: 黄金ETF, market: A_SHARE, asset_class: etf, role: risk_hedge, board: ETF, tradability: risk_hedge, data_source: tushare_fund_daily}
+  - {symbol: 511010.SH, name: 国债ETF, market: A_SHARE, asset_class: etf, role: risk_hedge, board: ETF, tradability: risk_hedge, data_source: tushare_fund_daily}
+  - {symbol: SOX, name: 费城半导体指数, market: US, asset_class: index, role: overseas_proxy, tradability: proxy_signal, data_source: configured_overseas_proxy}
+  - {symbol: NASDAQ100, name: 纳斯达克100, market: US, asset_class: index, role: overseas_proxy, tradability: proxy_signal, data_source: configured_overseas_proxy}
+style_baskets:
+  optical_modules:
+    symbols: [300308.SZ, 300502.SZ, 300394.SZ, 002281.SZ, 300570.SZ]
+    tradability: proxy_signal
+    note: 仅由真实本地日线构造等权风格收益，不作为用户账户执行组合
+  pcb:
+    symbols: [600183.SH, 002463.SZ, 002916.SZ, 300476.SZ]
+    tradability: proxy_signal
+    note: 仅由真实本地日线构造等权风格收益，不作为用户账户执行组合

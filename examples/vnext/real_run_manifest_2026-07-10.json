@@ -1,0 +1,49 @@
+{
+  "status": "PARTIAL",
+  "as_of": "2026-07-10",
+  "production_input": false,
+  "generated_from_real_sources": true,
+  "artifacts": {
+    "premarket_markdown": "data/vnext/reports/vnext_premarket_2026-07-10.md",
+    "premarket_json": "data/vnext/reports/vnext_premarket_2026-07-10.json",
+    "premarket_csv": "data/vnext/reports/vnext_premarket_2026-07-10.csv",
+    "policy_dataset": "data/vnext/backtest-inputs/policy_hypotheses.csv",
+    "backtest_result": "data/vnext/backtests/2026-07-10.json",
+    "ml_training_metadata": "data/vnext/ml/training.csv.metadata.json",
+    "ml_scoring_metadata": "data/vnext/ml/scoring_2026-07-10.csv.metadata.json",
+    "ml_model_registry": "data/vnext/ml/model_registry.json"
+  },
+  "real_run_summary": {
+    "daily_stock_files": 5738,
+    "valuation_stock_files": 5816,
+    "fund_flow_stock_files": 5383,
+    "fundamental_stock_files": 5473,
+    "fundamental_true_empty_codes": 57,
+    "concept_rows": 16,
+    "concept_target_rows": 380,
+    "industry_rows": 1,
+    "industry_target_rows": 80,
+    "telegram_credentials_valid": true,
+    "qmt_bridge_connected": true,
+    "qmt_account_readable": true,
+    "qmt_positions_readable": true,
+    "qmt_order_channel_enabled": false,
+    "cli_project_env_autoload": true,
+    "policy_trading_days": 1336,
+    "fixed_dynamic_hypothesis_rows": 252,
+    "ml_symbols": 5722,
+    "ml_training_rows": 6668235,
+    "ml_scoring_rows": 5510,
+    "ml_oos_rank_ic": 0.001138035682535087,
+    "ml_status": "PARTIAL",
+    "ml_lifecycle": "WATCH",
+    "ml_promotion_eligible": false,
+    "no_live_trade": true,
+    "live_enabled": false
+  },
+  "missing_evidence": [
+    "old TopN historical return series was deleted and cannot be silently reconstructed",
+    "MX_APIKEY is configured, but mx-data returned only 16/380 concept rows and 1/80 industry rows",
+    "intraday and event snapshots are stale; Hong Kong and overseas proxy datasets are missing"
+  ]
+}

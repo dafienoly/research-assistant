@@ -1,0 +1,27 @@
+version: 1
+default_model: ridge
+models:
+  ridge: enabled
+  elasticnet: enabled
+  random_forest: optional
+  xgboost_ranker: optional_dependency
+  lightgbm_ranker: optional_dependency
+  catboost_ranker: optional_dependency
+  mlp: optional
+  sequence_representation: reserved_not_live
+outputs:
+  - candidate_score
+  - rank
+  - confidence
+  - feature_attribution
+  - regime_applicability
+  - model_version
+  - training_window
+  - oos_score
+  - risk_warning
+forbidden_outputs: [buy, sell, executable_order]
+validation:
+  time_split: true
+  walk_forward_required_for_promotion: true
+  feature_importance_required: true
+  retirement_on_decay: true

@@ -29,6 +29,7 @@ _commands_dir = os.path.dirname(_test_dir)
 if _commands_dir not in sys.path:
     sys.path.insert(0, _commands_dir)
 
+import data_pipeline as data_pipeline_module
 from data_pipeline import (
     batch_daily,
     batch_fina,
@@ -50,13 +51,33 @@ from data_pipeline import (
 
 
 @pytest.fixture(autouse=True)
-def clean_normalized_dirs():
-    """Ensure clean normalized directories before each test."""
-    for d in [DAILY_DIR, FINA_DIR, VALUATION_DIR]:
-        d.mkdir(parents=True, exist_ok=True)
-        for f in d.iterdir():
-            if f.is_file() and f.suffix == ".csv":
-                f.unlink()
+def clean_normalized_dirs(tmp_path, monkeypatch):
+    """Isolate every test from the real data/normalized directories."""
+    daily_dir = tmp_path / "market"
+    fina_dir = tmp_path / "fundamentals"
+    valuation_dir = tmp_path / "valuation"
+    fund_flow_dir = tmp_path / "fund_flow"
+    etc_dir = tmp_path / "normalized"
+
+    for directory in [daily_dir, fina_dir, valuation_dir, fund_flow_dir, etc_dir]:
+        directory.mkdir(parents=True, exist_ok=True)
+
+    isolated_dirs = {
+        "DAILY_DIR": daily_dir,
+        "FINA_DIR": fina_dir,
+        "VALUATION_DIR": valuation_dir,
+        "FUND_FLOW_DIR": fund_flow_dir,
+        "ETC_DIR": etc_dir,
+    }
+    for name, directory in isolated_dirs.items():
+        monkeypatch.setattr(data_pipeline_module, name, directory)
+
+    # Existing assertions import these constants directly, so point the test
+    # module aliases at the same isolated paths as the production module.
+    test_module = sys.modules[__name__]
+    monkeypatch.setattr(test_module, "DAILY_DIR", daily_dir)
+    monkeypatch.setattr(test_module, "FINA_DIR", fina_dir)
+    monkeypatch.setattr(test_module, "VALUATION_DIR", valuation_dir)
     yield
 
 
@@ -350,3 +371,61 @@ class TestCLIHandlers:
         cmd_pull_valuation(["--codes", "000001.SZ"])
         captured = capsys.readouterr()
         assert "估值" in captured.out or "000001" in captured.out
+
+
+class TestGapReport:
+    def test_partial_concept_and_industry_are_reported_as_gaps(
+        self, monkeypatch, clean_normalized_dirs, capsys
+    ):
+        ts_client = MagicMock()
+        ts_client._query.return_value = pd.DataFrame(
+            {"ts_code": [f"{i:06d}.SZ" for i in range(100)]}
+        )
+        monkeypatch.setattr(data_pipeline_module, "_get_ts_client", lambda: ts_client)
+        monkeypatch.setattr(data_pipeline_module, "_get_trade_days", lambda _start: [])
+
+        concept_path = data_pipeline_module.ETC_DIR / "concept" / "concept_list.csv"
+        industry_path = data_pipeline_module.ETC_DIR / "industry" / "industry_list.csv"
+        concept_path.parent.mkdir(parents=True, exist_ok=True)
+        industry_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({"code": range(16)}).to_csv(concept_path, index=False)
+        pd.DataFrame({"code": range(1)}).to_csv(industry_path, index=False)
+
+        result = data_pipeline_module.gap_report_and_plan()
+        captured = capsys.readouterr()
+        by_type = {item["type"]: item for item in result["gaps"]}
+
+        assert by_type["概念板块"] == {
+            "type": "概念板块",
+            "have": 16,
+            "need": 380,
+            "gap": 364,
+            "status": "PARTIAL",
+        }
+        assert by_type["行业分类"] == {
+            "type": "行业分类",
+            "have": 1,
+            "need": 80,
+            "gap": 79,
+            "status": "PARTIAL",
+        }
+        assert "⚠️ 概念板块" in captured.out
+        assert "⚠️ 行业分类" in captured.out
+
+    def test_missing_stock_baseline_is_unknown_not_complete(
+        self, monkeypatch, clean_normalized_dirs, capsys
+    ):
+        ts_client = MagicMock()
+        ts_client._query.return_value = pd.DataFrame()
+        monkeypatch.setattr(data_pipeline_module, "_get_ts_client", lambda: ts_client)
+        monkeypatch.setattr(data_pipeline_module, "_get_trade_days", lambda _start: [])
+
+        result = data_pipeline_module.gap_report_and_plan()
+        captured = capsys.readouterr()
+
+        for item in result["gaps"][:4]:
+            assert item["need"] == "UNKNOWN"
+            assert item["gap"] == "UNKNOWN"
+            assert item["status"] == "UNKNOWN"
+        assert "✅ 日线 kline" not in captured.out
+        assert "⚠️ 日线 kline" in captured.out

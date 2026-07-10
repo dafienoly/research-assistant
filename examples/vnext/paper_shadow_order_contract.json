@@ -1,0 +1,46 @@
+{
+  "document_only": true,
+  "production_input": false,
+  "orders": [
+    {
+      "order": {
+        "approval_id": "REPLACE_WITH_REAL_APPROVAL_ID",
+        "symbol": "REPLACE_WITH_REAL_SYMBOL",
+        "side": "BUY",
+        "quantity": 0,
+        "limit_price": null,
+        "strategy_source": "REPLACE_WITH_REAL_STRATEGY_SOURCE",
+        "rationale": "REPLACE_WITH_REAL_EVIDENCE_CHAIN",
+        "regime": "MISSING",
+        "semiconductor_state": "MISSING",
+        "model_score": null,
+        "portfolio_impact": {},
+        "risk_summary": ["DOCUMENT_ONLY_NOT_EXECUTABLE"],
+        "data_freshness": "MISSING",
+        "account_permission": "MISSING",
+        "alternative_etf": null,
+        "watch_only": true,
+        "created_at": "REPLACE_WITH_REAL_TIMESTAMP"
+      },
+      "safety": {
+        "data_status": "MISSING",
+        "data_fresh": false,
+        "account_permission": false,
+        "funds_available": false,
+        "positions_synced": false,
+        "within_trading_session": false,
+        "price_limit_clear": false,
+        "suspension_clear": false,
+        "st_clear": false,
+        "liquidity_clear": false,
+        "stock_weight_clear": false,
+        "theme_exposure_clear": false,
+        "portfolio_drawdown_clear": false,
+        "daily_loss_clear": false,
+        "kill_switch_triggered": true,
+        "telegram_approved": false,
+        "approval_id": "REPLACE_WITH_REAL_APPROVAL_ID"
+      }
+    }
+  ]
+}

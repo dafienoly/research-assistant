@@ -1,0 +1,37 @@
+version: 1
+default_mode: READ_ONLY
+no_live_trade: true
+live_enabled: false
+allow_direct_ui_order: false
+approval:
+  provider: telegram
+  required_for_every_live_order: true
+  actions: [APPROVE, REJECT, MODIFY, DELAY]
+  modification_requires_reapproval: true
+kill_switch:
+  enabled: true
+  bypass_allowed: false
+promotion_path:
+  - READ_ONLY
+  - PAPER
+  - SHADOW
+  - LIVE_DRY_RUN
+  - LIVE_APPROVAL_REQUIRED
+  # LIVE_ENABLED is documented for future external authorization but unreachable in this release.
+live_safety_checks:
+  - data_freshness
+  - account_permission
+  - funds
+  - positions
+  - trading_time
+  - price_limit
+  - suspension
+  - st_status
+  - liquidity
+  - single_stock_weight
+  - theme_exposure
+  - portfolio_drawdown
+  - daily_loss
+  - kill_switch
+  - telegram_approval
+  - order_audit_log

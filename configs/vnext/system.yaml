@@ -1,0 +1,9 @@
+version: 1
+enabled: true
+environment_override: HERMES_VNEXT_ENABLED
+disable_values: ["0", "false", "no", "off"]
+disable_behavior:
+  cli_status: BLOCKED
+  api_status: 503
+  legacy_routes_affected: false
+  real_broker_called: false

@@ -1,42 +1,28 @@
 {
   "requirements": [
-    {
-      "id": "T1",
-      "title": "拆分 IC/RankIC — Pearson IC + Spearman RankIC",
-      "code_locations": [
-        {"file": "commands/factor_lab/batch_compute.py", "function": "compute_all_and_cache", "line": 189},
-        {"file": "commands/factor_lab/batch_compute.py", "function": "results dict", "line": 246}
-      ],
-      "expected_keywords": ["pearsonr", "spearmanr", "daily_pearson_ics", "daily_spearman_ics", "ic_mean", "rank_ic_mean"],
-      "behavior": "IC 使用 Pearson 线性相关系数逐日均值；RankIC 使用 Spearman 秩相关系数逐日均值；两者值不同"
-    },
-    {
-      "id": "T2",
-      "title": "最大回撤 — 从 top-bottom 净值曲线计算",
-      "code_locations": [
-        {"file": "commands/factor_lab/batch_compute.py", "function": "compute_all_and_cache", "line": 234}
-      ],
-      "expected_keywords": ["daily_spread", "cumprod", "expanding().max()", "max_drawdown"],
-      "behavior": "从 Top-Bottom 逐日收益序列构建净值曲线，用累积峰值法计算最大回撤"
-    },
-    {
-      "id": "T3",
-      "title": "风险暴露 — 波动率/动量/流动性截面暴露",
-      "code_locations": [
-        {"file": "commands/factor_lab/batch_compute.py", "function": "_compute_risk_exposure", "line": 310}
-      ],
-      "expected_keywords": ["vol_20d", "mom_20d", "turnover_rate", "spearmanr", "> 0.3"],
-      "behavior": "截面 Spearman 相关 >0.3 标记为高暴露；覆盖波动率/动量/流动性三个维度"
-    },
-    {
-      "id": "T4",
-      "title": "半导体等权超额收益 — 真实基准",
-      "code_locations": [
-        {"file": "commands/factor_lab/batch_compute.py", "function": "_compute_semiconductor_excess", "line": 367},
-        {"file": "commands/factor_lab/batch_compute.py", "function": "_load_semiconductor_stocks", "line": 344}
-      ],
-      "expected_keywords": ["semiconductor_chain_tags.csv", "benchmarks_v4", "semi_ret", "excess"],
-      "behavior": "从 U3 半导体池或 tags CSV 加载成分股，计算等权基准收益，与 top-bottom 相减得超额"
-    }
-  ]
+    {"id":"R1","title":"真实数据快照且缺失可见","code_locations":[{"file":"commands/factor_lab/vnext/snapshot.py","function":"build","line":70}],"expected_keywords":["Tushare","source_statuses","MISSING","PARTIAL"],"behavior":"只从配置的真实源和明确本地文件构建快照，失败记录来源状态，不静默替代"},
+    {"id":"R2","title":"数据质量与新鲜度门禁","code_locations":[{"file":"commands/factor_lab/vnext/data_quality.py","function":"inspect_file","line":129}],"expected_keywords":["max_age_days","DataStatus.MISSING","DataStatus.STALE","DataStatus.PARTIAL"],"behavior":"校验文件存在性、字段、记录数和更新时间并降级"},
+    {"id":"R3","title":"多资产宇宙与可交易性","code_locations":[{"file":"commands/factor_lab/vnext/data_quality.py","function":"execution_candidates","line":105}],"expected_keywords":["Tradability.TRADABLE","Tradability.ETF_SUBSTITUTION","Tradability.RISK_HEDGE"],"behavior":"只允许可交易、ETF替代和风险对冲资产进入执行候选"},
+    {"id":"R4","title":"固定与动态指数箱体","code_locations":[{"file":"commands/factor_lab/vnext/market.py","function":"compute_index_box","line":31}],"expected_keywords":["fixed_box","dynamic_box","rolling_60d_low","fixed_threshold_validation_required"],"behavior":"同时计算用户假设箱体和滚动学习箱体并标注固定阈值待验证"},
+    {"id":"R5","title":"政策托底、广度背离与风格轮动","code_locations":[{"file":"commands/factor_lab/vnext/market.py","function":"compute_policy_support_proxy","line":177}],"expected_keywords":["policy_support_proxy_score","breadth_divergence_score","index_box_position"],"behavior":"用可回测代理量化政策支持，不把国家队作为直接变量"},
+    {"id":"R6","title":"半导体十二态主线状态机","code_locations":[{"file":"commands/factor_lab/vnext/semiconductor.py","function":"evaluate","line":52}],"expected_keywords":["MainlineState","recommended_action_bias","state_transition_reason","preferred_instrument"],"behavior":"输出状态、置信度、证据缺口、转移原因、工具和动作偏置"},
+    {"id":"R7","title":"八态 Regime Router","code_locations":[{"file":"commands/factor_lab/vnext/regime.py","function":"route","line":35}],"expected_keywords":["regime_name","recommended_risk_budget","semiconductor_budget","allow_new_buy"],"behavior":"路由市场状态并给出风险、半导体、防守、现金预算和交易约束"},
+    {"id":"R8","title":"组合风险与假分散","code_locations":[{"file":"commands/factor_lab/vnext/portfolio.py","function":"analyze","line":56}],"expected_keywords":["downside_correlation","drawdown_overlap","technology_beta_exposure","false_diversification_warning"],"behavior":"计算多窗口/下行相关、回撤重叠、beta暴露与假分散"},
+    {"id":"R9","title":"候选边际 Sharpe 与回撤","code_locations":[{"file":"commands/factor_lab/vnext/portfolio.py","function":"candidate_impact","line":183}],"expected_keywords":["marginal_sharpe","marginal_drawdown","candidate_weight"],"behavior":"评估新候选对组合Sharpe和回撤的边际贡献"},
+    {"id":"R10","title":"RankIC 因子选择","code_locations":[{"file":"commands/factor_lab/vnext/ml.py","function":"select","line":33}],"expected_keywords":["rank_ic","selected_factors","rejected","redundant_with"],"behavior":"按RankIC与冗余约束选择可解释因子"},
+    {"id":"R11","title":"横截面模型治理","code_locations":[{"file":"commands/factor_lab/vnext/ml.py","function":"model_card","line":277}],"expected_keywords":["promotion_eligible","lifecycle_status","oos_score","direct_buy_sell_output"],"behavior":"模型输出score/rank/解释和OOS治理状态，不直接输出买卖"},
+    {"id":"R12","title":"回测稳健性和多 Regime 验证","code_locations":[{"file":"commands/factor_lab/vnext/backtest.py","function":"evaluate","line":146}],"expected_keywords":["cost_bps","slippage_bps","impact_bps","regimes"],"behavior":"验证成本、滑点、冲击、频率和牛熊震荡流动性冲击阶段"},
+    {"id":"R13","title":"Paper/Shadow 连续安全循环","code_locations":[{"file":"commands/factor_lab/vnext/trading.py","function":"run_continuous","line":58}],"expected_keywords":["run_once","interval_seconds","max_cycles"],"behavior":"连续运行纸面/影子循环并保留每周期结果"},
+    {"id":"R14","title":"交易安全门与 Kill Switch","code_locations":[{"file":"commands/factor_lab/vnext/execution.py","function":"evaluate","line":82}],"expected_keywords":["kill_switch","telegram_approval","approval_id_present","data_freshness"],"behavior":"在订单提交前检查全量安全前置条件"},
+    {"id":"R15","title":"Telegram 审批闸门","code_locations":[{"file":"commands/factor_lab/vnext/execution.py","function":"decide","line":358}],"expected_keywords":["APPROVE","REJECT","MODIFY","DELAY"],"behavior":"审批动作只更新审计记录，watch-only或Kill Switch无法批准"},
+    {"id":"R16","title":"miniQMT live-ready 但实盘硬阻断","code_locations":[{"file":"commands/factor_lab/vnext/execution.py","function":"submit","line":252}],"expected_keywords":["no_live_trade_safety_invariant","live_enabled","real_broker_called"],"behavior":"Live Broker接口和订单协议就绪，但提交永久返回BLOCKED且不调用真实broker"},
+    {"id":"R17","title":"反脆弱归因与训练样本","code_locations":[{"file":"commands/factor_lab/vnext/review.py","function":"review","line":31}],"expected_keywords":["structured_training_sample","policy_put_hypothesis_score","paper_vs_backtest_gap","shadow_vs_paper_gap"],"behavior":"归因Regime/主线/策略/仓位/执行/数据并生成治理决策和结构化样本"},
+    {"id":"R18","title":"统一盘前报告二十问","code_locations":[{"file":"commands/factor_lab/vnext/report.py","function":"render","line":22}],"expected_keywords":["当前 Regime","政策托底代理","missing_evidence","no_live_trade"],"behavior":"报告汇总Regime、主线、组合、证据、缺口、置信度和交易安全"},
+    {"id":"R19","title":"十二页投研交易控制台","code_locations":[{"file":"commands/frontend/src/pages/vnext/VNextPage.tsx","function":"","line":517}],"expected_keywords":["MISSING","STALE","PARTIAL","审批动作不会触发真实下单","data-health"],"behavior":"十二个页面显示加载/错误/空/陈旧态，审批与实盘动作严格分离"},
+    {"id":"R20","title":"VNext 可禁用与CLI项目根路径","code_locations":[{"file":"commands/factor_lab/vnext/cli.py","function":"handle","line":79}],"expected_keywords":["HERMES_VNEXT_ENABLED=false","no_live_trade","real_broker_called","_project_path"],"behavior":"环境开关可整体阻断VNext，CLI相对输入从项目根解析且安全状态可见"},
+    {"id":"R21","title":"CLI 自动加载项目凭据","code_locations":[{"file":"commands/hermes_cli.py","function":"_load_project_env","line":28}],"expected_keywords":["HERMES_ENV_FILE","load_dotenv","override=False"],"behavior":"CLI 分派前自动读取项目根 .env，显式 shell 环境变量优先且不输出凭据"},
+    {"id":"R22","title":"数据缺口必须 fail-visible","code_locations":[{"file":"commands/data_pipeline.py","function":"gap_report_and_plan","line":1215}],"expected_keywords":["UNKNOWN","PARTIAL","概念板块","行业分类"],"behavior":"基准不可用时标记 UNKNOWN；概念/行业按 380/80 目标计算真实缺口，少量非空数据不得冒充完成"},
+    {"id":"R23","title":"数据管道测试与真实数据隔离","code_locations":[{"file":"commands/tests/test_data_pipeline.py","function":"clean_normalized_dirs","line":54}],"expected_keywords":["tmp_path","monkeypatch","FUND_FLOW_DIR","ETC_DIR"],"behavior":"所有数据管道测试仅写 pytest 临时目录，不删除或覆盖 data/normalized 中的真实 CSV"}
+  ],
+  "source": "docs/vnext/e2e_acceptance_report.md"
 }

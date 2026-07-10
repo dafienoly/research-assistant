@@ -24,6 +24,22 @@ os.chdir(BASE)
 sys.path.insert(0, str(BASE))
 sys.path.insert(0, str(ROOT))
 
+
+def _load_project_env() -> bool:
+    """Load project credentials without overriding an explicit shell environment."""
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return False
+
+    env_path = Path(os.environ.get("HERMES_ENV_FILE", str(ROOT / ".env"))).expanduser()
+    if not env_path.is_file():
+        return False
+    return bool(load_dotenv(env_path, override=False))
+
+
+_load_project_env()
+
 from config import ensure_dirs, now_str, VENV_PYTHON
 
 
@@ -104,6 +120,31 @@ def show_help():
   shadow:v4-run [--date YYYY-MM-DD] [--capital 50000] [--top-n 10]
                                 V4.8 Shadow Trading: 影子交易 (计划vs行情, 相对等权基准)
   shadow:v4-report              查看 V4.8 Shadow Trading 多日报告
+  portfolio:multi-regime --date YYYY-MM-DD
+                                VNext 多资产 Regime + 组合风险分析（真实数据，缺失显式降级）
+  strategy:policy-put --date YYYY-MM-DD
+                                VNext 指数箱体/政策托底代理/广度背离分析
+  semi:mainline-state --date YYYY-MM-DD
+                                VNext 半导体主线状态机
+  ml:ranker-train --start YYYY-MM-DD --end YYYY-MM-DD [--input CSV]
+                                VNext 因子筛选与横截面排序模型训练（仅 score/rank）
+  ml:ranker-score --date YYYY-MM-DD
+                                查看 VNext ML Ranker 样本外模型卡/排序产物
+  trading:paper-run --date YYYY-MM-DD [--input ORDERS.json]
+  trading:shadow-run --date YYYY-MM-DD [--input ORDERS.json]
+                                VNext Paper / Shadow 安全运行入口（绝不调用真实 Broker）
+  approval:telegram-test       Telegram 审批配置与 dry-run 检查
+  broker:qmt-probe             miniQMT 只读探测（no_live_trade 永远开启）
+  review:antifragile --date YYYY-MM-DD [--input REVIEW.json]
+                                VNext 反脆弱归因与结构化训练样本
+  report:vnext-premarket --date YYYY-MM-DD
+                                生成 VNext 盘前统一报告
+  vnext:backtest-validate --input POLICY_DATA.csv [--date YYYY-MM-DD]
+                                政策托底/箱体/广度/轮动假设与多基准验证
+  vnext:backtest-build --start YYYY-MM-DD --date YYYY-MM-DD
+                                从真实 Tushare 指数/ETF与全A日线构建假设回测数据集
+  vnext:ml-dataset-build --start YYYY-MM-DD --end YYYY-MM-DD [--max-symbols N]
+                                从真实日线构建无未来泄漏的 ML 训练/评分数据集
   factor:review-decisions --start YYYY-MM-DD --end YYYY-MM-DD
                                 决策复盘: 系统推荐 vs 人工执行表现 (V1.13)
   factor:rebalance-diff --date 2026-07-03 --positions data/positions/current_positions.csv --plan B
@@ -439,6 +480,9 @@ def main():
         return
     from leader_commands import handle as _hlc
     if _hlc(command, args):
+        return
+    from factor_lab.vnext.cli import handle as _hvnext
+    if _hvnext(command, args):
         return
 
     # === 市场类 ===

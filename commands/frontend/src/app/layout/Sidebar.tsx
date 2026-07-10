@@ -4,18 +4,18 @@ import { Menu, Typography, Tooltip } from 'antd'
 import type { MenuProps } from 'antd'
 import {
   DashboardOutlined,
-  DatabaseOutlined,
   FundOutlined,
   ThunderboltOutlined,
-  ExperimentOutlined,
-  BarChartOutlined,
   PieChartOutlined,
-  DollarOutlined,
-  WalletOutlined,
-  SafetyOutlined,
-  FileTextOutlined,
-  AlertOutlined,
   SettingOutlined,
+  ApiOutlined,
+  CheckSquareOutlined,
+  ControlOutlined,
+  LineChartOutlined,
+  MedicineBoxOutlined,
+  RadarChartOutlined,
+  RobotOutlined,
+  SwapOutlined,
 } from '@ant-design/icons'
 
 interface SidebarProps {
@@ -26,18 +26,18 @@ interface SidebarProps {
 type MenuItem = Required<MenuProps>['items'][number]
 
 const RESEARCH_MENU: MenuItem[] = [
-  { key: '/', icon: <DashboardOutlined />, label: '首页' },
-  { key: '/data', icon: <DatabaseOutlined />, label: '数据中心' },
-  { key: '/stocks', icon: <FundOutlined />, label: '股票池' },
-  { key: '/semi', icon: <ThunderboltOutlined />, label: '半导体主题' },
-  { key: '/factors', icon: <ExperimentOutlined />, label: '因子实验室' },
-  { key: '/backtest', icon: <BarChartOutlined />, label: '回测实验室' },
-  { key: '/portfolio', icon: <PieChartOutlined />, label: '组合推荐' },
-  { key: '/qmt', icon: <DollarOutlined />, label: 'QMT 实盘' },
-  { key: '/paper', icon: <WalletOutlined />, label: 'Paper / Shadow' },
-  { key: '/livegate', icon: <SafetyOutlined />, label: 'Live Gate' },
-  { key: '/reports', icon: <FileTextOutlined />, label: '报告审计' },
-  { key: '/events', icon: <AlertOutlined />, label: '事件研报' },
+  { key: '/', icon: <DashboardOutlined />, label: 'Control Tower' },
+  { key: '/vnext/regime', icon: <RadarChartOutlined />, label: 'Regime / 托底' },
+  { key: '/vnext/semi', icon: <ThunderboltOutlined />, label: '半导体主线' },
+  { key: '/vnext/candidates', icon: <FundOutlined />, label: '信号候选' },
+  { key: '/vnext/portfolio', icon: <PieChartOutlined />, label: '组合风险' },
+  { key: '/vnext/ml', icon: <RobotOutlined />, label: 'ML Ranker' },
+  { key: '/vnext/backtests', icon: <LineChartOutlined />, label: '回测验证' },
+  { key: '/vnext/trading', icon: <SwapOutlined />, label: 'Paper / Shadow' },
+  { key: '/vnext/approvals', icon: <CheckSquareOutlined />, label: 'Telegram 审批' },
+  { key: '/vnext/execution', icon: <ControlOutlined />, label: 'miniQMT / 模式' },
+  { key: '/vnext/review', icon: <MedicineBoxOutlined />, label: '反脆弱复盘' },
+  { key: '/vnext/data-health', icon: <ApiOutlined />, label: '数据健康' },
 ]
 
 const Sidebar: React.FC<SidebarProps> = ({ collapsed, onOpenAgentOps }) => {

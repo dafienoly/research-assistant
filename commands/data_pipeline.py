@@ -1231,20 +1231,49 @@ def gap_report_and_plan() -> dict:
     ff_count = len(list(FUND_FLOW_DIR.glob("*.csv")))
     fina_count = len(list(FINA_DIR.glob("*.csv")))
 
-    gaps = [
-        {"type": "日线 kline", "have": daily_count, "need": total, "gap": total - daily_count},
-        {"type": "估值 (PE/PB)", "have": val_count, "need": total, "gap": total - val_count},
-        {"type": "资金流向", "have": ff_count, "need": total, "gap": total - ff_count},
-        {"type": "财务指标", "have": fina_count, "need": total, "gap": total - fina_count},
+    stock_datasets = [
+        ("日线 kline", daily_count),
+        ("估值 (PE/PB)", val_count),
+        ("资金流向", ff_count),
+        ("财务指标", fina_count),
     ]
+    gaps = []
+    for dataset_type, have in stock_datasets:
+        if total > 0:
+            gap = max(total - have, 0)
+            status = "OK" if gap == 0 else "PARTIAL"
+            need: int | str = total
+        else:
+            gap = "UNKNOWN"
+            status = "UNKNOWN"
+            need = "UNKNOWN"
+        gaps.append({
+            "type": dataset_type,
+            "have": have,
+            "need": need,
+            "gap": gap,
+            "status": status,
+        })
 
     # 概念/行业
     concept_path = ETC_DIR / "concept" / "concept_list.csv"
     industry_path = ETC_DIR / "industry" / "industry_list.csv"
     concept_list = _read_csv_safe(concept_path)
     industry_list = _read_csv_safe(industry_path)
-    gaps.append({"type": "概念板块", "have": len(concept_list), "need": "~380", "gap": "未拉取" if concept_list.empty else "✅"})
-    gaps.append({"type": "行业分类", "have": len(industry_list), "need": "~80", "gap": "未拉取" if industry_list.empty else "✅"})
+    for dataset_type, dataset, target in [
+        ("概念板块", concept_list, 380),
+        ("行业分类", industry_list, 80),
+    ]:
+        have = len(dataset)
+        gap = max(target - have, 0)
+        status = "OK" if gap == 0 else "MISSING" if have == 0 else "PARTIAL"
+        gaps.append({
+            "type": dataset_type,
+            "have": have,
+            "need": target,
+            "gap": gap,
+            "status": status,
+        })
 
     print(f"{'─'*60}")
     print(f"{'数据集':16s} {'已有':>8s} {'总需':>8s} {'缺口':>10s}")
@@ -1253,7 +1282,7 @@ def gap_report_and_plan() -> dict:
         have_str = str(g["have"])
         need_str = str(g["need"])
         gap_str = str(g["gap"]) if isinstance(g["gap"], str) else str(g["gap"])
-        icon = "✅" if (isinstance(g["gap"], int) and g["gap"] == 0) or g["gap"] == "✅" else "⚠️"
+        icon = "✅" if isinstance(g["gap"], int) and g["gap"] == 0 else "⚠️"
         print(f"  {icon} {g['type']:12s}  {have_str:>8s}  {need_str:>8s}  {gap_str:>10s}")
 
     print()

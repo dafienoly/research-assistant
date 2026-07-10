@@ -1,0 +1,13 @@
+{
+  "status": "MISSING",
+  "component": "regime",
+  "as_of": "YYYY-MM-DD",
+  "confidence": 0.0,
+  "evidence": [],
+  "missing_evidence": [
+    "real market snapshot has not been produced for the requested date"
+  ],
+  "data_sources": [],
+  "payload": {},
+  "production_input": false
+}

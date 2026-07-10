@@ -35,7 +35,37 @@ def init(ContextInfo):
 
 
 def handlebar(ContextInfo):
-    pass
+    """Publish a fail-visible read-only heartbeat on every QMT bar.
+
+    QMT's built-in strategy callback cannot access miniQMT order/account APIs.
+    The heartbeat therefore advertises that limitation explicitly and never
+    attempts to place, cancel, or query an order.
+    """
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    heartbeat = {
+        "as_of": datetime.now(CST).isoformat(),
+        "mode": "READ_ONLY",
+        "no_live_trade": True,
+        "live_enabled": False,
+        "order_channel": "DISABLED",
+        "account_channel": "BUILTIN_QMT_UNAVAILABLE",
+        "source": "qmt_builtin_strategy_handlebar",
+    }
+    path = OUTPUT_FILE + ".heartbeat.json"
+    temporary = path + ".tmp"
+    try:
+        with open(temporary, "w", encoding="utf-8") as handle:
+            json.dump(heartbeat, handle, ensure_ascii=False, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    except Exception as exc:
+        try:
+            with open(OUTPUT_FILE + ".err", "a", encoding="utf-8") as handle:
+                handle.write("heartbeat: " + repr(exc) + "\n")
+        except Exception:
+            return heartbeat
+    return heartbeat
 
 
 def _dumper_loop(ContextInfo, account_id=""):

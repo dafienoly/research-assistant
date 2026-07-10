@@ -60,6 +60,90 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Hermes VNext control console */
+.vnext-page {
+  min-height: 100%;
+  color: #0f172a;
+}
+
+.vnext-page-header {
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef6ff 100%);
+}
+
+.vnext-card {
+  border-radius: 12px;
+  border-color: #dbe4f0;
+}
+
+.vnext-card.degraded {
+  border-left: 4px solid #f59e0b;
+}
+
+.vnext-metric-card {
+  height: 100%;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.vnext-metric-value {
+  margin-top: 6px;
+  color: #0f172a;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.vnext-metric-value.danger,
+.vnext-danger-text {
+  color: #b91c1c;
+}
+
+.vnext-updated {
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.vnext-json {
+  max-width: 100%;
+  max-height: 360px;
+  margin: 0;
+  padding: 10px;
+  overflow: auto;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #dbeafe;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.vnext-json.compact {
+  max-height: 150px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .vnext-page {
+    color: #e2e8f0;
+  }
+
+  .vnext-page-header,
+  .vnext-metric-card,
+  .vnext-card {
+    border-color: #334155;
+    background: #111827;
+  }
+
+  .vnext-metric-value {
+    color: #f8fafc;
+  }
+}
+
 /* ── Utility Classes ───────────────────────────────────────────────────── */
 
 /* Card component — shadow-as-border inspired by Vercel */

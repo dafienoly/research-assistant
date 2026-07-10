@@ -68,6 +68,7 @@ from factor_lab.api_server.routes_live import router as live_router
 from factor_lab.api_server.routes_theme import router as theme_router
 from factor_lab.api_server.routes_events import router as events_router
 from factor_lab.api_server.routes_settings import router as settings_router
+from factor_lab.api_server.routes_vnext import router as vnext_router
 
 # ──────────────────────────────────────────────
 # 统一响应格式
@@ -363,6 +364,7 @@ app.include_router(live_router, prefix="/api")
 app.include_router(theme_router, prefix="/api")
 app.include_router(events_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
+app.include_router(vnext_router, prefix="/api")
 
 
 # ── /api/version ──────────────────────────────

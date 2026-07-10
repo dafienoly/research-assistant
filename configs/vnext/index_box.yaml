@@ -1,0 +1,21 @@
+version: 1
+index_box:
+  index: SSE_OR_CSI_ALL_PROXY
+  # User hypothesis thresholds. They are research inputs, never permanent rules.
+  lower_bound: 3900
+  policy_put_zone: 3950
+  neutral_line: 4000
+  upper_warning: 4050
+  upper_risk: 4100
+  upper_bound: 4200
+dynamic_box:
+  windows: [60, 120]
+  percentiles: [20, 80]
+  include_ma: true
+  include_vwap: true
+  include_volume_profile: true
+validation:
+  horizons: [1, 3, 5]
+  compare_fixed_vs_dynamic: true
+  minimum_events: 20
+  warning: fixed thresholds are hypotheses and require out-of-sample validation

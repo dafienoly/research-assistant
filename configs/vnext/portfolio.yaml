@@ -1,0 +1,27 @@
+version: 1
+objective: maximize_risk_adjusted_return_with_drawdown_control
+default_research_weights:
+  semiconductor: 0.35
+  technology: 0.15
+  hong_kong_tech: 0.10
+  dividend: 0.12
+  gold: 0.10
+  bond: 0.10
+  nasdaq_proxy: 0.08
+correlation_windows: [20, 60, 120]
+false_diversification:
+  absolute_correlation_warning: 0.75
+  technology_beta_warning: 0.72
+  semiconductor_beta_warning: 0.72
+  minimum_effective_assets: 2.5
+constraints:
+  watch_only_weight: 0
+  restricted_stock_weight: 0
+  overseas_proxy_default_weight: 0
+  etf_substitution_must_be_marked: true
+optimizers:
+  - risk_parity
+  - minimum_variance
+  - maximum_sharpe
+  - marginal_sharpe
+  - correlation_constrained
