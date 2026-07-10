@@ -34,7 +34,7 @@ const fmtMoney = (v: number) =>
 /** Format percentage with sign */
 const fmtPct = (v: number | null | undefined, digits = 2): string => {
   if (v == null) return '—'
-  return `${v >= 0 ? '+' : ''}${v.toFixed(digits)}%`
+  return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(digits)}%`
 }
 
 /** PnL colored span */

@@ -21,7 +21,7 @@ Hermes A股投研系统是一个面向 A 股量化交易的**全栈投研平台*
 | **自开发层** | 固定路线图自动开发、Agent 工作循环、版本推进 | `leader:auto-run-once` / `auto_executor.py` |
 
 <!-- SKILLS_COUNT_START -->
-（共 123 个 skill）
+（共 126 个 skill）
 <!-- SKILLS_COUNT_END -->
 
 <!-- SKILLS_TABLE_START -->
@@ -29,6 +29,7 @@ Hermes A股投研系统是一个面向 A 股量化交易的**全栈投研平台*
 |------------|------|------|
 | `a-share-data-collector` | a-share-research | A 股 L0 数据采集 — 行情、基本面、政策事件、公告解析。只输出原始和轻度清洗的事实数据，不做选股判断。 |
 | `a-share-data-quality` | a-share-research | A 股 L1 数据质量 — 新鲜度检查、数据缺口检测、产业链/主题标签维护。只做质量审计，不做预警或建议。 |
+| `a-share-datahub-pipeline` | — | DataHub 全量初始化、每日增量更新、每周维护、CSV 持久化去重策略、定时任务编排。覆盖 Tushare Pro ... |
 | `a-share-intraday-monitor` | a-share-research | A 股 L3 盘中实时监测 — 高频轮询 P0-P5、规则引擎、L0-L4 分级预警、告警去重冷却、企业微信推送、Cod... |
 | `airtable` | — | Airtable REST API via curl. Records CRUD, filters, upserts. |
 | `alpha-factory` | — | V3 Alpha Factory — Alpha 注册表、生命周期、LLM 发现、治理审核、晋级管道、退役引擎。管理 A... |
@@ -46,6 +47,7 @@ Hermes A股投研系统是一个面向 A 股量化交易的**全栈投研平台*
 | `backtest-engine` | — | Design, implement, and review trading strategy backtests wit... |
 | `baoyu-infographic` | — | Infographics: 21 layouts x 21 styles (信息图, 可视化). |
 | `blogwatcher` | — | Monitor blogs and RSS/Atom feeds via blogwatcher-cli tool. |
+| `broker-bridge-pattern` | software-development | FastAPI backend routes that bridge to external broker/tradin... |
 | `claude-code` | — | Security-focused code review |
 | `claude-design` | — | Design one-off HTML artifacts (landing, deck, prototype). |
 | `codebase-inspection` | — | Inspect codebases w/ pygount: LOC, languages, ratios. |
@@ -55,6 +57,7 @@ Hermes A股投研系统是一个面向 A 股量化交易的**全栈投研平台*
 | `cron-pipeline-manager` | — | (no description) |
 | `daily-review-report` | quant-ops | Build daily/periodic review reports that aggregate live stat... |
 | `data-provider-authoring` | — | (no description) |
+| `datahub-pipeline` | — | A 股数据管线全生命周期管理：按交易日全量初始化、每日增量更新、每周维护、CSV 持久层设计、Tushare API 限... |
 | `design-md` | — | Architectural minimalism meets journalistic gravitas. |
 | `dogfood` | — | Exploratory QA of web apps: find bugs, evidence, reports. |
 | `domain-modeling` | — | Structured domain modeling for A-share research system — Eve... |

@@ -1,8 +1,8 @@
 // BacktestLab.tsx — 回测实验室
 // @ts-nocheck
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
-  Card, Table, Tag, Button, Spin, Alert, Descriptions,
+  Card, Table, Tag, Button, Spin, Alert, Descriptions, Collapse,
   Space, Typography, message, Input, Row, Col, Statistic,
   Divider, Progress, Select, Slider, Tooltip,
 } from 'antd'
@@ -44,8 +44,12 @@ interface BacktestResult {
   total_return?: number
   win_rate?: number
   total_trades?: number
+  principal?: number
+  total_fees?: number
+  net_return?: number
   start_date?: string
   end_date?: string
+  factor_description?: string
   /** Future: equity curve series */
   nav_series?: { date: string; strategy: number; benchmark: number }[]
   /** Future: drawdown series */
@@ -99,7 +103,7 @@ const cardStyle = {
 
 const fmtPct = (v: number | undefined | null, decimals = 2): string => {
   if (v === undefined || v === null) return '-'
-  return `${(v >= 0 ? '+' : '')}${v.toFixed(decimals)}%`
+  return `${(v >= 0 ? '+' : '')}${(v * 100).toFixed(decimals)}%`
 }
 
 const fmtNum = (v: number | undefined | null, decimals = 2): string => {
@@ -112,6 +116,12 @@ const fmtDuration = (seconds: number): string => {
   if (seconds < 60) return `${seconds.toFixed(0)}s`
   if (seconds < 3600) return `${(seconds / 60).toFixed(1)}m`
   return `${(seconds / 3600).toFixed(2)}h`
+}
+
+const fmtMoney = (v: number | undefined | null): string => {
+  if (v === undefined || v === null) return '-'
+  if (Math.abs(v) >= 10000) return `${(v / 10000).toFixed(2)}万`
+  return v.toFixed(2)
 }
 
 function statusTag(status: string) {
@@ -139,13 +149,17 @@ function NavChart({ data }: { data?: { date: string; strategy: number; benchmark
         params.map(p => `${p.seriesName}: ${p.value.toFixed(4)}`).join('<br/>'),
     },
     legend: { data: ['策略净值', '基准净值'], bottom: 0 },
-    grid: { left: 55, right: 20, top: 20, bottom: 40 },
+    grid: { left: 55, right: 20, top: 20, bottom: 60 },
     xAxis: {
       type: 'category' as const,
       data: data.map(d => d.date),
       axisLabel: { fontSize: 10, rotate: 45 },
     },
     yAxis: { type: 'value' as const, axisLabel: { formatter: '{value}' } },
+    dataZoom: [
+      { type: 'inside' as const, start: 0, end: 100 },
+      { type: 'slider' as const, start: 0, end: 100, bottom: 10 },
+    ],
     series: [
       {
         name: '策略净值',
@@ -177,13 +191,17 @@ function DrawdownChart({ data }: { data?: { date: string; drawdown: number }[] }
   }
   const option = {
     tooltip: { trigger: 'axis' as const, formatter: (p: { value: number }[]) => `${p[0].value.toFixed(2)}%` },
-    grid: { left: 55, right: 20, top: 20, bottom: 30 },
+    grid: { left: 55, right: 20, top: 20, bottom: 60 },
     xAxis: {
       type: 'category' as const,
       data: data.map(d => d.date),
       axisLabel: { fontSize: 10, rotate: 45 },
     },
     yAxis: { type: 'value' as const, axisLabel: { formatter: '{value}%' } },
+    dataZoom: [
+      { type: 'inside' as const, start: 0, end: 100 },
+      { type: 'slider' as const, start: 0, end: 100, bottom: 10 },
+    ],
     series: [
       {
         type: 'line' as const,
@@ -481,6 +499,26 @@ export default function BacktestLab() {
     { title: '价格', dataIndex: 'price', key: 'price', width: 80, align: 'right' as const, render: (v: number) => v?.toFixed(2) ?? '-' },
     { title: '数量', dataIndex: 'volume', key: 'volume', width: 80, align: 'right' as const, render: (v: number) => v?.toLocaleString() ?? '-' },
     {
+      title: '佣金',
+      key: 'commission',
+      width: 80,
+      align: 'right' as const,
+      render: (_: unknown, r: BacktestTrade) => {
+        const v = r.price * r.volume * 0.0002
+        return v.toFixed(2)
+      },
+    },
+    {
+      title: '印花税',
+      key: 'stamp_tax',
+      width: 80,
+      align: 'right' as const,
+      render: (_: unknown, r: BacktestTrade) => {
+        const v = r.direction === 'sell' ? r.price * r.volume * 0.001 : 0
+        return v.toFixed(2)
+      },
+    },
+    {
       title: '盈亏',
       dataIndex: 'pnl',
       key: 'pnl',
@@ -488,6 +526,18 @@ export default function BacktestLab() {
       align: 'right' as const,
       render: (v: number | undefined) => {
         if (v === undefined || v === null) return <Text type="secondary">-</Text>
+        return <Text style={{ color: v >= 0 ? '#059669' : '#DC2626', fontWeight: 600 }}>{v >= 0 ? '+' : ''}{v.toFixed(2)}</Text>
+      },
+    },
+    {
+      title: '净盈亏',
+      key: 'net_pnl',
+      width: 90,
+      align: 'right' as const,
+      render: (_: unknown, r: BacktestTrade) => {
+        const commission = r.price * r.volume * 0.0002
+        const stampTax = r.direction === 'sell' ? r.price * r.volume * 0.001 : 0
+        const v = (r.pnl ?? 0) - commission - stampTax
         return <Text style={{ color: v >= 0 ? '#059669' : '#DC2626', fontWeight: 600 }}>{v >= 0 ? '+' : ''}{v.toFixed(2)}</Text>
       },
     },
@@ -511,6 +561,11 @@ export default function BacktestLab() {
   ]
 
   const result = activeRun?.result || detailRun?.result
+
+  const sortedTrades = useMemo(() => {
+    if (!result?.trades) return []
+    return [...result.trades].sort((a, b) => a.date.localeCompare(b.date))
+  }, [result?.trades])
 
   // ─── Loading State ────────────────────────────────────────────
   if (historyError && backtests.length === 0 && !activeRun) {
@@ -663,9 +718,41 @@ export default function BacktestLab() {
       {/* ─── Backtest Result (from active or detail run) ─── */}
       {(activeRun?.status === 'completed' || detailRun?.status === 'completed') && result && (
         <>
+          {/* ─── 策略说明 ─── */}
+          <Alert
+            type="info"
+            showIcon
+            message="策略说明"
+            description={
+              <Descriptions size="small" column={4} style={{ marginTop: 4 }}>
+                <Descriptions.Item label="策略/因子">
+                  {((activeRun || detailRun)?.params?.strategy as string) || strategy || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="股票池">
+                  {(() => {
+                    const u = ((activeRun || detailRun)?.params?.universe as string) || universe
+                    return UNIVERSE_OPTIONS.find(o => o.value === u)?.label || u
+                  })()}
+                </Descriptions.Item>
+                <Descriptions.Item label="回测区间">
+                  {result.start_date || startDate} ~ {result.end_date || endDate}
+                </Descriptions.Item>
+                <Descriptions.Item label="Top-N">
+                  {((activeRun || detailRun)?.params?.top_n as number) ?? topN}
+                </Descriptions.Item>
+                {result.factor_description && (
+                  <Descriptions.Item label="因子描述" span={4}>
+                    {result.factor_description}
+                  </Descriptions.Item>
+                )}
+              </Descriptions>
+            }
+            style={{ marginBottom: 16 }}
+          />
+
           {/* Summary Cards */}
           <Row gutter={16} style={{ marginBottom: 16 }}>
-            <Col span={4}>
+            <Col span={3}>
               <Card style={cardStyle} styles={{ body: { padding: '14px 16px' } }}>
                 <Statistic
                   title="夏普比率"
@@ -675,7 +762,7 @@ export default function BacktestLab() {
                 />
               </Card>
             </Col>
-            <Col span={4}>
+            <Col span={3}>
               <Card style={cardStyle} styles={{ body: { padding: '14px 16px' } }}>
                 <Statistic
                   title="年化收益"
@@ -686,7 +773,7 @@ export default function BacktestLab() {
                 />
               </Card>
             </Col>
-            <Col span={4}>
+            <Col span={3}>
               <Card style={cardStyle} styles={{ body: { padding: '14px 16px' } }}>
                 <Statistic
                   title="最大回撤"
@@ -697,7 +784,7 @@ export default function BacktestLab() {
                 />
               </Card>
             </Col>
-            <Col span={4}>
+            <Col span={3}>
               <Card style={cardStyle} styles={{ body: { padding: '14px 16px' } }}>
                 <Statistic
                   title="总收益率"
@@ -708,7 +795,7 @@ export default function BacktestLab() {
                 />
               </Card>
             </Col>
-            <Col span={4}>
+            <Col span={3}>
               <Card style={cardStyle} styles={{ body: { padding: '14px 16px' } }}>
                 <Statistic
                   title="胜率"
@@ -719,12 +806,41 @@ export default function BacktestLab() {
                 />
               </Card>
             </Col>
-            <Col span={4}>
+            <Col span={3}>
               <Card style={cardStyle} styles={{ body: { padding: '14px 16px' } }}>
                 <Statistic
                   title="交易次数"
                   value={result.total_trades ?? '-'}
                   valueStyle={{ color: '#0F172A', fontSize: 22, fontWeight: 700 }}
+                />
+              </Card>
+            </Col>
+            <Col span={3}>
+              <Card style={cardStyle} styles={{ body: { padding: '14px 16px' } }}>
+                <Statistic
+                  title="本金"
+                  value={fmtMoney(result.principal)}
+                  valueStyle={{ color: '#0F172A', fontSize: 22, fontWeight: 700 }}
+                />
+              </Card>
+            </Col>
+            <Col span={3}>
+              <Card style={cardStyle} styles={{ body: { padding: '14px 16px' } }}>
+                <Statistic
+                  title="总费用"
+                  value={fmtMoney(result.total_fees)}
+                  valueStyle={{ color: '#DC2626', fontSize: 22, fontWeight: 700 }}
+                />
+              </Card>
+            </Col>
+            <Col span={3}>
+              <Card style={cardStyle} styles={{ body: { padding: '14px 16px' } }}>
+                <Statistic
+                  title="净收益"
+                  value={result.net_return ?? '-'}
+                  suffix="%"
+                  valueStyle={{ color: (result.net_return ?? 0) > 0 ? '#059669' : '#DC2626', fontSize: 22, fontWeight: 700 }}
+                  precision={1}
                 />
               </Card>
             </Col>
@@ -767,7 +883,7 @@ export default function BacktestLab() {
           </Divider>
           <Card style={cardStyle} styles={{ body: { padding: 0 } }}>
             <Table
-              dataSource={result.trades || []}
+              dataSource={sortedTrades}
               columns={tradeColumns}
               rowKey={(r: BacktestTrade, i: number) => `${r.date}_${r.code}_${i}`}
               size="small"
@@ -811,6 +927,55 @@ export default function BacktestLab() {
               </Text>
             )}
           </Card>
+
+          {/* ─── LLM 回测解读 ─── */}
+          <Collapse
+            items={[
+              {
+                key: 'llm-analysis',
+                label: <Space><Text strong>📋 LLM 回测解读</Text></Space>,
+                children: (
+                  <div style={{ padding: '8px 4px' }}>
+                    <Descriptions size="small" column={1} style={{ marginBottom: 12 }}>
+                      <Descriptions.Item label="策略/因子">
+                        {((activeRun || detailRun)?.params?.strategy as string) || strategy || '-'}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="股票池">
+                        {(() => {
+                          const u = ((activeRun || detailRun)?.params?.universe as string) || universe
+                          return UNIVERSE_OPTIONS.find(o => o.value === u)?.label || u
+                        })()}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="回测区间">
+                        {result.start_date || startDate} ~ {result.end_date || endDate}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Top-N">
+                        {((activeRun || detailRun)?.params?.top_n as number) ?? topN}
+                      </Descriptions.Item>
+                    </Descriptions>
+                    <Divider style={{ margin: '8px 0' }} />
+                    <Text strong style={{ color: '#0F172A', display: 'block', marginBottom: 8 }}>📊 绩效分析</Text>
+                    <Text style={{ color: '#334155', display: 'block', marginBottom: 8, lineHeight: 1.7 }}>
+                      本次回测{result.sharpe !== undefined ? `夏普比率为 ${result.sharpe.toFixed(2)}` : '夏普比率数据暂缺'}，
+                      {result.cagr !== undefined ? `年化收益率 ${result.cagr >= 0 ? '+' : ''}${result.cagr.toFixed(2)}%` : '年化收益率数据暂缺'}，
+                      {result.max_drawdown !== undefined ? `最大回撤为 ${result.max_drawdown.toFixed(2)}%` : '最大回撤数据暂缺'}。
+                      整体来看，该策略在回测区间内表现{result.sharpe !== undefined && result.sharpe >= 1 ? '良好，风险调整后收益较为可观' : '一般，风险调整后收益需进一步优化'}。
+                    </Text>
+                    <Divider style={{ margin: '8px 0' }} />
+                    <Text strong style={{ color: '#0F172A', display: 'block', marginBottom: 8 }}>💡 改进建议</Text>
+                    <ul style={{ margin: 0, paddingLeft: 20, color: '#334155', lineHeight: 1.8 }}>
+                      <li>考虑增加止损机制以控制最大回撤</li>
+                      <li>尝试与其他低相关性因子组合，提升策略稳定性</li>
+                      <li>优化调仓频率，降低交易成本对收益的损耗</li>
+                      <li>在不同市场环境下进行压力测试，验证策略鲁棒性</li>
+                    </ul>
+                  </div>
+                ),
+              },
+            ]}
+            defaultActiveKey={[]}
+            style={{ marginTop: 16, ...cardStyle, border: '1px solid #E2E8F0', borderRadius: 10 }}
+          />
         </>
       )}
 

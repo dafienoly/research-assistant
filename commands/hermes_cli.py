@@ -1903,6 +1903,14 @@ run_daily_premarket(no_notify=True)
         from data_pipeline import cmd_backfill_timeseries
         cmd_backfill_timeseries(args)
 
+    elif command == "data:pull-remaining":
+        from data_pipeline import cmd_pull_remaining
+        cmd_pull_remaining(args)
+
+    elif command == "data:pull-concept-industry":
+        from data_pipeline import cmd_concept_industry
+        cmd_concept_industry(args)
+
     elif command == "data:registry-update-status":
         from data_pipeline import cmd_registry_update_status
         cmd_registry_update_status(args)

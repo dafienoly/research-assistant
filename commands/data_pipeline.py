@@ -118,7 +118,10 @@ def _append_to_csv(
     dedup_cols: list[str],
     sort_cols: list[str] | None = None,
 ) -> int:
-    """追加新行到 CSV，按 dedup_cols 去重，返回新增行数"""
+    """追加新行到 CSV，按 dedup_cols 去重，返回新增行数
+
+    ⚠️ 写入后立即 fsync 确保落盘（避免 WSL page cache 丢失数据）
+    """
     existing = _read_csv_safe(filepath)
     if existing.empty:
         combined = new_rows.copy()
@@ -139,8 +142,29 @@ def _append_to_csv(
             combined = combined.sort_values(ok_cols).reset_index(drop=True)
     filepath.parent.mkdir(parents=True, exist_ok=True)
     combined.to_csv(filepath, index=False, encoding="utf-8-sig")
+    # fsync: 强制数据落盘，防止 WSL page cache 丢失
+    _fsync_file(filepath)
     added = len(combined) - len(existing)
     return max(added, 0)
+
+
+def _fsync_file(path: Path) -> None:
+    """强制文件数据 + 父目录落盘（防止目录项丢失）"""
+    import os as _os
+    try:
+        fd = _os.open(str(path), _os.O_WRONLY)
+        try:
+            _os.fsync(fd)
+        finally:
+            _os.close(fd)
+        # 同步父目录（确保目录项持久化）
+        dfd = _os.open(str(path.parent), _os.O_RDONLY)
+        try:
+            _os.fsync(dfd)
+        finally:
+            _os.close(dfd)
+    except Exception:
+        pass  # fsync 失败不应阻断流程
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -296,44 +320,115 @@ def incremental_north_flow(trade_date: str = "") -> dict:
     return {"status": "ok", "trade_date": trade_date, **results}
 
 
+def _mx_data_query(question: str) -> dict:
+    """调用 mx:data API"""
+    import os
+    import requests
+    api_key = os.environ.get("MX_APIKEY")
+    if not api_key:
+        return {"error": "MX_APIKEY 未设置"}
+    url = "https://mkapi2.dfcfs.com/finskillshub/api/claw/query"
+    try:
+        resp = requests.post(url, headers={"apikey": api_key, "Content-Type": "application/json"},
+                             json={"toolQuery": question}, timeout=30)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def incremental_concept_industry() -> dict:
-    """刷新概念板块和行业分类（每周一次）"""
+    """刷新概念板块和行业分类（每周一次）
+
+    Tushare Pro 代理不支持 concept/industry 接口时自动降级到 mx-data。
+    """
     tc = _get_ts_client()
     print("  📅 概念/行业刷新")
-
     results = {}
 
-    # 概念板块列表
-    df = tc._query("concept")
+    # ─── 概念板块（Tushare → mx-data fallback）───
+    df = pd.DataFrame()
+    try:
+        df = tc._query("concept")
+    except Exception as e:
+        print(f"     ⚠️ Tushare concept 失败: {e}, 降级到 mx-data")
+
+    if df.empty:
+        mx = _mx_data_query("A股概念板块列表 代码 名称")
+        if "error" not in mx:
+            try:
+                dtos = mx.get("data", {}).get("data", {}).get("searchDataResultDTO", {}).get("dataTableDTOList", [])
+                rows = []
+                for tbl in dtos:
+                    raw = tbl.get("table") or tbl.get("rawTable") or {}
+                    name_map = tbl.get("nameMap") or {}
+                    head = raw.get("headName", [])
+                    if head:
+                        for key, val in raw.items():
+                            if key in ("headName", "headNameSub"):
+                                continue
+                            col_name = name_map.get(key, key)
+                            for i, v in enumerate(val):
+                                while len(rows) <= i:
+                                    rows.append({})
+                                rows[i][col_name] = v
+                            for i, h in enumerate(head):
+                                if i < len(rows):
+                                    rows[i]["板块名称"] = h
+                df = pd.DataFrame(rows)
+            except Exception as e:
+                print(f"     ⚠️ mx-data concept 解析失败: {e}")
+
     if not df.empty:
         out = ETC_DIR / "concept" / "concept_list.csv"
         out.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(out, index=False, encoding="utf-8-sig")
         results["concept_list"] = len(df)
         print(f"     ✅ concept_list: {len(df)} 条")
+    else:
+        print(f"     ⚠️  concept_list: 无数据（Tushare + mx-data 均失败）")
 
-        # 概念板块成分股 (逐板块)
-        total_detail = 0
-        for code in df["code"].dropna().unique()[:50]:  # 限50个，避免请求过多
+    # ─── 行业分类（Tushare → mx-data fallback）───
+    df_ind = pd.DataFrame()
+    try:
+        df_ind = tc._query("industry")
+    except Exception as e:
+        print(f"     ⚠️ Tushare industry 失败: {e}, 降级到 mx-data")
+
+    if df_ind.empty:
+        mx = _mx_data_query("申万行业分类 代码 名称")
+        if "error" not in mx:
             try:
-                dd = tc._query("concept_detail", id=code)
-                if not dd.empty:
-                    detail_out = ETC_DIR / "concept" / f"detail_{code}.csv"
-                    _append_to_csv(detail_out, dd, dedup_cols=["ts_code"], sort_cols=None)
-                    total_detail += len(dd)
-            except Exception:
-                pass
-        results["concept_detail"] = total_detail
-        print(f"     ✅ concept_detail: {total_detail} 条")
+                dtos = mx.get("data", {}).get("data", {}).get("searchDataResultDTO", {}).get("dataTableDTOList", [])
+                rows = []
+                for tbl in dtos:
+                    raw = tbl.get("table") or tbl.get("rawTable") or {}
+                    name_map = tbl.get("nameMap") or {}
+                    head = raw.get("headName", [])
+                    if head:
+                        for key, val in raw.items():
+                            if key in ("headName", "headNameSub"):
+                                continue
+                            col_name = name_map.get(key, key)
+                            for i, v in enumerate(val):
+                                while len(rows) <= i:
+                                    rows.append({})
+                                rows[i][col_name] = v
+                            for i, h in enumerate(head):
+                                if i < len(rows):
+                                    rows[i]["行业名称"] = h
+                df_ind = pd.DataFrame(rows)
+            except Exception as e:
+                print(f"     ⚠️ mx-data industry 解析失败: {e}")
 
-    # 行业分类
-    df_ind = tc._query("industry")
     if not df_ind.empty:
         out = ETC_DIR / "industry" / "industry_list.csv"
         out.parent.mkdir(parents=True, exist_ok=True)
         df_ind.to_csv(out, index=False, encoding="utf-8-sig")
         results["industry"] = len(df_ind)
         print(f"     ✅ industry: {len(df_ind)} 条")
+    else:
+        print(f"     ⚠️  industry: 无数据（Tushare + mx-data 均失败）")
 
     results["status"] = "ok"
     return results
@@ -660,7 +755,7 @@ def _get_trade_days(start_date: str = "20210101") -> list[str]:
 
 
 # ─── 批量配置（交易日遍历）───
-BATCH_TRADE_DAYS = 100  # 每批处理的交易日数，减少文件 I/O
+BATCH_TRADE_DAYS = 50  # 每批处理的交易日数（50天/批控制每批内存~25MB）
 
 
 def full_init_by_trade_date() -> dict:
@@ -904,6 +999,219 @@ def backfill_timeseries() -> dict:
     return results
 
 
+def pull_remaining_market_data() -> dict:
+    """P0: 补齐复权因子 + 涨跌停 + 停复牌
+
+    按交易日遍历 adj_factor / stk_limit（效率同 daily_basic），
+    suspend_d 季度级拉取（稀疏数据）。
+    """
+    print(f"{'='*50}")
+    print("📡 P0: 复权因子 + 涨跌停 + 停复牌")
+    print(f"{'='*50}")
+    print()
+
+    tc = _get_ts_client()
+    days = _get_trade_days("20210101")
+    if not days:
+        print("❌ 无法获取交易日历")
+        return {"status": "error"}
+    print(f"📅 {len(days)} 个交易日 (2021-01-01 ~ {days[-1]})")
+    print(f"   批大小: {BATCH_TRADE_DAYS} 天\n")
+
+    LIMITS_DIR = BASE / "data" / "normalized" / "limits"
+    SUSPEND_DIR = BASE / "data" / "normalized" / "suspend"
+    LIMITS_DIR.mkdir(parents=True, exist_ok=True)
+    SUSPEND_DIR.mkdir(parents=True, exist_ok=True)
+
+    errors: list[str] = []
+    results: dict = {}
+    num_batches = (len(days) + BATCH_TRADE_DAYS - 1) // BATCH_TRADE_DAYS
+
+    def _batch_pull(batch_days, api_name, out_dir, file_prefix="", fields=""):
+        total_rows = 0
+        for day in batch_days:
+            try:
+                kwargs = {"trade_date": day}
+                if fields:
+                    kwargs["fields"] = fields
+                df = tc._query(api_name, **kwargs)
+                if df is None or df.empty:
+                    continue
+                for ts_code, group in df.groupby("ts_code"):
+                    group = group.reset_index(drop=True)
+                    fname = f"{file_prefix}{ts_code}.csv" if file_prefix else f"{ts_code}.csv"
+                    out = out_dir / fname
+                    _append_to_csv(out, group, dedup_cols=["trade_date"], sort_cols=["trade_date"])
+                    total_rows += len(group)
+            except Exception as e:
+                errors.append(f"{api_name} {day}: {e}")
+        return total_rows
+
+    # ─── 复权因子 ──────────────────────────────────────
+    print("📊 复权因子 (adj_factor) ...")
+    adj_start = __import__("time").time()
+    adj_total = 0
+    for b in range(0, len(days), BATCH_TRADE_DAYS):
+        batch = days[b:b + BATCH_TRADE_DAYS]
+        r = _batch_pull(batch, "adj_factor", LIMITS_DIR, "adj_",
+                        fields="ts_code,trade_date,adj_factor")
+        adj_total += r
+        print(f"    复权: 批 {b//BATCH_TRADE_DAYS+1}/{num_batches} +{r}行")
+    adj_files = len(list(LIMITS_DIR.glob("adj_*.csv")))
+    results["adj_factor"] = {"files": adj_files, "rows": adj_total}
+    print(f"   ✅ 复权因子: {adj_files} 只 / {adj_total} 行")
+
+    # ─── 涨跌停 ────────────────────────────────────────
+    print("\n📊 涨跌停 (stk_limit) ...")
+    stk_start = __import__("time").time()
+    stk_total = 0
+    for b in range(0, len(days), BATCH_TRADE_DAYS):
+        batch = days[b:b + BATCH_TRADE_DAYS]
+        r = _batch_pull(batch, "stk_limit", LIMITS_DIR, "stk_limit_",
+                        fields="trade_date,ts_code,up_limit,down_limit")
+        stk_total += r
+        print(f"    涨跌停: 批 {b//BATCH_TRADE_DAYS+1}/{num_batches} +{r}行")
+    stk_files = len(list(LIMITS_DIR.glob("stk_limit_*.csv")))
+    results["stk_limit"] = {"files": stk_files, "rows": stk_total}
+    print(f"   ✅ 涨跌停: {stk_files} 只 / {stk_total} 行")
+
+    # ─── 停复牌（季度级）───
+    print("\n📊 停复牌 (suspend_d) ...")
+    sus_total = 0
+    for year in range(2021, 2027):
+        for quarter in [1, 2, 3, 4]:
+            start_q = f"{year}{quarter*3-2:02d}01"
+            end_q = f"{year}{quarter*3:02d}30" if quarter < 4 else f"{year}1231"
+            if start_q > days[-1]:
+                break
+            try:
+                df = tc._query("suspend_d", start_date=start_q, end_date=end_q)
+                if df is not None and not df.empty:
+                    out = SUSPEND_DIR / f"suspend_{year}Q{quarter}.csv"
+                    existing = _read_csv_safe(out)
+                    if existing.empty:
+                        final = df
+                    else:
+                        final = pd.concat([existing, df], ignore_index=True)
+                        final = final.drop_duplicates(subset=["ts_code", "trade_date"], keep="last")
+                    final.to_csv(out, index=False, encoding="utf-8-sig")
+                    added = len(final) - len(existing)
+                    sus_total += max(added, 0)
+            except Exception as e:
+                errors.append(f"suspend_d {year}Q{quarter}: {e}")
+    results["suspend_d"] = {"rows": sus_total}
+    print(f"   ✅ 停复牌: {sus_total} 条记录 (按季度)")
+
+    # ─── 汇总 ──────────────────────────────────────────
+    print(f"\n{'='*50}")
+    print("📋 P0 拉取汇总")
+    print(f"{'='*50}")
+    for name, r in results.items():
+        files = r.get("files", "-")
+        rows = r.get("rows", r.get("files", "-"))
+        print(f"  ✅ {name:12s}  files={files}  rows={rows}")
+    results["status"] = "ok"
+    results["errors"] = errors
+    return results
+
+
+def pull_concept_industry_mx() -> dict:
+    """P1: 概念板块 + 行业分类 → mx-data 调优查询"""
+    print(f"{'='*50}")
+    print("📡 P1: 概念板块+行业分类 (mx-data)")
+    print(f"{'='*50}")
+
+    # 尝试多个查询词取最佳结果
+    concept_queries = [
+        "A股全部概念板块列表 代码 名称",
+        "东方财富概念板块列表 板块代码 板块名称",
+        "概念板块 板块代码 板块名称 成分股数量",
+    ]
+    best_concept = pd.DataFrame()
+    for q in concept_queries:
+        mx = _mx_data_query(q)
+        if "error" in mx:
+            continue
+        try:
+            dtos = mx.get("data",{}).get("data",{}).get("searchDataResultDTO",{}).get("dataTableDTOList",[])
+            rows = []
+            for tbl in dtos:
+                raw = tbl.get("table") or tbl.get("rawTable") or {}
+                name_map = tbl.get("nameMap") or {}
+                head = raw.get("headName", [])
+                if head and len(head) > 2:
+                    df = pd.DataFrame({"板块名称": head})
+                    if len(df) > len(best_concept):
+                        best_concept = df
+                    continue
+                for key, vals in raw.items():
+                    if key in ("headName","headNameSub"): continue
+                    col_name = name_map.get(key, key)
+                    for i, v in enumerate(vals):
+                        while len(rows) <= i: rows.append({})
+                        rows[i][col_name] = v
+                    for i, h in enumerate(head):
+                        if i < len(rows): rows[i]["板块名称"] = h
+            if rows:
+                df = pd.DataFrame(rows)
+                if len(df) > len(best_concept):
+                    best_concept = df
+        except:
+            pass
+
+    if not best_concept.empty:
+        out = ETC_DIR / "concept" / "concept_list.csv"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        best_concept.to_csv(out, index=False, encoding="utf-8-sig")
+        print(f"   ✅ concept_list: {len(best_concept)} 条")
+    else:
+        print("   ⚠️ concept_list: mx-data 未返回有效数据")
+
+    # 行业分类
+    ind_queries = [
+        "申万行业分类 行业代码 行业名称",
+        "A股行业分类列表 行业代码 行业名称",
+        "行业板块 板块代码 板块名称",
+    ]
+    best_ind = pd.DataFrame()
+    for q in ind_queries:
+        mx = _mx_data_query(q)
+        if "error" in mx: continue
+        try:
+            dtos = mx.get("data",{}).get("data",{}).get("searchDataResultDTO",{}).get("dataTableDTOList",[])
+            rows = []
+            for tbl in dtos:
+                raw = tbl.get("table") or tbl.get("rawTable") or {}
+                name_map = tbl.get("nameMap") or {}
+                head = raw.get("headName", [])
+                if head and len(head) > 2:
+                    df = pd.DataFrame({"行业名称": head})
+                    if len(df) > len(best_ind): best_ind = df
+                    continue
+                for key, vals in raw.items():
+                    if key in ("headName","headNameSub"): continue
+                    col_name = name_map.get(key, key)
+                    for i, v in enumerate(vals):
+                        while len(rows) <= i: rows.append({})
+                        rows[i][col_name] = v
+                    for i, h in enumerate(head):
+                        if i < len(rows): rows[i]["行业名称"] = h
+            if rows:
+                df = pd.DataFrame(rows)
+                if len(df) > len(best_ind): best_ind = df
+        except: pass
+
+    if not best_ind.empty:
+        out = ETC_DIR / "industry" / "industry_list.csv"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        best_ind.to_csv(out, index=False, encoding="utf-8-sig")
+        print(f"   ✅ industry_list: {len(best_ind)} 条")
+    else:
+        print("   ⚠️ industry: mx-data 未返回有效数据")
+
+    return {"status": "ok", "concept": len(best_concept), "industry": len(best_ind)}
+
+
 def gap_report_and_plan() -> dict:
     """数据缺口报告 + 推荐拉取计划"""
     print(f"{'='*50}")
@@ -1021,6 +1329,7 @@ def batch_daily(
                 # 写出完整 DataFrame（含所有字段）
                 out_path = DAILY_DIR / f"{ts_code}.csv"
                 df.to_csv(out_path, index=False, encoding="utf-8-sig")
+                _fsync_file(out_path)
                 row_count = len(df)
                 results[ts_code] = row_count
                 total_rows += row_count
@@ -1103,6 +1412,7 @@ def batch_fina(
 
                 out_path = FINA_DIR / f"{ts_code}.csv"
                 df.to_csv(out_path, index=False, encoding="utf-8-sig")
+                _fsync_file(out_path)
                 row_count = len(df)
                 results[ts_code] = row_count
                 total_rows += row_count
@@ -1180,6 +1490,7 @@ def batch_valuation(
 
                 out_path = VALUATION_DIR / f"valuation_{ts_code}.csv"
                 df.to_csv(out_path, index=False, encoding="utf-8-sig")
+                _fsync_file(out_path)
                 row_count = len(df)
                 results[ts_code] = row_count
                 total_rows += row_count
@@ -1411,3 +1722,13 @@ def cmd_gap_report(args: list[str]) -> None:
 def cmd_backfill_timeseries(args: list[str]) -> None:
     """处理 data:backfill-timeseries 命令"""
     backfill_timeseries()
+
+
+def cmd_pull_remaining(args: list[str]) -> None:
+    """处理 data:pull-remaining 命令"""
+    pull_remaining_market_data()
+
+
+def cmd_concept_industry(args: list[str]) -> None:
+    """处理 data:pull-concept-industry 命令"""
+    pull_concept_industry_mx()

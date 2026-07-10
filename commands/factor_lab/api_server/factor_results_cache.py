@@ -40,7 +40,7 @@ def get_factor_metrics(factor_name: str) -> dict | None:
 
 
 def merge_metrics_into_definitions(definitions: list[dict]) -> list[dict]:
-    """将缓存的计算指标合并到因子定义列表，供 API 返回。"""
+    """将缓存的计算指标合并到因子定义列表，已计算的排在前面。"""
     results = load_results()
     enriched = []
     for fdef in definitions:
@@ -59,4 +59,8 @@ def merge_metrics_into_definitions(definitions: list[dict]) -> list[dict]:
             "risk_flags": metrics.get("risk_flags", []),
             "computed_at": metrics.get("computed_at"),
         })
+    # 已计算的排前面
+    enriched.sort(key=lambda f: (0 if f.get("IC") is not None else 1,
+                                  f.get("category", ""),
+                                  f.get("name", "")))
     return enriched

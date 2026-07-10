@@ -17,6 +17,7 @@ import { useQmtPositions } from '../hooks/useQmtPositions'
 import { useQmtOrders, useQmtTrades } from '../hooks/useQmtOrders'
 import { useQmtPlanPositions } from '../hooks/useQmtPlanPositions'
 import type { MetricColor } from '../types'
+import type { QmtAccount } from '../api/schemas'
 
 const { Text } = Typography
 
@@ -272,15 +273,51 @@ const QMTSpot: FC = () => {
 
   // ─── Unwrap ApiResult ─────────────────────────────────────────
   const qmtData = healthResp?.data
-  const acct = acctResp?.data
-  const posRaw = posResp?.data
+
+  // Backend returns { accounts: [{ balance, available, ... }], total_asset, available_cash }
+  // Frontend expects flat QmtAccount { total_assets, available, market_value, pnl, pnl_pct, ... }
+  const rawAcct = acctResp?.data as Record<string, unknown> | undefined
+  const acctArr = rawAcct?.accounts as Array<Record<string, unknown>> | undefined
+  const acctRecord = acctArr?.[0]
+  const a = (k: string, fallback = 0): number => {
+    const v = acctRecord?.[k]
+    return typeof v === 'number' ? v : fallback
+  }
+  const acctFlat: QmtAccount | null = acctRecord ? {
+    total_assets: a('m_dTotalAsset') || a('total_asset'),
+    available: a('m_dAvailable') || a('available'),
+    market_value: a('m_dMarketValue') || a('market_value'),
+    pnl: a('m_dProfitLossTotal') || a('m_dProfitLoss') || a('profit_loss_total'),
+    pnl_pct: 0,
+    frozen: a('m_dFrozen') || a('frozen'),
+    currency: '元',
+  } : null
+
+  // Backend positions: { positions: [{ ticker, name, volume, cost_price, current_price, profit_loss_pct, market_value }] }
+  // Frontend columns expect: { code, name, volume, cost_price, current_price, pnl, pnl_pct }
+  const rawPos = posResp?.data as Record<string, unknown> | undefined
+  const posArr = rawPos?.positions as Array<Record<string, unknown>> | undefined
+  const positions = Array.isArray(posArr) ? posArr.map((p: Record<string, unknown>) => ({
+    code: p.m_strStockCode ?? p.stock_code ?? p.ticker ?? p.code ?? '',
+    name: p.m_strStockName ?? p.stock_name ?? p.name ?? '',
+    volume: Number(p.m_nVolume ?? p.volume ?? 0),
+    cost_price: Number(p.m_dCostPrice ?? p.cost_price ?? 0),
+    current_price: Number(p.m_dLastPrice ?? p.m_dPrice ?? p.last_price ?? p.current_price ?? 0),
+    pnl: Number(p.m_dProfitLoss ?? p.profit_loss ?? Number(p.m_dMarketValue ?? p.market_value ?? 0) - Number(p.m_dCostPrice ?? p.cost_price ?? 0) * Number(p.m_nVolume ?? p.volume ?? 0)),
+    pnl_pct: Number(p.m_dProfitLossPct ?? p.profit_loss_pct ?? 0),
+    market: p.market ?? '',
+  })) : []
+
+  // Backend orders: NOT_FOUND → show empty
   const ordRaw = ordResp?.data
-  const tradeRaw = tradeResp?.data
-  const planRaw = planResp?.data
-  // Guard: API may return non-array; antd Table calls .some() on dataSource
-  const positions = Array.isArray(posRaw) ? posRaw : []
   const orders = Array.isArray(ordRaw) ? ordRaw : []
+
+  // Trades
+  const tradeRaw = tradeResp?.data
   const trades = Array.isArray(tradeRaw) ? tradeRaw : []
+
+  // Plan positions
+  const planRaw = planResp?.data
   const planPositions = Array.isArray(planRaw) ? planRaw : []
 
   const anyLoading = healthLoading || acctLoading || posLoading
@@ -378,38 +415,38 @@ const QMTSpot: FC = () => {
         <Col xs={24} sm={12} lg={6}>
           <MetricCard
             title="总资产"
-            value={acct ? fmtMoney(acct.total_assets) : '—'}
+            value={acctFlat ? fmtMoney(acctFlat.total_assets) : '—'}
             color="primary"
-            loading={acctLoading && !acct}
-            suffix={acct?.currency || '元'}
+            loading={acctLoading && !acctFlat}
+            suffix={acctFlat?.currency || '元'}
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <MetricCard
             title="可用资金"
-            value={acct ? fmtMoney(acct.available) : '—'}
+            value={acctFlat ? fmtMoney(acctFlat.available) : '—'}
             color="success"
-            loading={acctLoading && !acct}
-            suffix={acct?.currency || '元'}
+            loading={acctLoading && !acctFlat}
+            suffix={acctFlat?.currency || '元'}
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <MetricCard
             title="持仓市值"
-            value={acct ? fmtMoney(acct.market_value) : '—'}
+            value={acctFlat ? fmtMoney(acctFlat.market_value) : '—'}
             color="info"
-            loading={acctLoading && !acct}
-            suffix={acct?.currency || '元'}
+            loading={acctLoading && !acctFlat}
+            suffix={acctFlat?.currency || '元'}
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <MetricCard
             title="总盈亏"
-            value={acct ? fmtMoney(acct.pnl) : '—'}
-            color={(acct && acct.pnl >= 0 ? 'success' : 'error') as MetricColor}
-            loading={acctLoading && !acct}
-            suffix={acct?.currency || '元'}
-            trend={acct?.pnl_pct}
+            value={acctFlat ? fmtMoney(acctFlat.pnl) : '—'}
+            color={(acctFlat && acctFlat.pnl >= 0 ? 'success' : 'error') as MetricColor}
+            loading={acctLoading && !acctFlat}
+            suffix={acctFlat?.currency || '元'}
+            trend={acctFlat?.pnl_pct}
           />
         </Col>
       </Row>

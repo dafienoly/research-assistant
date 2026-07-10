@@ -222,7 +222,7 @@ def _run_gap_report() -> dict:
 
 @router.get("/data/coverage")
 async def data_coverage():
-    """扫描数据目录，返回各数据集的覆盖统计"""
+    """扫描数据目录，返回各数据集的覆盖统计（匹配 datahub 管线实际产出）"""
     import csv
     from pathlib import Path
 
@@ -232,10 +232,41 @@ async def data_coverage():
     norm_dir = data_dir / "normalized"
     fund_flow_dir = norm_dir / "fund_flow"
     market_dir = norm_dir / "market"
+    fundamentals_dir = norm_dir / "fundamentals"
 
     coverage = []
     total_stocks = 0
     total_rows = 0
+
+    # helper: 快速读 CSV 首尾行获取起止日期和行数
+    def _read_csv_meta(files, date_col, symbol_col=None):
+        if not files:
+            return 0, "", "", 0
+        dates = []
+        row_count = 0
+        for f in files[:50]:  # 抽样提速，但文件数少时全读
+            try:
+                with open(f, newline="", encoding="utf-8-sig") as fh:
+                    lines = fh.readlines()
+                    if len(lines) < 2:
+                        continue
+                    header = lines[0].strip().split(",")
+                    if date_col not in header:
+                        continue
+                    di = header.index(date_col)
+                    # 第一行数据
+                    first = lines[1].strip().split(",")
+                    if di < len(first):
+                        dates.append(first[di])
+                    # 最后一行
+                    last = lines[-1].strip().split(",")
+                    if di < len(last):
+                        dates.append(last[di])
+                    row_count += len(lines) - 1
+            except Exception:
+                continue
+        valid = [d for d in dates if d]
+        return len(files), min(valid) if valid else "", max(valid) if valid else "", row_count
 
     # K线日线
     if kline_dir.exists():
@@ -243,11 +274,14 @@ async def data_coverage():
         if kfiles:
             all_dates = []
             for f in kfiles:
-                with open(f, newline="") as fh:
-                    reader = csv.DictReader(fh)
-                    rows = list(reader)
-                    dates = [r.get("timeString", "") for r in rows if r.get("timeString")]
-                    all_dates.extend(dates)
+                try:
+                    with open(f, newline="") as fh:
+                        reader = csv.DictReader(fh)
+                        rows = list(reader)
+                        dates = [r.get("timeString", "") for r in rows if r.get("timeString")]
+                        all_dates.extend(dates)
+                except Exception:
+                    continue
             valid = [d for d in all_dates if d]
             coverage.append({
                 "dataset": "daily_kline",
@@ -260,33 +294,53 @@ async def data_coverage():
             total_stocks += len(kfiles)
             total_rows += len(all_dates)
 
-    # 个股资金流
-    if fund_flow_dir.exists():
-        ffiles = sorted(fund_flow_dir.glob("*.csv"))
-        if ffiles:
-            coverage.append({
-                "dataset": "fund_flow",
-                "stock_count": len(ffiles),
-                "row_count": 0,
-                "trade_days": ["", ""],
-                "latest_date": "",
-                "missing_rate": round((1 - len(ffiles) / 5863) * 100, 1),
-            })
-            total_stocks += len(ffiles)
-
     # 个股估值
     if market_dir.exists():
         mfiles = sorted(market_dir.glob("valuation_*.csv"))
         if mfiles:
+            cnt, d_min, d_max, r_cnt = _read_csv_meta(mfiles, "trade_date")
             coverage.append({
                 "dataset": "valuation",
-                "stock_count": len(mfiles),
-                "row_count": 0,
-                "trade_days": ["", ""],
-                "latest_date": "",
+                "stock_count": cnt,
+                "row_count": r_cnt,
+                "trade_days": [d_min, d_max] if d_min else ["", ""],
+                "latest_date": d_max or "",
                 "missing_rate": 0,
             })
-            total_stocks += len(mfiles)
+            total_stocks += cnt
+            total_rows += r_cnt
+
+    # 个股资金流
+    if fund_flow_dir.exists():
+        ffiles = sorted(fund_flow_dir.glob("*.csv"))
+        if ffiles:
+            cnt, d_min, d_max, r_cnt = _read_csv_meta(ffiles, "trade_date")
+            coverage.append({
+                "dataset": "fund_flow",
+                "stock_count": cnt,
+                "row_count": r_cnt,
+                "trade_days": [d_min, d_max] if d_min else ["", ""],
+                "latest_date": d_max or "",
+                "missing_rate": round((1 - cnt / 5863) * 100, 1) if cnt < 5863 else 0,
+            })
+            total_stocks += cnt
+            total_rows += r_cnt
+
+    # 个股基本面（新增）
+    if fundamentals_dir.exists():
+        fafiles = sorted(fundamentals_dir.glob("*.csv"))
+        if fafiles:
+            cnt, d_min, d_max, r_cnt = _read_csv_meta(fafiles, "end_date")
+            coverage.append({
+                "dataset": "fundamentals",
+                "stock_count": cnt,
+                "row_count": r_cnt,
+                "trade_days": [d_min, d_max] if d_min else ["", ""],
+                "latest_date": d_max or "",
+                "missing_rate": round((1 - cnt / 5528) * 100, 1) if cnt < 5528 else 0,
+            })
+            total_stocks += cnt
+            total_rows += r_cnt
 
     return api_success(data={
         "coverage": coverage,
@@ -297,15 +351,20 @@ async def data_coverage():
 
 @router.get("/data/manifests")
 async def data_manifests():
-    """读取 data/manifest.json 和其他清单文件"""
+    """读取 data/manifest.json + 自动探测其他数据集的清单"""
     from pathlib import Path
 
     base = Path(__file__).resolve().parent.parent.parent.parent
     data_dir = base / "data"
     manifest_file = data_dir / "manifest.json"
+    norm_dir = data_dir / "normalized"
+    fund_flow_dir = norm_dir / "fund_flow"
+    market_dir = norm_dir / "market"
+    fundamentals_dir = norm_dir / "fundamentals"
 
     manifests = []
 
+    # ── manifest.json (daily_kline) ──
     if manifest_file.exists():
         with open(manifest_file) as f:
             m = json.load(f)
@@ -322,7 +381,7 @@ async def data_manifests():
             "children": [f["file"] for f in m.get("files_analyzed", [])][:20],
         })
 
-    # universes.json
+    # ── universes.json ──
     uf = data_dir / "universes.json"
     if uf.exists():
         manifests.append({
@@ -337,5 +396,59 @@ async def data_manifests():
             "lineage": ["Tushare stock_basic", "Tushare daily_basic"],
             "children": ["U0", "U1", "U2", "U3", "U4", "ETF"],
         })
+
+    # ── 自动探测: valuation ──
+    if market_dir.exists():
+        mfiles = sorted(market_dir.glob("valuation_*.csv"))
+        if mfiles:
+            total_size = sum(f.stat().st_size for f in mfiles[:100])  # 抽样
+            manifests.append({
+                "manifest_id": "valuation",
+                "source_id": "datahub",
+                "dataset": "valuation",
+                "file": str(market_dir),
+                "record_count": len(mfiles),
+                "file_size": total_size * (len(mfiles) // 100 + 1),
+                "file_hash": "",
+                "created_at": datetime.fromtimestamp(mfiles[0].stat().st_mtime, tz=CST).isoformat(),
+                "lineage": ["Tushare daily_basic"],
+                "children": [f.name for f in mfiles[:5]] + (["..."] if len(mfiles) > 5 else []),
+            })
+
+    # ── 自动探测: fund_flow ──
+    if fund_flow_dir.exists():
+        ffiles = sorted(fund_flow_dir.glob("*.csv"))
+        if ffiles:
+            total_size = sum(f.stat().st_size for f in ffiles[:100])
+            manifests.append({
+                "manifest_id": "fund_flow",
+                "source_id": "datahub",
+                "dataset": "fund_flow",
+                "file": str(fund_flow_dir),
+                "record_count": len(ffiles),
+                "file_size": total_size * (len(ffiles) // 100 + 1),
+                "file_hash": "",
+                "created_at": datetime.fromtimestamp(ffiles[0].stat().st_mtime, tz=CST).isoformat(),
+                "lineage": ["Tushare fund_flow"],
+                "children": [f.name for f in ffiles[:5]] + (["..."] if len(ffiles) > 5 else []),
+            })
+
+    # ── 自动探测: fundamentals ──
+    if fundamentals_dir.exists():
+        fafiles = sorted(fundamentals_dir.glob("*.csv"))
+        if fafiles:
+            total_size = sum(f.stat().st_size for f in fafiles[:100])
+            manifests.append({
+                "manifest_id": "fundamentals",
+                "source_id": "datahub",
+                "dataset": "fundamentals",
+                "file": str(fundamentals_dir),
+                "record_count": len(fafiles),
+                "file_size": total_size * (len(fafiles) // 100 + 1),
+                "file_hash": "",
+                "created_at": datetime.fromtimestamp(fafiles[0].stat().st_mtime, tz=CST).isoformat(),
+                "lineage": ["Tushare fina_indicator"],
+                "children": [f.name for f in fafiles[:5]] + (["..."] if len(fafiles) > 5 else []),
+            })
 
     return api_success(data={"manifests": manifests})

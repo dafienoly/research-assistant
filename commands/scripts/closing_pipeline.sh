@@ -12,10 +12,6 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] === 收盘管线开始 ===" >> "$LOG"
 cd "$DIR"
 source "$VENV"
 
-# 0. DataHub 每日增量更新（日线+估值+资金流+北向）
-echo "[$(date '+%H:%M:%S')] datahub 每日增量更新 ..." >> "$LOG"
-python3 hermes_cli.py data:incremental-update >> "$LOG" 2>&1 || echo "  data:incremental-update 非致命错误" >> "$LOG"
-
 # 1. 因子挖掘
 echo "[$(date '+%H:%M:%S')] factor:mine 10 ..." >> "$LOG"
 python3 hermes_cli.py factor:mine 10 >> "$LOG" 2>&1 || echo "  factor:mine 非致命错误" >> "$LOG"

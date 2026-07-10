@@ -345,6 +345,85 @@ class PaperTradingService:
         result.reverse()
         return result[:limit]
 
+    # ── Dashboard ────────────────────────────────────────────────────
+
+    def get_dashboard(self) -> dict:
+        """聚合 Paper Dashboard 数据 — 供 /api/paper/dashboard 端点"""
+        try:
+            import numpy as np
+        except ImportError:
+            np = None
+
+        bal = self._account.to_dict()
+        orders = self.get_orders(limit=500)
+        fills = self.get_fills(limit=500)
+
+        n_pending = sum(1 for o in orders if o.get("status") == "pending")
+        n_completed = sum(1 for o in orders if o.get("status") in ("filled", "partial"))
+        n_filled = len(fills)
+        total_orders = len(orders) or 1
+        fill_rate = round(n_filled / total_orders * 100, 1)
+
+        total_pnl = bal.get("total_pnl", 0)
+        initial_capital = bal.get("initial_cash", 1_000_000)
+        total_return_pct = round((total_pnl / initial_capital) * 100, 2) if initial_capital else 0
+
+        # 从成交记录提取 PnL 序列
+        pnl_values = []
+        for f in fills:
+            pnl = f.get("pnl", 0) or 0
+            pnl_values.append(pnl)
+
+        sharpe = 0.0
+        volatility = 0.0
+        max_drawdown = 0.0
+        win_rate = 0.0
+        annualized_return = 0.0
+
+        if np is not None and len(pnl_values) >= 5:
+            arr = np.array(pnl_values, dtype=float)
+            if arr.std() > 0:
+                daily_returns = arr / initial_capital
+                volatility = round(float(arr.std()) * 100, 2)
+                sharpe = round(float(daily_returns.mean() / daily_returns.std() * np.sqrt(252)), 2) if daily_returns.std() > 0 else 0
+                annualized_return = round(float(daily_returns.mean() * 252 * 100), 2)
+                cum = np.cumprod(1 + daily_returns)
+                peak = np.maximum.accumulate(cum)
+                dd = (cum - peak) / peak
+                max_drawdown = round(float(np.min(dd)) * 100, 2)
+                wins = int((arr > 0).sum())
+                win_rate = round(wins / len(arr) * 100, 1)
+
+        n_trading_days = 1
+        created = bal.get("created_at", "")
+        if created:
+            try:
+                start = datetime.fromisoformat(created)
+                n_trading_days = max(1, (datetime.now(CST) - start).days)
+            except Exception:
+                pass
+
+        return {
+            "period": f"近{n_trading_days}天",
+            "n_trading_days": n_trading_days,
+            "n_pending": n_pending,
+            "n_completed": n_completed,
+            "paper_total_return_pct": total_return_pct,
+            "paper_annualized_return_pct": annualized_return,
+            "paper_volatility_pct": volatility,
+            "paper_sharpe": sharpe,
+            "paper_max_drawdown_pct": max_drawdown,
+            "paper_win_rate_pct": win_rate,
+            "execution_quality": {
+                "filled": n_filled,
+                "partial_filled": n_completed - n_filled,
+                "blocked": n_pending,
+                "fill_rate": fill_rate,
+            },
+            "status": "active",
+            "no_real_trade": n_filled == 0,
+        }
+
     # ── 内部成交模拟 ─────────────────────────────────────────────────
 
     def _try_fill(self, order: PaperOrder):

@@ -69,7 +69,7 @@ const cardStyle = {
 
 const fmtPct = (v: number | undefined | null, decimals = 2): string => {
   if (v === undefined || v === null) return '-'
-  return `${(v >= 0 ? '+' : '')}${v.toFixed(decimals)}%`
+  return `${(v >= 0 ? '+' : '')}${(v * 100).toFixed(decimals)}%`
 }
 
 const fmtNum = (v: number | undefined | null, decimals = 2): string => {

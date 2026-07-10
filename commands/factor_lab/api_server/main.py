@@ -20,7 +20,17 @@ from datetime import datetime, timezone, timedelta
 
 _API_DIR = os.path.dirname(__file__)  # .../api_server
 _FACTOR_LAB = os.path.dirname(_API_DIR)  # .../factor_lab
-sys.path.insert(0, os.path.dirname(_FACTOR_LAB))  # .../commands/
+_PROJECT_ROOT = os.path.dirname(_FACTOR_LAB)  # .../commands/
+sys.path.insert(0, _PROJECT_ROOT)
+
+# 加载项目级 .env (优先于环境变量, 不覆盖已有值)
+try:
+    from dotenv import load_dotenv
+    _dotenv_path = os.path.join(os.path.dirname(_PROJECT_ROOT), ".env")
+    if os.path.exists(_dotenv_path):
+        load_dotenv(_dotenv_path, override=False)
+except ImportError:
+    pass
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
