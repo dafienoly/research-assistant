@@ -1,0 +1,27 @@
+{
+  "skill_id": "data-quality",
+  "name": "数据质量检查",
+  "description": "检查各数据源的健康状态、新鲜度和注册表信息",
+  "category": "data",
+  "params": [
+    {
+      "name": "source_id",
+      "type": "string",
+      "label": "数据源ID",
+      "default": null,
+      "required": false,
+      "description": "可选，只检查指定数据源",
+      "choices": null
+    }
+  ],
+  "tags": [
+    "data",
+    "quality",
+    "freshness",
+    "health"
+  ],
+  "handler": "factor_lab.research_skill.builtins:_execute_data_quality",
+  "version": "1.0.0",
+  "created_at": "2026-07-06T15:05:02.018658+08:00",
+  "updated_at": "2026-07-06T15:05:02.019397+08:00"
+}

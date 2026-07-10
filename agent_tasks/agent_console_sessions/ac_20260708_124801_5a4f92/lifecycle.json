@@ -1,0 +1,8 @@
+{
+  "pid": 21912,
+  "status": "orphaned",
+  "agent": "claude_code",
+  "prompt": "Auto execute V8.4: GitHub Issue/PR Pipeline",
+  "created_at": "2026-07-08T12:48:01.676787+08:00",
+  "orphaned_at": "2026-07-08T12:48:02.375063+08:00"
+}

@@ -1,0 +1,2 @@
+date,strategy_name,symbol,name,final_score,signal,rank,reason,risk_flags,created_at
+2026-07-03,semiconductor_trend_following,688012,中微公司,72.5,buy_watch,1,趋势因子+成交量因子双确认,,2026-07-03T17:43:18+08:00

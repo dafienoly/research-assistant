@@ -1,0 +1,88 @@
+{
+  "developer_claims": [
+    {
+      "id": "T1",
+      "title": "拆分 IC/RankIC — Pearson IC + Spearman RankIC",
+      "verified": false,
+      "code_locations": [
+        {
+          "file": "commands/factor_lab/batch_compute.py",
+          "function": "compute_all_and_cache",
+          "line": 189
+        },
+        {
+          "file": "commands/factor_lab/batch_compute.py",
+          "function": "results dict",
+          "line": 246
+        }
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "最大回撤 — 从 top-bottom 净值曲线计算",
+      "verified": false,
+      "code_locations": [
+        {
+          "file": "commands/factor_lab/batch_compute.py",
+          "function": "compute_all_and_cache",
+          "line": 234
+        }
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "风险暴露 — 波动率/动量/流动性截面暴露",
+      "verified": false,
+      "code_locations": [
+        {
+          "file": "commands/factor_lab/batch_compute.py",
+          "function": "_compute_risk_exposure",
+          "line": 310
+        }
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "半导体等权超额收益 — 真实基准",
+      "verified": false,
+      "code_locations": [
+        {
+          "file": "commands/factor_lab/batch_compute.py",
+          "function": "_compute_semiconductor_excess",
+          "line": 367
+        },
+        {
+          "file": "commands/factor_lab/batch_compute.py",
+          "function": "_load_semiconductor_stocks",
+          "line": 344
+        }
+      ]
+    }
+  ],
+  "unverified_claims": [
+    {
+      "id": "T1",
+      "title": "拆分 IC/RankIC — Pearson IC + Spearman RankIC"
+    },
+    {
+      "id": "T2",
+      "title": "最大回撤 — 从 top-bottom 净值曲线计算"
+    },
+    {
+      "id": "T3",
+      "title": "风险暴露 — 波动率/动量/流动性截面暴露"
+    },
+    {
+      "id": "T4",
+      "title": "半导体等权超额收益 — 真实基准"
+    }
+  ],
+  "unmapped_code": [],
+  "conflicts": [],
+  "summary": {
+    "developer_claims": 4,
+    "unverified": 4,
+    "unmapped": 0,
+    "conflicts": 0
+  }
+}

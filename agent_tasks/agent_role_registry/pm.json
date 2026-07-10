@@ -1,0 +1,36 @@
+{
+  "role_id": "pm",
+  "name": "Project Manager",
+  "description": "项目经理 — 负责任务规划、优先级排序、进度跟踪和资源协调",
+  "capabilities": [
+    "plan:task",
+    "plan:roadmap",
+    "plan:sprint",
+    "plan:prioritize",
+    "review:progress",
+    "assign:role",
+    "review:code"
+  ],
+  "responsibilities": [
+    "生成任务计划和 Sprint 规划",
+    "评估任务优先级和依赖关系",
+    "分配资源和角色",
+    "跟踪版本进度和完成状态",
+    "审批关键里程碑交付"
+  ],
+  "constraints": [
+    "不直接修改代码",
+    "不执行测试",
+    "不访问交易系统"
+  ],
+  "allowed_backends": [
+    "dry-run",
+    "claude"
+  ],
+  "max_concurrent_tasks": 3,
+  "requires_approval": false,
+  "auto_assignable": true,
+  "version": "1.0.0",
+  "created_at": "2026-07-08T10:13:07.557501+08:00",
+  "updated_at": "2026-07-08T10:13:07.557534+08:00"
+}

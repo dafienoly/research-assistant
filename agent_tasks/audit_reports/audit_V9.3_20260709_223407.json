@@ -1,0 +1,30 @@
+{
+  "version": "V9.3",
+  "status": "passed",
+  "phases_run": [
+    "phase1"
+  ],
+  "results": {
+    "passed": 7,
+    "failed": 0,
+    "warnings": 2
+  },
+  "fail_items": [],
+  "warn_items": [
+    {
+      "type": "INFRA",
+      "file": "gateway",
+      "line": 0,
+      "msg": "Gateway ticker 不可用"
+    },
+    {
+      "type": "INFRA",
+      "file": "git",
+      "line": 0,
+      "msg": "Git 仓库异常: TIMEOUT"
+    }
+  ],
+  "started_at": "2026-07-09T22:33:56.213589+08:00",
+  "finished_at": "2026-07-09T22:34:07.271801+08:00",
+  "report_path": "/home/ly/.hermes/research-assistant/agent_tasks/audit_reports/audit_V9.3_20260709_223407.json"
+}

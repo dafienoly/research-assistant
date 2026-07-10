@@ -1,0 +1,10 @@
+{
+  "universe_name": "ai_cpo_pcb_storage",
+  "source_files": [
+    "stock_theme_tags.csv"
+  ],
+  "total_stocks": 15,
+  "survivorship_bias_warning": "true",
+  "label_timing_bias_warning": "true",
+  "created_at": "2026-07-07T11:36:46+08:00"
+}

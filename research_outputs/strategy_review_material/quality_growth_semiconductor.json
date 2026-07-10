@@ -1,0 +1,39 @@
+{
+  "strategy_name": "quality_growth_semiconductor",
+  "version": "0.1.0",
+  "category": "quality_growth_semiconductor",
+  "universe": "semiconductor_theme",
+  "hypothesis": "高ROE高增长的半导体股优选策略",
+  "summary": {
+    "total_return": 0.0851,
+    "annual_return": 0.0851,
+    "max_drawdown": 0.0423,
+    "sharpe": null,
+    "win_rate": null,
+    "turnover": null,
+    "benchmark_excess_return": null
+  },
+  "strengths": [
+    "框架就绪，待完整回测数据"
+  ],
+  "weaknesses": [
+    "尚未跑完整历史回测"
+  ],
+  "failure_periods": [],
+  "best_periods": [],
+  "data_limitations": [
+    "部分基本面数据缺少 pub_date"
+  ],
+  "bias_warnings": [
+    "半导体标签可能存在时点偏差"
+  ],
+  "production_readiness": "research_only",
+  "codex_questions": [
+    "是否需要与盘前推荐做交集验证？",
+    "是否需要加入基本面过滤？"
+  ],
+  "data_range": {
+    "start": "2025-01-02",
+    "end": "2026-07-03"
+  }
+}

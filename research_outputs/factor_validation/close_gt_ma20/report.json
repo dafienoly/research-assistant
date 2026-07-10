@@ -1,0 +1,188 @@
+{
+  "factor_name": "close_gt_ma20",
+  "factor_family": "trend",
+  "status": "ok",
+  "ic_analysis": {
+    "factor_name": "close_gt_ma20",
+    "n_dates": 339,
+    "ic_mean": 0.0398,
+    "ic_std": 0.144,
+    "ic_ir": 0.2762,
+    "pos_ratio": 0.6401,
+    "monthly_ic_series": [
+      {
+        "year_month": "2025-02",
+        "ic": 0.06172589469257086
+      },
+      {
+        "year_month": "2025-03",
+        "ic": 0.05767972123255604
+      },
+      {
+        "year_month": "2025-04",
+        "ic": 0.07106124534978975
+      },
+      {
+        "year_month": "2025-05",
+        "ic": 0.037821196299833125
+      },
+      {
+        "year_month": "2025-06",
+        "ic": 0.07176623816663927
+      },
+      {
+        "year_month": "2025-07",
+        "ic": 0.08974286239622832
+      },
+      {
+        "year_month": "2025-08",
+        "ic": 0.0338055463692731
+      },
+      {
+        "year_month": "2025-09",
+        "ic": 0.054745126218633235
+      },
+      {
+        "year_month": "2025-10",
+        "ic": 0.08140094622132542
+      },
+      {
+        "year_month": "2025-11",
+        "ic": 0.031616801309002254
+      },
+      {
+        "year_month": "2025-12",
+        "ic": 0.012206208553223628
+      },
+      {
+        "year_month": "2026-01",
+        "ic": 0.02649166101568485
+      },
+      {
+        "year_month": "2026-02",
+        "ic": 0.033401963546009585
+      },
+      {
+        "year_month": "2026-03",
+        "ic": 0.014879369104499367
+      },
+      {
+        "year_month": "2026-04",
+        "ic": 0.017741946074831826
+      },
+      {
+        "year_month": "2026-05",
+        "ic": -0.018972203254055423
+      },
+      {
+        "year_month": "2026-06",
+        "ic": -0.002802300166301462
+      }
+    ],
+    "layer_test": {
+      "layer_returns": {
+        "mean": {
+          "0": -1.7895093125920177e-05,
+          "1": -8.299075916155273e-05,
+          "2": -2.6295816778944224e-05,
+          "3": 0.0002700086973084433,
+          "4": 0.0007413125232148204
+        },
+        "std": {
+          "0": 0.013636910392394,
+          "1": 0.012702512330410249,
+          "2": 0.0119959767428537,
+          "3": 0.012796545314029309,
+          "4": 0.013103045793754625
+        },
+        "count": {
+          "0": 339,
+          "1": 339,
+          "2": 339,
+          "3": 339,
+          "4": 339
+        }
+      },
+      "long_short_mean": 0.0007592076163407405,
+      "long_short_sharpe": 1.1530078070787468
+    }
+  },
+  "anti_overfit": {
+    "peer_benchmark": {
+      "beats_peer": true,
+      "strategy_cumulative_pct": 33.36,
+      "peer_ew_cumulative_pct": 14.14,
+      "excess_return_pct": 19.23,
+      "excess_sharpe": 0.2891,
+      "n_days": 843
+    },
+    "placebo": {
+      "true_ic_mean": 0.0398,
+      "shuffled_mean": 0.001,
+      "shuffled_std": 0.0025,
+      "factor_score_percentile": 100.0,
+      "verdict": "pass"
+    }
+  },
+  "walk_forward": {
+    "factor_name": "close_gt_ma20",
+    "method": "rolling",
+    "n_windows": 3,
+    "period_results": [
+      {
+        "window": "wf_1",
+        "train_dates": "2023-01-03 00:00:00 ~ 2023-11-15 00:00:00",
+        "test_dates": "2023-11-16 00:00:00 ~ 2024-09-25 00:00:00",
+        "train_ic": 0,
+        "test_sharpe": 0.0,
+        "test_positive": false
+      },
+      {
+        "window": "wf_2",
+        "train_dates": "2023-11-16 00:00:00 ~ 2024-09-25 00:00:00",
+        "test_dates": "2024-09-26 00:00:00 ~ 2025-08-08 00:00:00",
+        "train_ic": 0,
+        "test_sharpe": 1.0063,
+        "test_positive": true
+      },
+      {
+        "window": "wf_3",
+        "train_dates": "2024-09-26 00:00:00 ~ 2025-08-08 00:00:00",
+        "test_dates": "2025-08-11 00:00:00 ~ 2026-06-25 00:00:00",
+        "train_ic": 0.0654,
+        "test_sharpe": 1.0483,
+        "test_positive": true
+      }
+    ],
+    "oos_positive_ratio": 0.6667,
+    "avg_test_sharpe": 0.6849,
+    "avg_train_ic": 0.0218,
+    "overall_verdict": "pass"
+  },
+  "benchmark_comparison": {
+    "benchmark": "CSI300",
+    "strategy_cum_pct": 33.36,
+    "benchmark_cum_pct": 28.08,
+    "excess_return_pct": 5.29,
+    "excess_sharpe": 0.0389,
+    "n_days": 842,
+    "period": "2023-01-04 ~ 2026-06-30"
+  },
+  "scoring": {
+    "overall_score": 91.0,
+    "grade": "A",
+    "pass_gate": true,
+    "ic_score": 32.6,
+    "peer_score": 20,
+    "wf_score": 13.4,
+    "placebo_score": 15.0,
+    "monotonicity_score": 10,
+    "reject_reasons": []
+  },
+  "derived": {
+    "monotonicity": "部分",
+    "ls_sharpe": 1.1530078070787468,
+    "ic_half_life_days": 25.20146319699546,
+    "industry_exposure": "多行业分散 (A股全市场)"
+  }
+}

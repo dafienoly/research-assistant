@@ -1,0 +1,17 @@
+{
+  "source": "hermes",
+  "version": "V9.4",
+  "stage": "V9.4",
+  "status": "partial",
+  "report_dir": "/home/ly/.hermes/research-assistant/agent_tasks/agent_logs/auto_20260710_180502_693776",
+  "summary": {
+    "passed": 0,
+    "failed": 1
+  },
+  "completed_tasks": [],
+  "remaining_tasks": [
+    "T001"
+  ],
+  "next_question": "剩余 1 个任务待完成",
+  "generated_at": "2026-07-10T18:13:13.335524+08:00"
+}

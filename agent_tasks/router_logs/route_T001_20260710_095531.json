@@ -1,0 +1,28 @@
+{
+  "timestamp": "20260710_095531_959199",
+  "profile": {
+    "task_id": "T001",
+    "title": "",
+    "version": "V8.1",
+    "priority": "P2",
+    "task_type": "unknown",
+    "required_caps": [
+      "implement:code"
+    ],
+    "description": "",
+    "owner": "",
+    "backend": "",
+    "safety_tags": []
+  },
+  "route": {
+    "task_id": "T001",
+    "role_id": "developer",
+    "backend": "dry-run",
+    "strategy": "composite",
+    "confidence": 0.8,
+    "reasoning": "Composite routing: role=developer (score=12.0, sources=[rule:rtl_v8(+4.5); rule:rtl_p2(+3.5); cap:implement:code(+3.0)]), backend=dry-run",
+    "alternatives": [],
+    "blocked": false,
+    "blocked_reason": ""
+  }
+}

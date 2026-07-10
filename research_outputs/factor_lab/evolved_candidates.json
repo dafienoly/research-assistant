@@ -1,0 +1,52 @@
+[
+  {
+    "name": "accel",
+    "expression": "ts_av_diff(ret5, 10)",
+    "hypothesis": "LLM 生成: ts_av_diff(ret5, 10)"
+  },
+  {
+    "name": "vol_mom",
+    "expression": "rank(ret5) * rank(ema(volume,5) / ema(volume,20))",
+    "hypothesis": "LLM 生成: rank(ret5) * rank(ema(volume,5) / ema(volume,20))"
+  },
+  {
+    "name": "volatility_reversal",
+    "expression": "rank(reversal5) * rank(ts_std(close, 20))",
+    "hypothesis": "LLM 生成: rank(reversal5) * rank(ts_std(close, 20))"
+  },
+  {
+    "name": "**Design rationale",
+    "expression": "**",
+    "hypothesis": "LLM 生成: **"
+  },
+  {
+    "name": "mom_vol_confirm",
+    "expression": "rank(ret5) * rank(ema(volume,5) / ema(volume,20))",
+    "hypothesis": "LLM 生成: rank(ret5) * rank(ema(volume,5) / ema(volume,20))"
+  },
+  {
+    "name": "lowvol_momentum",
+    "expression": "rank(ret5) * rank(-ts_std(close, 20))",
+    "hypothesis": "LLM 生成: rank(ret5) * rank(-ts_std(close, 20))"
+  },
+  {
+    "name": "trend_smoothness",
+    "expression": "rank(ts_corr(close, ts_mean(close, 5), 20))",
+    "hypothesis": "LLM 生成: rank(ts_corr(close, ts_mean(close, 5), 20))"
+  },
+  {
+    "name": "pv_corr",
+    "expression": "rank(ts_corr(ret5, vol_ratio60, 10))",
+    "hypothesis": "LLM 生成: rank(ts_corr(ret5, vol_ratio60, 10))"
+  },
+  {
+    "name": "vol_adjusted_mom",
+    "expression": "rank(ret5) * rank(-ts_std(close, 20))",
+    "hypothesis": "LLM 生成: rank(ret5) * rank(-ts_std(close, 20))"
+  },
+  {
+    "name": "volume_breakout",
+    "expression": "rank(close_gt_ma20) * rank(ema(volume,5) / ema(volume,20))",
+    "hypothesis": "LLM 生成: rank(close_gt_ma20) * rank(ema(volume,5) / ema(volume,20))"
+  }
+]

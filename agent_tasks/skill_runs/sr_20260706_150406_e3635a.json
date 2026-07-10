@@ -1,0 +1,21 @@
+{
+  "skill_id": "data-quality",
+  "status": "completed",
+  "data": {
+    "health": {
+      "error": "'HealthTracker' object has no attribute 'get_all_health'"
+    },
+    "fetch_log_count": 948,
+    "last_fetch": "2026-07-06T15:02:06+08:00",
+    "sources": {
+      "error": "'DataRegistry' object has no attribute 'list'"
+    }
+  },
+  "error": "",
+  "started_at": "2026-07-06T15:04:06.344501+08:00",
+  "completed_at": "2026-07-06T15:04:06.354057+08:00",
+  "duration_ms": 9.5,
+  "run_id": "sr_20260706_150406_e3635a",
+  "skill_name": "数据质量检查",
+  "skill_category": "data"
+}

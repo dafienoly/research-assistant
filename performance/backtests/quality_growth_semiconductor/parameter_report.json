@@ -1,0 +1,19 @@
+{
+  "strategy": "quality_growth_semiconductor",
+  "total_combinations": 27,
+  "best_params": {
+    "top_n": 8,
+    "ret20_weight": 0.08,
+    "vol_ratio20_weight": 0.08
+  },
+  "best_total_return": 0.0851,
+  "best_max_drawdown": 0.0423,
+  "return_range": {
+    "min": 0.0595,
+    "max": 0.0851,
+    "std": 0.012799999999999999
+  },
+  "stability_note": "检查 best_params 是否在 grid 边缘；如果在边缘则需扩展搜索范围",
+  "overfit_risk": "low",
+  "created_at": "2026-07-03T17:51:15+08:00"
+}

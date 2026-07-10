@@ -1,0 +1,32 @@
+{
+  "timestamp": "20260709_170408_614895",
+  "profile": {
+    "task_id": "T001",
+    "title": "External Notification Center",
+    "version": "V9.3",
+    "priority": "P1",
+    "task_type": "test",
+    "required_caps": [
+      "test:unit",
+      "test:integration",
+      "test:regression"
+    ],
+    "description": "Implement V9.3: External Notification Center Objective: 外部通知中心（Telegram/短信/邮件） ## 详细描述 多渠道通知：Telegram/短信/邮件推送。通知模板、频率控制、告警规则。新增 notification_center.py、routes_notify.py、前端通知配置页。20+ 测试。",
+    "owner": "hermes_auto_developer",
+    "backend": "",
+    "safety_tags": [
+      "auto_apply=False, no_live_trade=True"
+    ]
+  },
+  "route": {
+    "task_id": "T001",
+    "role_id": "",
+    "backend": "",
+    "strategy": "version_safe",
+    "confidence": 1.0,
+    "reasoning": "BLOCKED: Safety tag blocks live execution: auto_apply=False, no_live_trade=True",
+    "alternatives": [],
+    "blocked": true,
+    "blocked_reason": "Safety tag blocks live execution: auto_apply=False, no_live_trade=True"
+  }
+}

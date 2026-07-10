@@ -1,0 +1,10 @@
+{
+  "passed": false,
+  "auto_triggered_at": "20260708_234541",
+  "changed_files": [
+    "/home/ly/.hermes/research-assistant/commands/intraday_monitor.py",
+    "/home/ly/.hermes/research-assistant/commands/hermes_cli.py",
+    "/home/ly/.hermes/research-assistant/commands/tests/test_intraday_monitor.py"
+  ],
+  "auto_exit_code": 1
+}

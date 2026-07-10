@@ -1,0 +1,31 @@
+{
+  "passed": false,
+  "auto_triggered_at": "20260708_223758",
+  "changed_files": [
+    "/home/ly/.hermes/research-assistant/commands/data_providers/tushare/tushare_stock.py",
+    "/home/ly/.hermes/research-assistant/commands/data_providers/tushare/tushare_market.py",
+    "/home/ly/.hermes/research-assistant/commands/tests/test_tushare_stock.py",
+    "/home/ly/.hermes/research-assistant/commands/data_providers/tushare/tushare_fund_flow.py",
+    "/home/ly/.hermes/research-assistant/commands/factor_lab/data/tushare_client.py",
+    "/home/ly/.hermes/research-assistant/commands/data_audit.py",
+    "/home/ly/.hermes/research-assistant/commands/data_providers/tushare/__init__.py",
+    "/home/ly/.hermes/research-assistant/commands/data_pipeline.py",
+    "/home/ly/.hermes/research-assistant/commands/factor_lab/data/tushare_registry.py",
+    "/home/ly/.hermes/research-assistant/commands/tests/test_data_manager.py",
+    "/home/ly/.hermes/research-assistant/commands/data_providers/tushare/tushare_fina.py",
+    "/home/ly/.hermes/research-assistant/commands/data_manager.py",
+    "/home/ly/.hermes/research-assistant/commands/hermes_cli.py",
+    "/home/ly/.hermes/research-assistant/commands/benchmarks_v4.py",
+    "/home/ly/.hermes/research-assistant/commands/factor_lab/validate_v4.py",
+    "/home/ly/.hermes/research-assistant/commands/tests/test_tushare_fina.py",
+    "/home/ly/.hermes/research-assistant/commands/tests/test_tushare_event.py",
+    "/home/ly/.hermes/research-assistant/commands/factor_lab/core/gate.py",
+    "/home/ly/.hermes/research-assistant/commands/data_providers/__init__.py",
+    "/home/ly/.hermes/research-assistant/commands/tests/test_tushare_fund_flow.py",
+    "/home/ly/.hermes/research-assistant/commands/tests/test_universes.py",
+    "/home/ly/.hermes/research-assistant/commands/tests/test_tushare_market.py",
+    "/home/ly/.hermes/research-assistant/commands/data_providers/tushare/tushare_event.py",
+    "/home/ly/.hermes/research-assistant/commands/universes.py"
+  ],
+  "auto_exit_code": 1
+}

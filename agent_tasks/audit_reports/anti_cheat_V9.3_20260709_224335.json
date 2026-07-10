@@ -1,0 +1,195 @@
+{
+  "version": "V9.3",
+  "passed": false,
+  "gates_run": [
+    "gate1",
+    "gate2",
+    "gate3",
+    "gate4",
+    "gate5"
+  ],
+  "findings": [
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "NO_TASKS",
+      "file": "",
+      "line": 0,
+      "message": "Plan 文件中未解析到 Task 定义（格式: ### Task N）",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "INFO",
+      "category": "CHANGED_FILES",
+      "file": "",
+      "line": 0,
+      "message": "发现 10 个变更文件（无 Task 解析）",
+      "detail": "data/audit/datahub_full_pipeline.log\ndata/normalized/fundamentals/603130.SH.csv\ndata/normalized/fundamentals/603131.SH.csv\ndata/normalized/fundamentals/603132.SH.csv\ndata/normalized/fundamentals/603135.SH.csv\ndata/normalized/fundamentals/603136.SH.csv\ndata/normalized/fundamentals/603137.SH.csv\ndata/normalized/fundamentals/603138.SH.csv\ndata/normalized/fundamentals/603139.SH.csv\ndata/normalized/fundamentals/603150.SH.csv"
+    },
+    {
+      "gate": "gate2",
+      "severity": "INFO",
+      "category": "NO_CHANGES",
+      "file": "",
+      "line": 0,
+      "message": "无变更的 Python 文件，跳过",
+      "detail": ""
+    },
+    {
+      "gate": "gate3",
+      "severity": "INFO",
+      "category": "NO_SOURCE",
+      "file": "",
+      "line": 0,
+      "message": "变更中无可测试源文件",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "RUNTIME_GATE_START",
+      "file": "",
+      "line": 0,
+      "message": "Runtime Smoke Gate: 0 个新 Python 文件",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "WARN",
+      "category": "CLI_SMOKE_FAILED",
+      "file": "",
+      "line": 0,
+      "message": "CLI --dry-run 返回非零: exit=1",
+      "detail": "❌ 未知命令: --dry-run\n使用 -h 查看帮助\n"
+    },
+    {
+      "gate": "gate4",
+      "severity": "WARN",
+      "category": "DATA_HEALTH_FAILED",
+      "file": "",
+      "line": 0,
+      "message": "数据源 data:health-check --dry-run: 异常 (exit=1)",
+      "detail": "❌ 未知命令: data:health-check\n使用 -h 查看帮助\n"
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "DATA_HEALTH_OK",
+      "file": "",
+      "line": 0,
+      "message": "数据源 factor:signal --dry-run: 正常",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "WARN",
+      "category": "DATA_HEALTH_FAILED",
+      "file": "",
+      "line": 0,
+      "message": "数据源 premarket --dry-run: 异常 (exit=1)",
+      "detail": "❌ 未知命令: premarket\n使用 -h 查看帮助\n"
+    },
+    {
+      "gate": "gate4",
+      "severity": "WARN",
+      "category": "DATA_HEALTH_FAILED",
+      "file": "",
+      "line": 0,
+      "message": "数据源 alpha:factory --status: 异常 (exit=1)",
+      "detail": "Traceback (most recent call last):\n  File \"/home/ly/.hermes/research-assistant/commands/hermes_cli.py\", line 2541, in <module>\n    main()\n    ~~~~^^\n  File \"/home/ly/.hermes/research-assistant/command"
+    },
+    {
+      "gate": "gate4",
+      "severity": "FAIL",
+      "category": "PYTEST_FAILED",
+      "file": "",
+      "line": 0,
+      "message": "标准 pytest 返回码 4",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "FE_TSC_SKIP",
+      "file": "",
+      "line": 0,
+      "message": "无前端 TypeScript 变更，跳过 tsc 检查",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "API_SMOKE_SKIP",
+      "file": "",
+      "line": 0,
+      "message": "无路由文件变更，跳过 API 端点冒烟测试",
+      "detail": ""
+    },
+    {
+      "gate": "gate5",
+      "severity": "FAIL",
+      "category": "MAPPING_FUNC_MISSING",
+      "file": "/home/ly/.hermes/scripts/mx_data_step.sh",
+      "line": 0,
+      "message": "需求 R2: 符号 bash script tail 不存在（未找到 def/class/= 定义）",
+      "detail": ""
+    },
+    {
+      "gate": "gate5",
+      "severity": "FAIL",
+      "category": "MAPPING_FUNC_MISSING",
+      "file": "/home/ly/.hermes/scripts/announcement_parse.sh",
+      "line": 0,
+      "message": "需求 R3: 符号 bash script tail 不存在（未找到 def/class/= 定义）",
+      "detail": ""
+    },
+    {
+      "gate": "gate5",
+      "severity": "WARN",
+      "category": "MAPPING_SELF_CLAIM_UNVERIFIED",
+      "file": "",
+      "line": 0,
+      "message": "需求 R1 'northbound_data 接入每日增量管线注册表更新' 未经审计器验证",
+      "detail": "developer mapping 声称已实现，但审计器从 diff 中未找到对应证据"
+    },
+    {
+      "gate": "gate5",
+      "severity": "WARN",
+      "category": "MAPPING_SELF_CLAIM_UNVERIFIED",
+      "file": "",
+      "line": 0,
+      "message": "需求 R2 'margin_data 接入 mx_data_step.sh 注册表更新' 未经审计器验证",
+      "detail": "developer mapping 声称已实现，但审计器从 diff 中未找到对应证据"
+    },
+    {
+      "gate": "gate5",
+      "severity": "WARN",
+      "category": "MAPPING_SELF_CLAIM_UNVERIFIED",
+      "file": "",
+      "line": 0,
+      "message": "需求 R3 'event_data 接入 announcement_parse.sh 注册表更新' 未经审计器验证",
+      "detail": "developer mapping 声称已实现，但审计器从 diff 中未找到对应证据"
+    },
+    {
+      "gate": "gate5",
+      "severity": "WARN",
+      "category": "MAPPING_SELF_CLAIM_UNVERIFIED",
+      "file": "",
+      "line": 0,
+      "message": "需求 R4 'sentiment_data 接入 data_hub_rebuilder.py 注册表更新' 未经审计器验证",
+      "detail": "developer mapping 声称已实现，但审计器从 diff 中未找到对应证据"
+    },
+    {
+      "gate": "gate5",
+      "severity": "INFO",
+      "category": "LLM_SKIP",
+      "file": "",
+      "line": 0,
+      "message": "未配置 LLM API key，跳过 LLM 审查",
+      "detail": "风险等级=MEDIUM，在高风险模式下 LLM_SKIP 不允许默认通过"
+    }
+  ],
+  "started_at": "2026-07-09T22:43:33.654137+08:00",
+  "finished_at": "2026-07-09T22:43:35.277752+08:00"
+}

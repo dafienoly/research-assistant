@@ -1,0 +1,17 @@
+{
+  "strategy": "ma20_gt_ma60",
+  "status": "completed",
+  "data_range": {
+    "start": "2025-01-02",
+    "end": "2026-07-03"
+  },
+  "initial_cash": 1000000.0,
+  "final_equity": 1107811.81,
+  "total_return": 0.1078,
+  "annual_return": 0.1078,
+  "max_drawdown": 0.1458,
+  "closed_trades": 286,
+  "total_trades": 574,
+  "universe_size": 15,
+  "created_at": "2026-07-03T17:51:05+08:00"
+}

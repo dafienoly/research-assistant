@@ -1,0 +1,1909 @@
+{
+  "version": "",
+  "passed": false,
+  "gates_run": [
+    "gate1",
+    "gate2",
+    "gate3",
+    "gate4"
+  ],
+  "findings": [
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "NO_TASKS",
+      "file": "",
+      "line": 0,
+      "message": "Plan 文件中未解析到 Task 定义（格式: ### Task N）",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "INFO",
+      "category": "CHANGED_FILES",
+      "file": "",
+      "line": 0,
+      "message": "发现 432 个变更文件（无 Task 解析）",
+      "detail": ".hermes/plans/task_spec_v324_industry_factors.md\n.hermes/plans/task_spec_v325_alpha_metadata.md\n.hermes/plans/task_spec_v331_factor_weighting.md\n.hermes/plans/task_spec_v332_portfolio_constraints.md\n.hermes/plans/task_spec_v363_llm_diagnosis.md\n.hermes/plans/task_spec_v364_auto_research_loop.md\n.hermes/plans/v3-integration-audit.md\n.hermes/plans/v3-usage-guide.md\nAGENTS.md\nCLAUDE.md\nagent_tasks/VERSION\nbackend/__init__.py\nbackend/services/__init__.py\nbackend/services/universe_cache.py\ncommands/.coverage\ncommands/benchmarks_v4.py\ncommands/data_audit.py\ncommands/data_manager.py\ncommands/data_pipeline.py\ncommands/data_providers/__init__.py"
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/data_providers/__init__.py",
+      "line": 0,
+      "message": "新增 DataProviderRegistry 组件但未发现注册代码: __init__.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/data_providers/tushare/tushare_event.py",
+      "line": 0,
+      "message": "新增 DataProviderRegistry 组件但未发现注册代码: tushare_event.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/data_providers/tushare/tushare_fina.py",
+      "line": 0,
+      "message": "新增 DataProviderRegistry 组件但未发现注册代码: tushare_fina.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/data_providers/tushare/tushare_fund_flow.py",
+      "line": 0,
+      "message": "新增 DataProviderRegistry 组件但未发现注册代码: tushare_fund_flow.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/data_providers/tushare/tushare_market.py",
+      "line": 0,
+      "message": "新增 DataProviderRegistry 组件但未发现注册代码: tushare_market.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/data_providers/tushare/tushare_stock.py",
+      "line": 0,
+      "message": "新增 DataProviderRegistry 组件但未发现注册代码: tushare_stock.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/factor_lab/alpha/future_leakage_gate.py",
+      "line": 0,
+      "message": "新增 GateEngine 组件但未发现注册代码: future_leakage_gate.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/factor_lab/api_server/main.py",
+      "line": 0,
+      "message": "新增 CommandRegistry 组件但未发现注册代码: main.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/factor_lab/api_server/routes_backup.py",
+      "line": 0,
+      "message": "新增 CommandRegistry 组件但未发现注册代码: routes_backup.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/factor_lab/api_server/routes_console.py",
+      "line": 0,
+      "message": "新增 CommandRegistry 组件但未发现注册代码: routes_console.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/factor_lab/api_server/routes_data.py",
+      "line": 0,
+      "message": "新增 CommandRegistry 组件但未发现注册代码: routes_data.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/factor_lab/api_server/routes_paper.py",
+      "line": 0,
+      "message": "新增 CommandRegistry 组件但未发现注册代码: routes_paper.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/factor_lab/api_server/routes_reports.py",
+      "line": 0,
+      "message": "新增 CommandRegistry 组件但未发现注册代码: routes_reports.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/factor_lab/api_server/routes_roadmap.py",
+      "line": 0,
+      "message": "新增 CommandRegistry 组件但未发现注册代码: routes_roadmap.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/factor_lab/api_server/routes_status.py",
+      "line": 0,
+      "message": "新增 CommandRegistry 组件但未发现注册代码: routes_status.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/factor_lab/audit/risk_classifier.py",
+      "line": 0,
+      "message": "新增 CommandRegistry 组件但未发现注册代码: risk_classifier.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/factor_lab/leader/agent_runner.py",
+      "line": 0,
+      "message": "新增 CommandRegistry 组件但未发现注册代码: agent_runner.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "SYMBOL_NOT_REGISTERED",
+      "file": "commands/factor_lab/leader/roadmap.py",
+      "line": 0,
+      "message": "新增 CommandRegistry 组件但未发现注册代码: roadmap.py",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "INFO",
+      "category": "SCAN_FILES",
+      "file": "",
+      "line": 0,
+      "message": "扫描 152 个 Python 文件",
+      "detail": "backend/__init__.py\nbackend/services/__init__.py\nbackend/services/universe_cache.py\ncommands/benchmarks_v4.py\ncommands/data_audit.py\ncommands/data_manager.py\ncommands/data_pipeline.py\ncommands/data_providers/__init__.py\ncommands/data_providers/tushare/__init__.py\ncommands/data_providers/tushare/tushare_event.py\ncommands/data_providers/tushare/tushare_fina.py\ncommands/data_providers/tushare/tushare_fund_flow.py\ncommands/data_providers/tushare/tushare_market.py\ncommands/data_providers/tushare/tushare_stock.py\ncommands/eastmoney_direct.py"
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "backend/services/universe_cache.py",
+      "line": 49,
+      "message": "函数 'UniverseCache.invalidate' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/benchmarks_v4.py",
+      "line": 89,
+      "message": "函数 '_load_universes' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/adaptive/shadow_forward.py",
+      "line": 523,
+      "message": "函数 'StandingShadowForward._fetch_csi300_return' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/agent_console/adapters.py",
+      "line": 63,
+      "message": "函数 '_run_hermes_demo' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/agent_console/adapters.py",
+      "line": 88,
+      "message": "函数 '_run_hermes_research' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/alpha/failure_db.py",
+      "line": 74,
+      "message": "函数 'FailureDatabase._load_index' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/alpha/failure_db.py",
+      "line": 202,
+      "message": "函数 'FailureDatabase._detect_market_regime' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/alpha/llm_alpha_discovery.py",
+      "line": 39,
+      "message": "函数 '_fsync_dir' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/alpha/llm_alpha_discovery.py",
+      "line": 49,
+      "message": "函数 '_fsync_file' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/alpha/registry.py",
+      "line": 169,
+      "message": "函数 'AlphaRegistry.load_index' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/alpha/retirement_engine.py",
+      "line": 99,
+      "message": "函数 'RetirementPolicy._load' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/alpha/retirement_engine.py",
+      "line": 596,
+      "message": "函数 'run_retirement' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/alpha/retirement_engine.py",
+      "line": 602,
+      "message": "函数 'run_auto_retirement' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/api_server/routes_backup.py",
+      "line": 35,
+      "message": "函数 '_background_run' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_RETURN_DICT",
+      "file": "commands/factor_lab/api_server/routes_console.py",
+      "line": 17,
+      "message": "函数 'list_adapters' 返回硬编码字典: keys=['adapters']",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/api_server/routes_data.py",
+      "line": 179,
+      "message": "函数 '_run_freshness_check' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/api_server/routes_data.py",
+      "line": 197,
+      "message": "函数 '_run_gap_report' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/api_server/routes_factor.py",
+      "line": 22,
+      "message": "函数 '_build_meta' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/api_server/routes_reports.py",
+      "line": 422,
+      "message": "函数 'list_backtest_reports' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/api_server/routes_universe.py",
+      "line": 99,
+      "message": "函数 '_background_build' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/api_server/services/audit_service.py",
+      "line": 83,
+      "message": "函数 'AuditService.get_by_run_id' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/api_server/services/command_runner.py",
+      "line": 34,
+      "message": "函数 'CommandResult.is_running' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_RETURN_DICT",
+      "file": "commands/factor_lab/api_server/services/command_runner.py",
+      "line": 48,
+      "message": "函数 'CommandResult.to_dict' 返回硬编码字典: keys=['run_id', 'command', 'returncode', 'stdout', 'stderr', 'started_at', 'finished_at', 'is_running', 'duration_seconds']",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/api_server/services/command_runner.py",
+      "line": 68,
+      "message": "函数 'CommandRunner.run' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_RETURN_DICT",
+      "file": "commands/factor_lab/api_server/services/job_service.py",
+      "line": 45,
+      "message": "函数 'Job.to_dict' 返回硬编码字典: keys=['run_id', 'name', 'job_type', 'params', 'status', 'progress', 'message', 'result', 'error', 'created_at', 'started_at', 'finished_at', 'duration_seconds', 'log_length']",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/audit/report_writer.py",
+      "line": 37,
+      "message": "函数 '_run_id' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_RETURN_DICT",
+      "file": "commands/factor_lab/audit/skip_governance.py",
+      "line": 51,
+      "message": "函数 'SkipRecord.to_dict' 返回硬编码字典: keys=['gate', 'reason', 'initiator', 'timestamp', 'allowed', 'expires_at', 'risk']",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/composite/factor_combiner.py",
+      "line": 15,
+      "message": "函数 'compute_composite' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/composite/factor_combiner.py",
+      "line": 115,
+      "message": "函数 '_rank_blend' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/expression_parser.py",
+      "line": 112,
+      "message": "函数 'op_rank' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/expression_parser.py",
+      "line": 116,
+      "message": "函数 'op_zscore' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/expression_parser.py",
+      "line": 172,
+      "message": "函数 'op_ts_rank' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/expression_parser.py",
+      "line": 579,
+      "message": "函数 'ExpressionParser.validate' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/factor_base.py",
+      "line": 246,
+      "message": "函数 'profit_growth_factor' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/factor_base.py",
+      "line": 835,
+      "message": "函数 'compute_factor' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/factor_base.py",
+      "line": 1522,
+      "message": "函数 '_load_semiconductor_factors' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/factor_engine.py",
+      "line": 156,
+      "message": "函数 'load_fund_flow' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/factor_engine.py",
+      "line": 166,
+      "message": "函数 'load_north_bound' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/factor_engine.py",
+      "line": 176,
+      "message": "函数 'load_margin_trading' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/factor_engine.py",
+      "line": 186,
+      "message": "函数 'load_events' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/factor_engine.py",
+      "line": 196,
+      "message": "函数 'load_sentiment' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/leader/agent_runner.py",
+      "line": 286,
+      "message": "函数 'AgentRunner._backend_dry_run' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/leader/agent_runner.py",
+      "line": 477,
+      "message": "函数 '_build_agent_prompt' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_RETURN_DICT",
+      "file": "commands/factor_lab/leader/audit_push.py",
+      "line": 98,
+      "message": "函数 'AuditReport.to_dict' 返回硬编码字典: keys=['version', 'status', 'phases_run', 'results', 'fail_items', 'warn_items', 'started_at', 'finished_at', 'report_path']",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/leader/audit_push.py",
+      "line": 124,
+      "message": "函数 '_run' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/leader/auto_executor.py",
+      "line": 27,
+      "message": "函数 '_new_run_id' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/leader/roadmap_cursor.py",
+      "line": 26,
+      "message": "函数 '_load' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_RETURN_DICT",
+      "file": "commands/factor_lab/live/signal_generator.py",
+      "line": 241,
+      "message": "函数 'Ret5Ma20GateSignalGenerator._to_candidate' 返回硬编码字典: keys=['symbol', 'name', 'close', 'ret5', 'ma20', 'close_gt_ma20', 'rank']",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/orchestration/daily_premarket_runner.py",
+      "line": 180,
+      "message": "函数 '_load_json' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/orchestration/daily_premarket_runner.py",
+      "line": 770,
+      "message": "函数 '_generate_decision_template' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/pipeline_worker.py",
+      "line": 184,
+      "message": "函数 'FactorPipelineWorker._run_validation' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/portfolio/portfolio_backtest.py",
+      "line": 289,
+      "message": "函数 'PortfolioBacktestEngine.run_with_benchmark' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/research_loop.py",
+      "line": 223,
+      "message": "函数 '_validate_expression' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/research_loop.py",
+      "line": 241,
+      "message": "函数 '_load_knowledge_base' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/research_loop.py",
+      "line": 517,
+      "message": "函数 'ResearchLoop._evaluate_single' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/research_loop/__init__.py",
+      "line": 231,
+      "message": "函数 '_validate_expression' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/research_loop/__init__.py",
+      "line": 249,
+      "message": "函数 '_load_knowledge_base' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/research_loop/__init__.py",
+      "line": 719,
+      "message": "函数 'ResearchLoop._evaluate_single' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/risk/risk_rules.py",
+      "line": 245,
+      "message": "函数 'RuleEvaluator.evaluate_rules' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/risk/risk_rules.py",
+      "line": 645,
+      "message": "函数 'build_default_rule_evaluator' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/risk/risk_sentinel.py",
+      "line": 738,
+      "message": "函数 'RiskSentinel.is_running' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/semiconductor_events.py",
+      "line": 104,
+      "message": "函数 '_load_symbol_map' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_RETURN_DICT",
+      "file": "commands/factor_lab/strategy/execution_aware_backtester.py",
+      "line": 184,
+      "message": "函数 '_empty_result' 返回硬编码字典: keys=['returns', 'equity_curve', 'positions', 'trades', 'metrics', 'turnover', 'n_trades', 'execution_log']",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/validate_factor_v4.py",
+      "line": 139,
+      "message": "函数 'compute_win_rate' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/validate_factor_v4.py",
+      "line": 157,
+      "message": "函数 'compute_calmar' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/factor_lab/validate_factor_v4.py",
+      "line": 601,
+      "message": "函数 '_compute_strategy_returns' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/hermes_cli.py",
+      "line": 2277,
+      "message": "函数 '_parse_int' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/hermes_cli.py",
+      "line": 2288,
+      "message": "函数 '_parse_str' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/hermes_cli.py",
+      "line": 2456,
+      "message": "函数 '_handle_sector_rankings' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/intraday_monitor.py",
+      "line": 288,
+      "message": "函数 'Deduplicator._load' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_RETURN_DICT",
+      "file": "commands/live_readiness.py",
+      "line": 62,
+      "message": "函数 'ReadinessReport.to_dict' 返回硬编码字典: keys=['overall', 'run_id', 'scanned_at', 'gates', 'blockers', 'warnings', 'infos']",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/monitor_588710.py",
+      "line": 111,
+      "message": "函数 '_fetch_holding_names' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_RETURN_DICT",
+      "file": "commands/package_publisher.py",
+      "line": 93,
+      "message": "函数 'PackagePublisher._build_manifest' 返回硬编码字典: keys=['package_id', 'producer', 'env', 'created_at', 'type', 'data_date', 'files', 'freshness', 'source_summary']",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/package_publisher.py",
+      "line": 93,
+      "message": "函数 'PackagePublisher._build_manifest' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_agent_runner.py",
+      "line": 99,
+      "message": "函数 'test_runner_does_not_require_codex' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_benchmarks_v4.py",
+      "line": 299,
+      "message": "函数 'TestValidateV4.test_compute_strategy_returns' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_RETURN_DICT",
+      "file": "commands/tests/test_data_audit.py",
+      "line": 120,
+      "message": "函数 'mock_get_universe' 返回硬编码字典: keys=['name', 'stocks']",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_data_audit.py",
+      "line": 327,
+      "message": "函数 'TestSurvivorship.test_delisted_detection' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_data_audit.py",
+      "line": 333,
+      "message": "函数 'TestSurvivorship.test_st_detection' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_RETURN_LIST",
+      "file": "commands/tests/test_data_manager.py",
+      "line": 145,
+      "message": "函数 '_mock_get' 返回硬编码列表: []",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_RETURN_DICT",
+      "file": "commands/tests/test_data_pipeline.py",
+      "line": 161,
+      "message": "函数 'mock_get_universe' 返回硬编码字典: keys=['name', 'stocks']",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_RETURN_DICT",
+      "file": "commands/tests/test_intraday_monitor.py",
+      "line": 53,
+      "message": "函数 '_fake_quote' 返回硬编码字典: keys=['code', 'price', 'change_pct', 'volume', 'amount', 'source']",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_intraday_monitor.py",
+      "line": 99,
+      "message": "函数 'no_fetch' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_intraday_monitor.py",
+      "line": 383,
+      "message": "函数 'TestRunAll.test_run_all_returns_report' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_intraday_monitor.py",
+      "line": 391,
+      "message": "函数 'TestRunAll.test_empty_run_all' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_live_readiness.py",
+      "line": 712,
+      "message": "函数 'TestLiveReadinessReport.test_run_empty_evidence' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_live_readiness.py",
+      "line": 727,
+      "message": "函数 'TestLiveReadinessReport.test_run_all_pass' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_live_readiness.py",
+      "line": 738,
+      "message": "函数 'TestLiveReadinessReport.test_run_all_fail' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_live_readiness.py",
+      "line": 748,
+      "message": "函数 'TestLiveReadinessReport.test_run_with_context' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_live_readiness.py",
+      "line": 797,
+      "message": "函数 'TestLiveReadinessReport.test_gate_summary_generated' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_live_readiness.py",
+      "line": 813,
+      "message": "函数 'TestLiveReadinessReport.test_generated_at_is_datetime' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_live_readiness.py",
+      "line": 832,
+      "message": "函数 'TestRunLiveReadiness.test_latest_with_no_runs' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_live_readiness.py",
+      "line": 1041,
+      "message": "函数 'TestLiveReadinessIntegration.test_empty_report_generates_safe_result' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_live_readiness.py",
+      "line": 1065,
+      "message": "函数 'TestLiveReadinessIntegration.test_gap_analysis_runs_without_crashing' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_portfolio_builder.py",
+      "line": 49,
+      "message": "函数 'builder' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_portfolio_builder.py",
+      "line": 204,
+      "message": "函数 'TestBuildPortfolio.test_build_empty_signals' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_portfolio_builder.py",
+      "line": 252,
+      "message": "函数 'TestApplyConstraints.test_constraints_late_session' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_portfolio_builder.py",
+      "line": 438,
+      "message": "函数 'TestIndustryExposure.test_compute_industry_exposure_empty' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_portfolio_builder.py",
+      "line": 511,
+      "message": "函数 'TestCLICommands.test_cmd_build_lowfreq_defaults' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_portfolio_builder.py",
+      "line": 515,
+      "message": "函数 'TestCLICommands.test_cmd_build_lowfreq_custom_top_n' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_portfolio_builder.py",
+      "line": 518,
+      "message": "函数 'TestCLICommands.test_cmd_build_lowfreq_custom_capital' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_semiconductor_events.py",
+      "line": 278,
+      "message": "函数 'TestSemiconductorEventEngine.test_infer_event_type_default' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_semiconductor_events.py",
+      "line": 285,
+      "message": "函数 'TestSemiconductorEventEngine.test_infer_event_type_content_based' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_semiconductor_events.py",
+      "line": 583,
+      "message": "函数 'TestCLICommands.test_cmd_event_list_with_filter' 代码行数=1（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_universes.py",
+      "line": 604,
+      "message": "函数 'TestEdgeCases.test_core_score_low' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_LOW_COMPLEXITY",
+      "file": "commands/tests/test_validate_v4.py",
+      "line": 368,
+      "message": "函数 'TestEnhancedMetrics.test_compute_enhanced_metrics_empty' 代码行数=2（名称暗示复杂逻辑）",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "EMPTY_DATA_AS_SUCCESS",
+      "file": "commands/factor_lab/live/signal_generator.py",
+      "line": 321,
+      "message": "返回空数据而未标记 degraded — 可能伪装正常",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "EMPTY_DATA_AS_SUCCESS",
+      "file": "commands/factor_lab/paper/shadow_trading.py",
+      "line": 425,
+      "message": "返回空数据而未标记 degraded — 可能伪装正常",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "EMPTY_DATA_AS_SUCCESS",
+      "file": "commands/factor_lab/paper/shadow_trading.py",
+      "line": 426,
+      "message": "返回空数据而未标记 degraded — 可能伪装正常",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "EMPTY_DATA_AS_SUCCESS",
+      "file": "commands/factor_lab/paper/shadow_trading.py",
+      "line": 427,
+      "message": "返回空数据而未标记 degraded — 可能伪装正常",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "EMPTY_DATA_AS_SUCCESS",
+      "file": "commands/factor_lab/portfolio/portfolio_backtest.py",
+      "line": 195,
+      "message": "返回空数据而未标记 degraded — 可能伪装正常",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "EMPTY_DATA_AS_SUCCESS",
+      "file": "commands/factor_lab/portfolio/portfolio_backtest.py",
+      "line": 320,
+      "message": "返回空数据而未标记 degraded — 可能伪装正常",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "EMPTY_DATA_AS_SUCCESS",
+      "file": "commands/factor_lab/portfolio/portfolio_backtest.py",
+      "line": 330,
+      "message": "返回空数据而未标记 degraded — 可能伪装正常",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "PROD_MOCK_DATA",
+      "file": "commands/factor_lab/reports/test_daily_review.py",
+      "line": 31,
+      "message": "生产路径发现 'mock_data' — 不允许生产代码使用假数据",
+      "detail": "路径 commands/factor_lab/reports/test_daily_review.py 被标记为生产路径，不允许出现 mock/demo/fallback 数据"
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "PROD_MOCK_DATA",
+      "file": "commands/factor_lab/reports/test_daily_review.py",
+      "line": 278,
+      "message": "生产路径发现 'mock_data' — 不允许生产代码使用假数据",
+      "detail": "路径 commands/factor_lab/reports/test_daily_review.py 被标记为生产路径，不允许出现 mock/demo/fallback 数据"
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "EMPTY_DATA_AS_SUCCESS",
+      "file": "commands/factor_lab/risk_exposure.py",
+      "line": 682,
+      "message": "返回空数据而未标记 degraded — 可能伪装正常",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "EMPTY_DATA_AS_SUCCESS",
+      "file": "commands/factor_lab/risk_exposure.py",
+      "line": 713,
+      "message": "返回空数据而未标记 degraded — 可能伪装正常",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "EMPTY_DATA_AS_SUCCESS",
+      "file": "commands/factor_lab/strategy/execution_aware_backtester.py",
+      "line": 363,
+      "message": "返回空数据而未标记 degraded — 可能伪装正常",
+      "detail": ""
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "EMPTY_DATA_AS_SUCCESS",
+      "file": "commands/portfolio_builder.py",
+      "line": 785,
+      "message": "返回空数据而未标记 degraded — 可能伪装正常",
+      "detail": ""
+    },
+    {
+      "gate": "gate3",
+      "severity": "INFO",
+      "category": "SOURCE_FILES",
+      "file": "",
+      "line": 0,
+      "message": "发现 2 个源文件需要测试覆盖",
+      "detail": "commands/dive_prediction/live_predictor.py\ncommands/monitor_588710.py"
+    },
+    {
+      "gate": "gate3",
+      "severity": "FAIL",
+      "category": "NO_TEST_FILE",
+      "file": "commands/dive_prediction/live_predictor.py",
+      "line": 0,
+      "message": "源文件 live_predictor.py 没有对应的测试文件 (期望: tests/test_live_predictor.py)",
+      "detail": "创建 /home/ly/.hermes/research-assistant/commands/tests/test_live_predictor.py 并编写至少一个测试函数"
+    },
+    {
+      "gate": "gate3",
+      "severity": "FAIL",
+      "category": "NO_TEST_FILE",
+      "file": "commands/monitor_588710.py",
+      "line": 0,
+      "message": "源文件 monitor_588710.py 没有对应的测试文件 (期望: tests/test_monitor_588710.py)",
+      "detail": "创建 /home/ly/.hermes/research-assistant/commands/tests/test_monitor_588710.py 并编写至少一个测试函数"
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "RUNTIME_GATE_START",
+      "file": "",
+      "line": 0,
+      "message": "Runtime Smoke Gate: 65 个新 Python 文件",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "FAIL",
+      "category": "IMPORT_FAILED",
+      "file": "backend/services/universe_cache.py",
+      "line": 0,
+      "message": "模块导入失败: backend.services.universe_cache",
+      "detail": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import backend.services.universe_cache\nModuleNotFoundError: No module named 'backend'\n"
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/benchmarks_v4.py",
+      "line": 0,
+      "message": "模块导入成功: benchmarks_v4",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/data_audit.py",
+      "line": 0,
+      "message": "模块导入成功: data_audit",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/data_manager.py",
+      "line": 0,
+      "message": "模块导入成功: data_manager",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/data_pipeline.py",
+      "line": 0,
+      "message": "模块导入成功: data_pipeline",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/data_providers/tushare/tushare_event.py",
+      "line": 0,
+      "message": "模块导入成功: data_providers.tushare.tushare_event",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/data_providers/tushare/tushare_fina.py",
+      "line": 0,
+      "message": "模块导入成功: data_providers.tushare.tushare_fina",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/data_providers/tushare/tushare_fund_flow.py",
+      "line": 0,
+      "message": "模块导入成功: data_providers.tushare.tushare_fund_flow",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/data_providers/tushare/tushare_market.py",
+      "line": 0,
+      "message": "模块导入成功: data_providers.tushare.tushare_market",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/data_providers/tushare/tushare_stock.py",
+      "line": 0,
+      "message": "模块导入成功: data_providers.tushare.tushare_stock",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/dive_prediction/live_predictor.py",
+      "line": 0,
+      "message": "模块导入成功: dive_prediction.live_predictor",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/alpha/failure_db.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.alpha.failure_db",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/alpha/future_leakage_gate.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.alpha.future_leakage_gate",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/alpha/multiple_testing.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.alpha.multiple_testing",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/response.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.response",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/routes_audit.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.routes_audit",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/routes_backtest.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.routes_backtest",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/routes_benchmark.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.routes_benchmark",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/routes_events.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.routes_events",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/routes_factor.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.routes_factor",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/routes_jobs.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.routes_jobs",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/routes_live.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.routes_live",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/routes_portfolio.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.routes_portfolio",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/routes_qmt.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.routes_qmt",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/routes_settings.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.routes_settings",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/routes_theme.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.routes_theme",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "FAIL",
+      "category": "IMPORT_FAILED",
+      "file": "commands/factor_lab/api_server/routes_universe.py",
+      "line": 0,
+      "message": "模块导入失败: factor_lab.api_server.routes_universe",
+      "detail": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import factor_lab.api_server.routes_universe\n  File \"/home/ly/.hermes/research-assistant/commands/factor_lab/api_server/ro"
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/services/audit_service.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.services.audit_service",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/services/command_runner.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.services.command_runner",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/services/job_service.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.services.job_service",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/api_server/test_v5_api_audit.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.api_server.test_v5_api_audit",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "FAIL",
+      "category": "IMPORT_FAILED",
+      "file": "commands/factor_lab/audit/auditor_mapping.py",
+      "line": 0,
+      "message": "模块导入失败: factor_lab.audit.auditor_mapping",
+      "detail": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import factor_lab.audit.auditor_mapping\n  File \"/home/ly/.hermes/research-assistant/commands/factor_lab/audit/auditor_mapp"
+    },
+    {
+      "gate": "gate4",
+      "severity": "FAIL",
+      "category": "IMPORT_FAILED",
+      "file": "commands/factor_lab/audit/gate4_runtime_smoke.py",
+      "line": 0,
+      "message": "模块导入失败: factor_lab.audit.gate4_runtime_smoke",
+      "detail": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import factor_lab.audit.gate4_runtime_smoke\n  File \"/home/ly/.hermes/research-assistant/commands/factor_lab/audit/gate4_ru"
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/audit/report_writer.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.audit.report_writer",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/audit/risk_classifier.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.audit.risk_classifier",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/audit/skip_governance.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.audit.skip_governance",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/backend/services/factor_registry_service.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.backend.services.factor_registry_service",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/data/tushare_client.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.data.tushare_client",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/data/tushare_registry.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.data.tushare_registry",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "FAIL",
+      "category": "IMPORT_FAILED",
+      "file": "commands/factor_lab/paper/shadow_trading.py",
+      "line": 0,
+      "message": "模块导入失败: factor_lab.paper.shadow_trading",
+      "detail": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import factor_lab.paper.shadow_trading\n  File \"/home/ly/.hermes/research-assistant/commands/factor_lab/paper/shadow_tradin"
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/reports/daily_review.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.reports.daily_review",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/reports/test_daily_review.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.reports.test_daily_review",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/risk_exposure.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.risk_exposure",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/semiconductor_events.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.semiconductor_events",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/semiconductor_factors.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.semiconductor_factors",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/validate_factor_v4.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.validate_factor_v4",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/factor_lab/validate_v4.py",
+      "line": 0,
+      "message": "模块导入成功: factor_lab.validate_v4",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "FAIL",
+      "category": "IMPORT_FAILED",
+      "file": "commands/live_readiness.py",
+      "line": 0,
+      "message": "模块导入失败: live_readiness",
+      "detail": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import live_readiness\n  File \"/home/ly/.hermes/research-assistant/commands/live_readiness.py\", line 31, in <module>\n    fr"
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/monitor_588710.py",
+      "line": 0,
+      "message": "模块导入成功: monitor_588710",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/portfolio_builder.py",
+      "line": 0,
+      "message": "模块导入成功: portfolio_builder",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/scripts/v5_api_smoke.py",
+      "line": 0,
+      "message": "模块导入成功: scripts.v5_api_smoke",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/scripts/v5_data_integrity_check.py",
+      "line": 0,
+      "message": "模块导入成功: scripts.v5_data_integrity_check",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "IMPORT_OK",
+      "file": "commands/universes.py",
+      "line": 0,
+      "message": "模块导入成功: universes",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "FAIL",
+      "category": "IMPORT_FAILED",
+      "file": "scripts/batch_register_alphas.py",
+      "line": 0,
+      "message": "模块导入失败: scripts.batch_register_alphas",
+      "detail": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import scripts.batch_register_alphas\nModuleNotFoundError: No module named 'scripts.batch_register_alphas'\n"
+    },
+    {
+      "gate": "gate4",
+      "severity": "FAIL",
+      "category": "IMPORT_FAILED",
+      "file": "scripts/phase2_walkforward.py",
+      "line": 0,
+      "message": "模块导入失败: scripts.phase2_walkforward",
+      "detail": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import scripts.phase2_walkforward\nModuleNotFoundError: No module named 'scripts.phase2_walkforward'\n"
+    },
+    {
+      "gate": "gate4",
+      "severity": "FAIL",
+      "category": "IMPORT_FAILED",
+      "file": "scripts/refresh_kline_data.py",
+      "line": 0,
+      "message": "模块导入失败: scripts.refresh_kline_data",
+      "detail": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import scripts.refresh_kline_data\nModuleNotFoundError: No module named 'scripts.refresh_kline_data'\n"
+    },
+    {
+      "gate": "gate4",
+      "severity": "FAIL",
+      "category": "IMPORT_FAILED",
+      "file": "scripts/register_strategy_alpha.py",
+      "line": 0,
+      "message": "模块导入失败: scripts.register_strategy_alpha",
+      "detail": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import scripts.register_strategy_alpha\nModuleNotFoundError: No module named 'scripts.register_strategy_alpha'\n"
+    },
+    {
+      "gate": "gate4",
+      "severity": "FAIL",
+      "category": "IMPORT_FAILED",
+      "file": "scripts/run_composites.py",
+      "line": 0,
+      "message": "模块导入失败: scripts.run_composites",
+      "detail": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import scripts.run_composites\nModuleNotFoundError: No module named 'scripts.run_composites'\n"
+    },
+    {
+      "gate": "gate4",
+      "severity": "WARN",
+      "category": "CLI_SMOKE_FAILED",
+      "file": "",
+      "line": 0,
+      "message": "CLI --dry-run 返回非零: exit=1",
+      "detail": "❌ 未知命令: --dry-run\n使用 -h 查看帮助\n"
+    },
+    {
+      "gate": "gate4",
+      "severity": "WARN",
+      "category": "DATA_HEALTH_FAILED",
+      "file": "",
+      "line": 0,
+      "message": "数据源 data:health-check --dry-run: 异常 (exit=1)",
+      "detail": "❌ 未知命令: data:health-check\n使用 -h 查看帮助\n"
+    },
+    {
+      "gate": "gate4",
+      "severity": "INFO",
+      "category": "DATA_HEALTH_OK",
+      "file": "",
+      "line": 0,
+      "message": "数据源 factor:signal --dry-run: 正常",
+      "detail": ""
+    },
+    {
+      "gate": "gate4",
+      "severity": "WARN",
+      "category": "DATA_HEALTH_FAILED",
+      "file": "",
+      "line": 0,
+      "message": "数据源 premarket --dry-run: 异常 (exit=1)",
+      "detail": "❌ 未知命令: premarket\n使用 -h 查看帮助\n"
+    },
+    {
+      "gate": "gate4",
+      "severity": "WARN",
+      "category": "DATA_HEALTH_FAILED",
+      "file": "",
+      "line": 0,
+      "message": "数据源 alpha:factory --status: 异常 (exit=1)",
+      "detail": "Traceback (most recent call last):\n  File \"/home/ly/.hermes/research-assistant/commands/hermes_cli.py\", line 1974, in <module>\n    main()\n    ~~~~^^\n  File \"/home/ly/.hermes/research-assistant/command"
+    },
+    {
+      "gate": "gate4",
+      "severity": "FAIL",
+      "category": "PYTEST_FAILED",
+      "file": "",
+      "line": 0,
+      "message": "标准 pytest 返回码 4",
+      "detail": ""
+    },
+    {
+      "gate": "gate5",
+      "severity": "FAIL",
+      "category": "GATE_ERROR",
+      "file": "",
+      "line": 0,
+      "message": "Gate 执行异常: No module named 'factor_lab.audit.gate5_llm_review'",
+      "detail": "No module named 'factor_lab.audit.gate5_llm_review'"
+    }
+  ],
+  "started_at": "2026-07-09T11:30:03.003545+08:00",
+  "finished_at": "2026-07-09T11:31:07.648381+08:00",
+  "extra": {
+    "risk": "HIGH",
+    "skip_info": [],
+    "gates_requested": [
+      "gate1",
+      "gate2",
+      "gate3",
+      "gate4",
+      "gate5",
+      "semgrep"
+    ]
+  },
+  "risk": "HIGH",
+  "run_id": "20260709_113107"
+}

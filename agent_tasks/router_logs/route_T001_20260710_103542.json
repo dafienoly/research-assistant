@@ -1,0 +1,28 @@
+{
+  "timestamp": "20260710_103542_998787",
+  "profile": {
+    "task_id": "T001",
+    "title": "Live Trade",
+    "version": "live_execution",
+    "priority": "P0",
+    "task_type": "unknown",
+    "required_caps": [
+      "implement:code"
+    ],
+    "description": "Do live trade",
+    "owner": "",
+    "backend": "",
+    "safety_tags": []
+  },
+  "route": {
+    "task_id": "T001",
+    "role_id": "",
+    "backend": "",
+    "strategy": "version_safe",
+    "confidence": 1.0,
+    "reasoning": "BLOCKED: Version 'live_execution' requires human approval (unsafe prefix)",
+    "alternatives": [],
+    "blocked": true,
+    "blocked_reason": "Version 'live_execution' requires human approval (unsafe prefix)"
+  }
+}

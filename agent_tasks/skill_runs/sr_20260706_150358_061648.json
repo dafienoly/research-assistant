@@ -1,0 +1,30 @@
+{
+  "skill_id": "market-snapshot",
+  "status": "completed",
+  "data": {
+    "timestamp": "2026-07-06T15:03:58.602648+08:00",
+    "note": "市场快照 — 基础信息概览",
+    "data_sources": {
+      "error": "'HealthTracker' object has no attribute 'get_all_health'"
+    },
+    "factors": {
+      "registered": 142
+    },
+    "alphas": {
+      "registered": 3
+    },
+    "system": {
+      "modules": 43,
+      "cli_handlers": 78,
+      "test_files": 74,
+      "stage": "V3.0"
+    }
+  },
+  "error": "",
+  "started_at": "2026-07-06T15:03:58.602216+08:00",
+  "completed_at": "2026-07-06T15:04:00.764642+08:00",
+  "duration_ms": 2162.4,
+  "run_id": "sr_20260706_150358_061648",
+  "skill_name": "市场快照",
+  "skill_category": "monitor"
+}

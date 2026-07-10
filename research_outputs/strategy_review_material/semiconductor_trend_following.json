@@ -1,0 +1,39 @@
+{
+  "strategy_name": "semiconductor_trend_following",
+  "version": "0.1.0",
+  "category": "semiconductor_trend_following",
+  "universe": "semiconductor_theme",
+  "hypothesis": "半导体主题趋势跟随策略 — 用于验证 Strategy Lab 框架",
+  "summary": {
+    "total_return": 0.0595,
+    "annual_return": 0.0595,
+    "max_drawdown": 0.0398,
+    "sharpe": null,
+    "win_rate": null,
+    "turnover": null,
+    "benchmark_excess_return": null
+  },
+  "strengths": [
+    "框架就绪，待完整回测数据"
+  ],
+  "weaknesses": [
+    "尚未跑完整历史回测"
+  ],
+  "failure_periods": [],
+  "best_periods": [],
+  "data_limitations": [
+    "部分基本面数据缺少 pub_date"
+  ],
+  "bias_warnings": [
+    "半导体标签可能存在时点偏差"
+  ],
+  "production_readiness": "research_only",
+  "codex_questions": [
+    "是否需要与盘前推荐做交集验证？",
+    "是否需要加入基本面过滤？"
+  ],
+  "data_range": {
+    "start": "2025-01-02",
+    "end": "2026-07-03"
+  }
+}

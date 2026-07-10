@@ -1,0 +1,12 @@
+{
+  "last_updated": "2026-07-10T08:15:20+08:00",
+  "cooldowns": [],
+  "budget": {
+    "morning_used": 0,
+    "morning_limit": 5,
+    "afternoon_used": 0,
+    "afternoon_limit": 5,
+    "stock_daily": {},
+    "sector_daily": {}
+  }
+}

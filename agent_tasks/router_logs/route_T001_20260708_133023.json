@@ -1,0 +1,30 @@
+{
+  "timestamp": "20260708_133023_949904",
+  "profile": {
+    "task_id": "T001",
+    "title": "GitHub Issue/PR Pipeline",
+    "version": "V8.4",
+    "priority": "P1",
+    "task_type": "research",
+    "required_caps": [
+      "review:progress"
+    ],
+    "description": "Implement V8.4: GitHub Issue/PR Pipeline Objective: Issue/PR 流水线 ## 详细描述 GitHub Issue/PR 自动流水线：监控 Issue → 自动分析 → 创建 PR → 代码审查 → 合并。新增 github_pipeline.py、pr_manager.py。25+ 测试。",
+    "owner": "hermes_auto_developer",
+    "backend": "",
+    "safety_tags": [
+      "auto_apply=False, no_live_trade=True"
+    ]
+  },
+  "route": {
+    "task_id": "T001",
+    "role_id": "",
+    "backend": "",
+    "strategy": "version_safe",
+    "confidence": 1.0,
+    "reasoning": "BLOCKED: Safety tag blocks live execution: auto_apply=False, no_live_trade=True",
+    "alternatives": [],
+    "blocked": true,
+    "blocked_reason": "Safety tag blocks live execution: auto_apply=False, no_live_trade=True"
+  }
+}

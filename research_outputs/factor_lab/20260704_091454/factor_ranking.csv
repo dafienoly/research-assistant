@@ -1,0 +1,31 @@
+﻿name,category,description,mean_ic,std_ic,ir,pos_ratio
+ret5,momentum,5日收益率动量,0.0345,0.1734,0.1993,0.5718
+reversal5,reversal,短期反转,-0.0345,0.1734,-0.1993,0.4282
+close_gt_ma20,trend,收盘价在MA20上方幅度,0.0333,0.184,0.1811,0.5689
+vol_ratio60,volume,60日量比,0.031,0.1552,0.1995,0.5847
+vol_ratio20,volume,20日量比,0.0268,0.1422,0.1887,0.5865
+ret10,momentum,10日收益率动量,0.0259,0.1851,0.1398,0.5629
+ret20,momentum,20日收益率动量,0.0254,0.193,0.1318,0.5529
+reversal20,reversal,中期反转,-0.0254,0.193,-0.1318,0.4471
+ma5_gt_ma10,trend,快慢均线关系,0.0234,0.183,0.1278,0.5613
+atr20,volatility,平均真实波幅,0.0218,0.2732,0.0799,0.5543
+ts_regression_slope20,trend,20日线性回归斜率,0.0216,0.1917,0.1124,0.5484
+ma10_gt_ma20,trend,快慢均线关系(10/20),0.021,0.1895,0.111,0.5572
+ret_std20,momentum,20日收益率波动,0.0191,0.2579,0.0739,0.5588
+volatility20,volatility,20日收益波动率,0.0191,0.2579,0.0739,0.5588
+vol_ratio5,volume,5日量比,0.0136,0.1239,0.11,0.5449
+min_low60,momentum,60日最低价距当前比例,0.0128,0.2343,0.0545,0.5648
+turnover20,volume,20日换手率均值,0.0069,0.1763,0.0394,0.5425
+ret60,momentum,60日收益率动量,0.0054,0.228,0.0237,0.56
+amihud_illiquidity20,liquidity,Amihud非流动性指标,0.0041,0.1625,0.0251,0.5206
+vol_price_corr20,volume,量价相关性,-0.0029,0.1121,-0.0259,0.4824
+max_high60,momentum,60日最高价距当前比例,0.0023,0.2052,0.0113,0.5083
+ma20_gt_ma60,trend,快慢均线关系(20/60),-0.0008,0.231,-0.0034,0.5449
+roe_q,quality,ROE（来自基本面）,0,0,0,0
+gross_margin_q,quality,毛利率,0,0,0,0
+debt_ratio_q,quality,资产负债率,0,0,0,0
+net_inflow_5d,fund_flow,主力净流入(5日),0,0,0,0
+net_inflow_1d,fund_flow,主力净流入(今日),0,0,0,0
+mom_volume,evolved,"LLM 生成: rank(ret5) * rank(volume / ts_mean(volume, 20))",nan,nan,0,0.0
+trend_volume,evolved,"LLM 生成: rank(close / ts_mean(close, 20)) * rank(volume / ts_mean(vol",nan,nan,0,0.0
+vol_momentum,evolved,LLM 生成: rank(ret5) * rank(high / low),nan,nan,0,0.0

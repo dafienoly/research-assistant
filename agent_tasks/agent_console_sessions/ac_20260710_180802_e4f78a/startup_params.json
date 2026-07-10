@@ -1,0 +1,8 @@
+{
+  "backend": "claude",
+  "agent_adapter": "claude_code",
+  "effort_level": "ultra",
+  "cli_command": "claude --print --dangerously-skip-permissions --permission-mode auto --add-dir ... --model deepseek-v4",
+  "streaming_mode": "tail+live",
+  "permission_mode": "auto"
+}

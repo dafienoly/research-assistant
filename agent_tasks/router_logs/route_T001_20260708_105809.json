@@ -1,0 +1,31 @@
+{
+  "timestamp": "20260708_105809_897941",
+  "profile": {
+    "task_id": "T001",
+    "title": "Auto Bugfix Loop",
+    "version": "V8.2",
+    "priority": "P1",
+    "task_type": "bugfix",
+    "required_caps": [
+      "fix:bug",
+      "implement:code"
+    ],
+    "description": "Implement V8.2: Auto Bugfix Loop Objective: 自动 bugfix",
+    "owner": "hermes_auto_developer",
+    "backend": "",
+    "safety_tags": [
+      "auto_apply=False, no_live_trade=True"
+    ]
+  },
+  "route": {
+    "task_id": "T001",
+    "role_id": "",
+    "backend": "",
+    "strategy": "version_safe",
+    "confidence": 1.0,
+    "reasoning": "BLOCKED: Safety tag blocks live execution: auto_apply=False, no_live_trade=True",
+    "alternatives": [],
+    "blocked": true,
+    "blocked_reason": "Safety tag blocks live execution: auto_apply=False, no_live_trade=True"
+  }
+}

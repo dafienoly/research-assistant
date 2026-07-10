@@ -1,0 +1,51 @@
+{
+  "version": "V7.5",
+  "status": "failed",
+  "phases_run": [
+    "phase1",
+    "phase2",
+    "phase4"
+  ],
+  "results": {
+    "passed": 15,
+    "failed": 1,
+    "warnings": 4
+  },
+  "fail_items": [
+    {
+      "type": "INFRA",
+      "file": "hermes-daemon",
+      "line": 0,
+      "msg": "Hermes 守护未运行"
+    }
+  ],
+  "warn_items": [
+    {
+      "type": "SECURITY",
+      "file": "shell-injection",
+      "line": 0,
+      "msg": "subprocess shell=True 发现: /home/ly/.hermes/research-assistant/commands/factor_lab/leader/audit_push.py:236:    rc, out = _run("
+    },
+    {
+      "type": "ARCH",
+      "file": "timeout",
+      "line": 0,
+      "msg": "1小时超时: /home/ly/.hermes/research-assistant/commands/factor_lab/leader/audit_push.py:246:    rc, out = _run("
+    },
+    {
+      "type": "ARCH",
+      "file": "timeout",
+      "line": 0,
+      "msg": "1小时超时: /home/ly/.hermes/research-assistant/commands/factor_lab/leader/auto_executor.py:270:        _stdout,"
+    },
+    {
+      "type": "ARCH",
+      "file": "timeout",
+      "line": 0,
+      "msg": "1小时超时: /home/ly/.hermes/research-assistant/commands/factor_lab/leader/auto_executor.py:276:        agent_er"
+    }
+  ],
+  "started_at": "2026-07-07T18:38:20.694914+08:00",
+  "finished_at": "2026-07-07T18:38:29.922789+08:00",
+  "report_path": "/home/ly/.hermes/research-assistant/agent_tasks/audit_reports/audit_V7.5_20260707_183829.json"
+}

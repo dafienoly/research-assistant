@@ -1,0 +1,44 @@
+{
+  "skill_id": "factor-ranking",
+  "name": "因子排名",
+  "description": "列出所有注册因子，按分类统计，展示因子基本信息",
+  "category": "analysis",
+  "params": [
+    {
+      "name": "top_n",
+      "type": "int",
+      "label": "展示数量",
+      "default": 50,
+      "required": false,
+      "description": "返回前 N 个因子",
+      "choices": null
+    },
+    {
+      "name": "category",
+      "type": "string",
+      "label": "分类筛选",
+      "default": null,
+      "required": false,
+      "description": "可选，只返回指定分类的因子",
+      "choices": [
+        "momentum",
+        "volatility",
+        "quality",
+        "value",
+        "growth",
+        "liquidity",
+        "sentiment",
+        "others"
+      ]
+    }
+  ],
+  "tags": [
+    "factor",
+    "analysis",
+    "ranking"
+  ],
+  "handler": "factor_lab.research_skill.builtins:_execute_factor_ranking",
+  "version": "1.0.0",
+  "created_at": "2026-07-06T15:05:02.018687+08:00",
+  "updated_at": "2026-07-06T15:05:02.019548+08:00"
+}

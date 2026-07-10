@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes 投研看板 - 雷赛智能</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0e17;font-family:'PingFang SC','Microsoft YaHei',sans-serif;padding:20px;color:#e8edf5}
+.container{max-width:800px;margin:0 auto}
+.header{background:linear-gradient(135deg,#1a3a2a 0%,#0d1b2a 100%);border-radius:16px;padding:28px 32px;margin-bottom:16px;border:1px solid rgba(46,213,115,0.15)}
+.header .ticker{font-size:13px;color:#5a8a7a;letter-spacing:1px;margin-bottom:4px}
+.header .name{font-size:26px;font-weight:700;color:#fff}
+.header .price{font-size:38px;font-weight:700;color:#fff;margin-top:6px}
+.header .change{font-size:18px;font-weight:600;padding:2px 10px;border-radius:6px}
+.change.up{color:#2ed573;background:rgba(46,213,115,0.12)}
+.header .date{font-size:12px;color:#4a6a5a;margin-top:6px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.card{background:linear-gradient(180deg,#132d1a 0%,#0f1a12 100%);border-radius:12px;padding:20px;border:1px solid rgba(46,213,115,0.08)}
+.card.full{grid-column:1/-1}
+.card-title{font-size:12px;color:#5a8a7a;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;font-weight:600}
+.ma-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ma-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(46,213,115,0.06)}
+.ma-label{color:#6a8a7a;font-size:13px}
+.ma-val.ok{color:#2ed573}
+.ma-val.bad{color:#ff4757}
+.flow-item{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(46,213,115,0.04)}
+.flow-label{color:#6a8a7a;font-size:13px}
+.flow-val.positive{color:#2ed573}
+.flow-val.negative{color:#ff4757}
+.judgment{background:linear-gradient(135deg,#1a3a2a 0%,#132d1a 100%);border-radius:12px;padding:20px;margin-bottom:12px;border-left:3px solid #2ed573;border:1px solid rgba(46,213,115,0.1)}
+.judgment-text{font-size:14px;line-height:1.7;color:#c8e6d5}
+.signal-list{list-style:none}
+.signal-list li{padding:6px 0 6px 16px;position:relative;font-size:13px;color:#c8e6d5}
+.signal-list li::before{content:'';position:absolute;left:0;top:12px;width:6px;height:6px;border-radius:50%}
+.signal-list li.danger::before{background:#ff4757}
+.signal-list li.info::before{background:#2ed573}
+.scenario-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.scenario{background:rgba(46,213,115,0.04);border-radius:8px;padding:12px;text-align:center;border:1px solid rgba(46,213,115,0.06)}
+.scenario .type{font-size:12px;font-weight:600;margin-bottom:4px}
+.scenario .type.bullish{color:#2ed573}
+.scenario .type.base{color:#ffa502}
+.scenario .type.bearish{color:#ff4757}
+.scenario .desc{font-size:11px;color:#6a8a7a;line-height:1.4}
+.footer{text-align:center;padding:12px;color:#3a5a4a;font-size:11px}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+  <div class="ticker">002979.SZ · 自动化设备 · 运动控制</div>
+  <div class="name">雷赛智能</div>
+  <div class="price">69.55</div>
+  <div class="change up">连续2日一字涨停</div>
+  <div class="date">2026-07-03 更新 · 量比 0.77 缩量</div>
+</div>
+<div class="judgment">
+  <div class="card-title">⚡ 核心判断</div>
+  <div class="judgment-text">半年报业绩预告超预期(+55~65%)驱动连续两日一字涨停，缩量封板说明筹码锁定良好。龙虎榜显示机构在7/2涨停日净卖出约1.6亿、游资接力，资金流向显示超大单(机构)今日仍在大举买入+7,949万，但大单/中单/小单均在卖出——形成"机构对倒、散户出局"的结构。多头趋势延续中，但需警惕连续涨停后的获利盘兑现。</div>
+</div>
+<div class="row">
+  <div class="card">
+    <div class="card-title">📊 均线状态</div>
+    <div class="ma-grid">
+      <div class="ma-item"><span class="ma-label">MA5</span><span class="ma-val ok">59.62 ✅</span></div>
+      <div class="ma-item"><span class="ma-label">MA10</span><span class="ma-val ok">56.25 ✅</span></div>
+      <div class="ma-item"><span class="ma-label">MA20</span><span class="ma-val ok">54.88 ✅</span></div>
+      <div class="ma-item"><span class="ma-label">MA60</span><span class="ma-val ok">50.94 ✅</span></div>
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:#6a8a7a">60日高 69.55 · 低 36.58 · 距高点 0%</div>
+  </div>
+  <div class="card">
+    <div class="card-title">💰 资金流向（今日）</div>
+    <div class="flow-item"><span class="flow-label">主力净流入</span><span class="flow-val positive">+6,034万</span></div>
+    <div class="flow-item"><span class="flow-label">超大单</span><span class="flow-val positive">+7,949万</span></div>
+    <div class="flow-item"><span class="flow-label">大单</span><span class="flow-val negative">-1,915万</span></div>
+    <div class="flow-item"><span class="flow-label">小单（散户）</span><span class="flow-val negative">-2,421万</span></div>
+    <div style="margin-top:6px;font-size:11px;color:#4a6a5a">5日主力累计 +1.31亿</div>
+  </div>
+</div>
+<div class="card full">
+  <div class="card-title">🎯 情景推演</div>
+  <div class="scenario-grid">
+    <div class="scenario"><div class="type bullish">偏多</div><div class="desc">7/6继续缩量封板，超大单维持净流入→趋势延续</div></div>
+    <div class="scenario"><div class="type base">基准</div><div class="desc">打开涨停放量换手，收盘守住63+→观望2-3天</div></div>
+    <div class="scenario"><div class="type bearish">偏空</div><div class="desc">打开涨停后放量下跌破63→回调至57-58</div></div>
+  </div>
+</div>
+<div class="footer">Hermes A股投研助手 · 数据: Baostock + 妙想金融 · 不构成投资建议</div>
+</div>
+</body>
+</html>

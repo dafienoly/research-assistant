@@ -1,0 +1,925 @@
+{
+  "status": "ok",
+  "actions": [
+    "idle"
+  ],
+  "updated_at": "2026-07-05T12:08:04.255437+08:00",
+  "last_dispatched_completion": "V2.15.1|dry_run_completion|completed|2026-07-05T11:59:40.879683+08:00",
+  "completion_status": "completed",
+  "completion_stage": "dry_run_completion",
+  "completion_version": "V2.15.1",
+  "remaining_tasks": [],
+  "latest_run_id": "auto_20260705_120731",
+  "ticks": [
+    {
+      "updated_at": "2026-07-10T13:04:19.830753+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:07:34.303664+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:10:34.946394+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:13:35.585013+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:16:50.259854+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:19:50.900108+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:22:51.540892+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:26:06.054564+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:29:06.843767+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:32:07.490021+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:35:22.700231+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:38:23.411717+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:41:24.078317+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:44:38.069175+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:47:38.863762+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:50:39.522397+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:53:53.609534+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:56:54.389455+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T13:59:55.054958+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:03:09.380444+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:06:10.525331+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:09:11.247004+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:12:25.703812+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:15:26.726506+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:18:27.817637+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:21:46.768888+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:24:48.356369+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:27:52.133210+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:31:13.132934+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:34:13.984036+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:37:14.857425+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:40:36.140399+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:43:36.936141+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:46:38.003899+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:49:58.971972+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:52:59.726333+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:56:01.716869+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T14:59:23.200319+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:02:24.103632+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:05:24.935833+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:08:53.021737+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:11:53.772363+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:14:54.796204+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:18:09.884477+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:21:10.793941+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:24:11.813479+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:27:40.155189+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:30:40.894068+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:33:41.620844+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:36:56.006782+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:39:56.731189+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:42:57.469952+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:46:12.502675+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:49:13.194909+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:52:13.900353+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:55:28.089825+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T15:58:28.773260+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:01:29.461067+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:04:43.781185+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:07:44.534785+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:10:45.209694+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:14:00.026660+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:17:00.861098+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:20:01.970682+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:23:16.515475+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:26:17.272327+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:29:18.124310+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:32:32.400590+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:35:33.517226+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:38:34.451923+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:41:52.759912+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:44:53.432804+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:47:54.088895+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:51:08.755126+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:54:09.444454+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T16:57:10.162244+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:00:25.663214+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:03:26.479984+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:06:27.678696+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:09:44.445707+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:12:45.503511+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:15:46.489907+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:19:04.127523+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:22:05.021964+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:25:05.765288+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:28:21.170250+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:31:21.947482+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:34:22.895132+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:38:20.666391+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:41:21.496602+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:44:22.590072+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:47:39.739464+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:50:40.476383+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:53:41.264032+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:56:57.404716+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T17:59:58.371220+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T18:02:59.202875+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.3"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T18:08:02.774098+08:00",
+      "lock_status": "free",
+      "completion_status": "completed",
+      "completed_tasks": [
+        "V9.3"
+      ],
+      "remaining_tasks": []
+    },
+    {
+      "updated_at": "2026-07-10T18:10:11.254303+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.4"
+      ]
+    },
+    {
+      "updated_at": "2026-07-10T18:13:12.888978+08:00",
+      "lock_status": "free",
+      "completion_status": "partial",
+      "completed_tasks": [],
+      "remaining_tasks": [
+        "V9.4"
+      ]
+    }
+  ],
+  "last_tick": {
+    "updated_at": "2026-07-10T18:13:12.888978+08:00",
+    "lock_status": "free",
+    "completion_status": "partial",
+    "completed_tasks": [],
+    "remaining_tasks": [
+      "V9.4"
+    ]
+  },
+  "tick_count": 100
+}

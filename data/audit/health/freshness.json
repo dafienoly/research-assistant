@@ -1,0 +1,107 @@
+{
+  "report_type": "freshness",
+  "generated_at": "2026-07-09T22:59:58+08:00",
+  "today": "20260709",
+  "data_dir": "/home/ly/.hermes/research-assistant/data/normalized/market",
+  "total_stocks": 5736,
+  "stocks_with_data": 5735,
+  "average_lag_days": 36.1,
+  "max_lag_days": 2002,
+  "max_lag_code": "600317.SH",
+  "min_lag_days": 0,
+  "min_lag_code": "000001.SZ",
+  "freshness_distribution": {
+    "fresh (<=7d)": 5525,
+    "stale (8-30d)": 10,
+    "old (31-90d)": 4,
+    "ancient (>90d)": 196
+  },
+  "stale_stocks": [
+    {
+      "ts_code": "600193.SH",
+      "latest_date": "2026-06-29",
+      "lag_days": 10,
+      "freshness_level": "stale"
+    },
+    {
+      "ts_code": "600608.SH",
+      "latest_date": "2026-06-29",
+      "lag_days": 10,
+      "freshness_level": "stale"
+    },
+    {
+      "ts_code": "605081.SH",
+      "latest_date": "2026-06-29",
+      "lag_days": 10,
+      "freshness_level": "stale"
+    },
+    {
+      "ts_code": "300214.SZ",
+      "latest_date": "2026-06-26",
+      "lag_days": 13,
+      "freshness_level": "stale"
+    },
+    {
+      "ts_code": "601369.SH",
+      "latest_date": "2026-06-26",
+      "lag_days": 13,
+      "freshness_level": "stale"
+    },
+    {
+      "ts_code": "688072.SH",
+      "latest_date": "2026-06-26",
+      "lag_days": 13,
+      "freshness_level": "stale"
+    },
+    {
+      "ts_code": "600421.SH",
+      "latest_date": "2026-06-22",
+      "lag_days": 17,
+      "freshness_level": "stale"
+    },
+    {
+      "ts_code": "600599.SH",
+      "latest_date": "2026-06-22",
+      "lag_days": 17,
+      "freshness_level": "stale"
+    },
+    {
+      "ts_code": "600636.SH",
+      "latest_date": "2026-06-22",
+      "lag_days": 17,
+      "freshness_level": "stale"
+    },
+    {
+      "ts_code": "600696.SH",
+      "latest_date": "2026-06-22",
+      "lag_days": 17,
+      "freshness_level": "stale"
+    }
+  ],
+  "old_stocks": [
+    {
+      "ts_code": "688287.SH",
+      "latest_date": "2026-06-08",
+      "lag_days": 31,
+      "freshness_level": "old"
+    },
+    {
+      "ts_code": "300344.SZ",
+      "latest_date": "2026-04-21",
+      "lag_days": 79,
+      "freshness_level": "old"
+    },
+    {
+      "ts_code": "000638.SZ",
+      "latest_date": "2026-04-13",
+      "lag_days": 87,
+      "freshness_level": "old"
+    },
+    {
+      "ts_code": "300391.SZ",
+      "latest_date": "2026-04-10",
+      "lag_days": 90,
+      "freshness_level": "old"
+    }
+  ]
+}

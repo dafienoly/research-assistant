@@ -1,0 +1,3 @@
+{"type": "answer_delta", "session_id": "ac_20260705_203311_ab8219", "data": "answer content", "status": "", "agent": "", "prompt": "", "timestamp": "2026-07-05T20:33:11.095557+08:00"}
+{"type": "diagnostic", "session_id": "ac_20260705_203311_ab8219", "data": "stdout line", "status": "", "agent": "", "prompt": "", "timestamp": "2026-07-05T20:33:11.095926+08:00"}
+{"type": "done", "session_id": "ac_20260705_203311_ab8219", "data": "", "status": "completed", "agent": "", "prompt": "", "timestamp": "2026-07-05T20:33:11.096049+08:00"}

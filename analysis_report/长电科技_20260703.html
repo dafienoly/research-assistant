@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes 投研看板</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0e17;font-family:'PingFang SC','Microsoft YaHei',sans-serif;padding:20px;color:#e8edf5}
+.container{max-width:800px;margin:0 auto}
+.header{background:linear-gradient(135deg,#1a2a4a 0%,#0d1b2a 100%);border-radius:16px;padding:28px 32px;margin-bottom:16px;border:1px solid rgba(56,132,255,0.15);position:relative;overflow:hidden}
+.header::before{content:'';position:absolute;top:-50%;right:-20%;width:200px;height:200px;background:radial-gradient(circle,rgba(56,132,255,0.06) 0%,transparent 70%);border-radius:50%}
+.header .ticker{font-size:13px;color:#5a7db0;letter-spacing:1px;margin-bottom:4px}
+.header .name{font-size:26px;font-weight:700;color:#fff;margin-bottom:2px}
+.header .price-row{display:flex;align-items:baseline;gap:12px;margin-top:6px}
+.header .price{font-size:38px;font-weight:700;color:#fff}
+.header .change{font-size:18px;font-weight:600;padding:2px 10px;border-radius:6px}
+.change.down{color:#ff4757;background:rgba(255,71,87,0.12)}
+.change.up{color:#2ed573;background:rgba(46,213,115,0.12)}
+.header .date{font-size:12px;color:#4a6a8a;margin-top:6px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.card{background:linear-gradient(180deg,#131d33 0%,#0f182a 100%);border-radius:12px;padding:20px;border:1px solid rgba(56,132,255,0.08)}
+.card.full{grid-column:1/-1}
+.card-title{font-size:12px;color:#5a7db0;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;font-weight:600}
+.ma-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ma-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(56,132,255,0.06)}
+.ma-item:last-child{border-bottom:none}
+.ma-label{color:#6a8aaa;font-size:13px}
+.ma-val{font-size:14px;font-weight:600}
+.ma-val.ok{color:#2ed573}
+.ma-val.warn{color:#ffa502}
+.ma-val.bad{color:#ff4757}
+.flow-item{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(56,132,255,0.04)}
+.flow-item:last-child{border-bottom:none}
+.flow-label{color:#6a8aaa;font-size:13px}
+.flow-val{font-size:14px;font-weight:600}
+.flow-val.positive{color:#2ed573}
+.flow-val.negative{color:#ff4757}
+.judgment{background:linear-gradient(135deg,#1a2a4a 0%,#131d33 100%);border-radius:12px;padding:20px;margin-bottom:12px;border-left:3px solid #3884ff;border:1px solid rgba(56,132,255,0.1)}
+.judgment-text{font-size:14px;line-height:1.7;color:#c8d6e5}
+.signal-list{list-style:none;padding:0}
+.signal-list li{padding:6px 0;padding-left:16px;position:relative;font-size:13px;line-height:1.6;color:#c8d6e5;border-bottom:1px solid rgba(56,132,255,0.04)}
+.signal-list li::before{content:'';position:absolute;left:0;top:12px;width:6px;height:6px;border-radius:50%}
+.signal-list li.danger::before{background:#ff4757}
+.signal-list li.warn::before{background:#ffa502}
+.signal-list li.info::before{background:#3884ff}
+.scenario-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+.scenario{background:rgba(56,132,255,0.04);border-radius:8px;padding:12px;text-align:center;border:1px solid rgba(56,132,255,0.06)}
+.scenario .type{font-size:12px;font-weight:600;margin-bottom:4px}
+.scenario .type.bullish{color:#2ed573}
+.scenario .type.base{color:#ffa502}
+.scenario .type.bearish{color:#ff4757}
+.scenario .desc{font-size:11px;color:#6a8aaa;line-height:1.4}
+.footer{text-align:center;padding:12px;color:#3a5a7a;font-size:11px;border-top:1px solid rgba(56,132,255,0.06)}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <div class="ticker">600584.SH · 半导体 · 封测</div>
+  <div class="name">长电科技</div>
+  <div class="price-row">
+    <span class="price">90.88</span>
+    <span class="change down">-6.07%</span>
+  </div>
+  <div class="date">2026-07-03 更新 · 量比 0.66 缩量</div>
+</div>
+
+<div class="judgment">
+  <div class="card-title">⚡ 核心判断</div>
+  <div class="judgment-text">
+    长电科技自4月低点38.78涨至6月高点106.64（+175%），驱动逻辑是AI算力拉动先进封装需求爆发+78亿临港建厂。目前回撤14.8%，MA5/MA10跌破，短线获利盘兑现。今日主力净流出8.27亿，散户净流入7.17亿——机构出货散户接盘的典型结构。但5日主力仍净流入30.69亿，中线资金未完全离场。关键支撑在MA20（86.44），若守住则中期趋势仍在。
+  </div>
+</div>
+
+<div class="row">
+  <div class="card">
+    <div class="card-title">📊 均线状态</div>
+    <div class="ma-grid">
+      <div class="ma-item"><span class="ma-label">MA5</span><span class="ma-val bad">100.06 ❌</span></div>
+      <div class="ma-item"><span class="ma-label">MA10</span><span class="ma-val bad">97.74 ❌</span></div>
+      <div class="ma-item"><span class="ma-label">MA20</span><span class="ma-val ok">86.44 ✅</span></div>
+      <div class="ma-item"><span class="ma-label">MA60</span><span class="ma-val ok">66.69 ✅</span></div>
+    </div>
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(56,132,255,0.06);font-size:12px;color:#6a8aaa">
+      60日高 106.64 &nbsp;·&nbsp; 60日低 38.78 &nbsp;·&nbsp; 距高点 -14.8%
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">💰 资金流向（今日）</div>
+    <div class="flow-item"><span class="flow-label">主力净流入</span><span class="flow-val negative">-8.27亿</span></div>
+    <div class="flow-item"><span class="flow-label">超大单</span><span class="flow-val negative">-3.91亿</span></div>
+    <div class="flow-item"><span class="flow-label">大单</span><span class="flow-val negative">-4.36亿</span></div>
+    <div class="flow-item"><span class="flow-label">中单</span><span class="flow-val positive">+1.10亿</span></div>
+    <div class="flow-item"><span class="flow-label">小单（散户）</span><span class="flow-val positive">+7.17亿</span></div>
+    <div style="margin-top:6px;font-size:11px;color:#4a6a8a">5日主力累计 +30.69亿</div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="card">
+    <div class="card-title">📋 基本面</div>
+    <div class="flow-item"><span class="flow-label">2026Q1 营收</span><span class="flow-val" style="color:#e8edf5">91.71亿</span></div>
+    <div class="flow-item"><span class="flow-label">2026Q1 净利润</span><span class="flow-val" style="color:#e8edf5">2.79亿</span></div>
+    <div class="flow-item"><span class="flow-label">毛利率</span><span class="flow-val" style="color:#e8edf5">14.55%</span></div>
+    <div class="flow-item"><span class="flow-label">ROE</span><span class="flow-val" style="color:#e8edf5">1.01%</span></div>
+    <div class="flow-item"><span class="flow-label">负债率</span><span class="flow-val" style="color:#ffa502">57.96%</span></div>
+    <div class="flow-item"><span class="flow-label">PE（2025）</span><span class="flow-val" style="color:#ffa502">~104倍</span></div>
+    <div class="flow-item" style="border-bottom:none"><span class="flow-label">先进封装收入占比</span><span class="flow-val" style="color:#2ed573">69.5%</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📰 消息面</div>
+    <ul class="signal-list">
+      <li class="info">6/24 拟投资78亿建临港先进封测工厂</li>
+      <li class="info">6/25 涨停（收104.17），3天2板</li>
+      <li class="warn">6/26 异动公告（连续2日涨幅异常）</li>
+      <li class="info">2026固投预算约100亿</li>
+      <li class="warn">PE 104倍，估值高位</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card full">
+  <div class="card-title">⚠️ 风险信号</div>
+  <ul class="signal-list">
+    <li class="danger">今日主力净流出 8.27亿 / 散户接盘 7.17亿 — 机构出货结构</li>
+    <li class="danger">MA5/MA10 已跌破，短线趋势转弱</li>
+    <li class="warn">静态 PE 104 倍，估值极端高位</li>
+    <li class="warn">股价自低点已涨 175%，获利盘巨大</li>
+    <li class="info">78亿临港项目周期长（2028一期完成），短期无法贡献利润</li>
+  </ul>
+</div>
+
+<div class="card full">
+  <div class="card-title">🎯 情景推演</div>
+  <div class="scenario-grid">
+    <div class="scenario">
+      <div class="type bullish">偏多</div>
+      <div class="desc">缩量回踩MA20(86)不破+主力回流→看100-107</div>
+    </div>
+    <div class="scenario">
+      <div class="type base">基准</div>
+      <div class="desc">86-97震荡，等半年报/临港进展→观望1-2周</div>
+    </div>
+    <div class="scenario">
+      <div class="type bearish">偏空</div>
+      <div class="desc">放量跌破MA20(86)+主力持续流出→回调至80-84</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">Hermes A股投研助手 · 数据来源: Baostock + 妙想金融 + 东方财富 · 不构成投资建议</div>
+
+</div>
+</body>
+</html>

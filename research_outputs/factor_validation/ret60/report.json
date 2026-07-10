@@ -1,0 +1,180 @@
+{
+  "factor_name": "ret60",
+  "factor_family": "momentum",
+  "status": "ok",
+  "ic_analysis": {
+    "factor_name": "ret60",
+    "n_dates": 298,
+    "ic_mean": 0.0292,
+    "ic_std": 0.1388,
+    "ic_ir": 0.2106,
+    "pos_ratio": 0.5772,
+    "monthly_ic_series": [
+      {
+        "year_month": "2025-04",
+        "ic": 0.06424688475514234
+      },
+      {
+        "year_month": "2025-05",
+        "ic": 0.02544225343552019
+      },
+      {
+        "year_month": "2025-06",
+        "ic": 0.06339406818589391
+      },
+      {
+        "year_month": "2025-07",
+        "ic": 0.061986211178380206
+      },
+      {
+        "year_month": "2025-08",
+        "ic": 0.021978657861235366
+      },
+      {
+        "year_month": "2025-09",
+        "ic": 0.022438066118580954
+      },
+      {
+        "year_month": "2025-10",
+        "ic": 0.09114266750926092
+      },
+      {
+        "year_month": "2025-11",
+        "ic": 0.04181525551551193
+      },
+      {
+        "year_month": "2025-12",
+        "ic": 0.012712819776422026
+      },
+      {
+        "year_month": "2026-01",
+        "ic": 0.030757259436872398
+      },
+      {
+        "year_month": "2026-02",
+        "ic": -0.03942652403839235
+      },
+      {
+        "year_month": "2026-03",
+        "ic": 0.08076907836641982
+      },
+      {
+        "year_month": "2026-04",
+        "ic": 0.00228424186004975
+      },
+      {
+        "year_month": "2026-05",
+        "ic": -0.020390575580168626
+      },
+      {
+        "year_month": "2026-06",
+        "ic": -0.03871520443486737
+      }
+    ],
+    "layer_test": {
+      "layer_returns": {
+        "mean": {
+          "0": 0.00013255231853530564,
+          "1": -9.349215261523225e-05,
+          "2": -0.0004922159926098217,
+          "3": -0.00036433669059054833,
+          "4": 0.0006953803155830379
+        },
+        "std": {
+          "0": 0.012609743701887432,
+          "1": 0.010823113241347005,
+          "2": 0.010541080431334122,
+          "3": 0.01129804042957477,
+          "4": 0.01360412224641594
+        },
+        "count": {
+          "0": 298,
+          "1": 298,
+          "2": 298,
+          "3": 298,
+          "4": 298
+        }
+      },
+      "long_short_mean": 0.0005628279970477321,
+      "long_short_sharpe": 0.8492288244204557
+    }
+  },
+  "anti_overfit": {
+    "peer_benchmark": {
+      "beats_peer": true,
+      "strategy_cumulative_pct": 23.31,
+      "peer_ew_cumulative_pct": 12.24,
+      "excess_return_pct": 11.06,
+      "excess_sharpe": 0.1415,
+      "n_days": 843
+    },
+    "placebo": {
+      "true_ic_mean": 0.0292,
+      "shuffled_mean": -0.001,
+      "shuffled_std": 0.0028,
+      "factor_score_percentile": 100.0,
+      "verdict": "pass"
+    }
+  },
+  "walk_forward": {
+    "factor_name": "ret60",
+    "method": "rolling",
+    "n_windows": 3,
+    "period_results": [
+      {
+        "window": "wf_1",
+        "train_dates": "2023-01-03 00:00:00 ~ 2023-11-15 00:00:00",
+        "test_dates": "2023-11-16 00:00:00 ~ 2024-09-25 00:00:00",
+        "train_ic": 0,
+        "test_sharpe": 0.0,
+        "test_positive": false
+      },
+      {
+        "window": "wf_2",
+        "train_dates": "2023-11-16 00:00:00 ~ 2024-09-25 00:00:00",
+        "test_dates": "2024-09-26 00:00:00 ~ 2025-08-08 00:00:00",
+        "train_ic": 0,
+        "test_sharpe": 1.3824,
+        "test_positive": true
+      },
+      {
+        "window": "wf_3",
+        "train_dates": "2024-09-26 00:00:00 ~ 2025-08-08 00:00:00",
+        "test_dates": "2025-08-11 00:00:00 ~ 2026-06-25 00:00:00",
+        "train_ic": 0.0501,
+        "test_sharpe": 0.7091,
+        "test_positive": true
+      }
+    ],
+    "oos_positive_ratio": 0.6667,
+    "avg_test_sharpe": 0.6972,
+    "avg_train_ic": 0.0167,
+    "overall_verdict": "pass"
+  },
+  "benchmark_comparison": {
+    "benchmark": "CSI300",
+    "strategy_cum_pct": 23.31,
+    "benchmark_cum_pct": 28.08,
+    "excess_return_pct": -4.77,
+    "excess_sharpe": -0.1053,
+    "n_days": 842,
+    "period": "2023-01-04 ~ 2026-06-30"
+  },
+  "scoring": {
+    "overall_score": 81.5,
+    "grade": "A",
+    "pass_gate": true,
+    "ic_score": 26.1,
+    "peer_score": 20,
+    "wf_score": 13.5,
+    "placebo_score": 15.0,
+    "monotonicity_score": 7,
+    "reject_reasons": []
+  },
+  "derived": {
+    "monotonicity": "不单调",
+    "ls_sharpe": 0.8492288244204557,
+    "ic_half_life_days": 4.277084708524964,
+    "industry_exposure": "多行业分散 (A股全市场)"
+  }
+}

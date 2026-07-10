@@ -1,0 +1,121 @@
+{
+  "version": "",
+  "passed": false,
+  "gates_run": [
+    "gate1",
+    "gate2",
+    "gate3"
+  ],
+  "findings": [
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "NO_TASKS",
+      "file": "",
+      "line": 0,
+      "message": "Plan 文件中未解析到 Task 定义（格式: ### Task N）",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "INFO",
+      "category": "CHANGED_FILES",
+      "file": "",
+      "line": 0,
+      "message": "发现 6 个变更文件（无 Task 解析）",
+      "detail": "commands/_auto_audit_e2e_test.py\ncommands/debug_auto_audit_test.py\ncommands/factor_lab/audit/git_utils.py\ncommands/frontend/src/pages/AgentConsole.jsx\ncommands/frontend/src/pages/Dashboard.jsx\ncommands/frontend/src/pages/SessionHistory.jsx"
+    },
+    {
+      "gate": "gate2",
+      "severity": "INFO",
+      "category": "SCAN_FILES",
+      "file": "",
+      "line": 0,
+      "message": "扫描 3 个 Python 文件",
+      "detail": "commands/_auto_audit_e2e_test.py\ncommands/debug_auto_audit_test.py\ncommands/factor_lab/audit/git_utils.py"
+    },
+    {
+      "gate": "gate2",
+      "severity": "FAIL",
+      "category": "STUB_PASS",
+      "file": "commands/_auto_audit_e2e_test.py",
+      "line": 1,
+      "message": "函数 'fake_compute' 只有 pass 占位",
+      "detail": "函数体为空实现"
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "SEMGREP",
+      "file": "commands/_auto_audit_e2e_test.py",
+      "line": 1,
+      "message": "函数 fake_compute 只有 ... 占位",
+      "detail": "规则: tmp.todo-stub | 函数 fake_compute 只有 ... 占位"
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "SEMGREP",
+      "file": "commands/factor_lab/audit/git_utils.py",
+      "line": 20,
+      "message": "函数 get_all_changed_files 只有 ... 占位",
+      "detail": "规则: tmp.todo-stub | 函数 get_all_changed_files 只有 ... 占位"
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "SEMGREP",
+      "file": "commands/factor_lab/audit/git_utils.py",
+      "line": 93,
+      "message": "函数 get_source_files 只有 ... 占位",
+      "detail": "规则: tmp.todo-stub | 函数 get_source_files 只有 ... 占位"
+    },
+    {
+      "gate": "gate3",
+      "severity": "INFO",
+      "category": "SOURCE_FILES",
+      "file": "",
+      "line": 0,
+      "message": "发现 3 个源文件需要测试覆盖",
+      "detail": "commands/_auto_audit_e2e_test.py\ncommands/debug_auto_audit_test.py\ncommands/factor_lab/audit/git_utils.py"
+    },
+    {
+      "gate": "gate3",
+      "severity": "FAIL",
+      "category": "NO_TEST_FILE",
+      "file": "commands/_auto_audit_e2e_test.py",
+      "line": 0,
+      "message": "源文件 _auto_audit_e2e_test.py 没有对应的测试文件 (期望: tests/test__auto_audit_e2e_test.py)",
+      "detail": "创建 /home/ly/.hermes/research-assistant/commands/tests/test__auto_audit_e2e_test.py 并编写至少一个测试函数"
+    },
+    {
+      "gate": "gate3",
+      "severity": "FAIL",
+      "category": "NO_TEST_FILE",
+      "file": "commands/debug_auto_audit_test.py",
+      "line": 0,
+      "message": "源文件 debug_auto_audit_test.py 没有对应的测试文件 (期望: tests/test_debug_auto_audit_test.py)",
+      "detail": "创建 /home/ly/.hermes/research-assistant/commands/tests/test_debug_auto_audit_test.py 并编写至少一个测试函数"
+    },
+    {
+      "gate": "gate3",
+      "severity": "WARN",
+      "category": "FUNC_NOT_TESTED",
+      "file": "commands/factor_lab/audit/git_utils.py",
+      "line": 0,
+      "message": "函数 'get_all_changed_files' 没有对应的测试 (期望: test_get_all_changed_files)",
+      "detail": "在 /home/ly/.hermes/research-assistant/commands/tests/test_git_utils.py 中添加 def test_get_all_changed_files(): ..."
+    },
+    {
+      "gate": "gate3",
+      "severity": "WARN",
+      "category": "FUNC_NOT_TESTED",
+      "file": "commands/factor_lab/audit/git_utils.py",
+      "line": 0,
+      "message": "函数 'get_source_files' 没有对应的测试 (期望: test_get_source_files)",
+      "detail": "在 /home/ly/.hermes/research-assistant/commands/tests/test_git_utils.py 中添加 def test_get_source_files(): ..."
+    }
+  ],
+  "started_at": "2026-07-08T15:26:04.361877+08:00",
+  "finished_at": "2026-07-08T15:26:15.880412+08:00"
+}

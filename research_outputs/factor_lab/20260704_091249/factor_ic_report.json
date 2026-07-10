@@ -1,0 +1,248 @@
+{
+  "stats": [
+    {
+      "name": "ret5",
+      "category": "momentum",
+      "description": "5日收益率动量",
+      "mean_ic": 0.0345,
+      "std_ic": 0.1734,
+      "ir": 0.1993,
+      "pos_ratio": 0.5718
+    },
+    {
+      "name": "reversal5",
+      "category": "reversal",
+      "description": "短期反转",
+      "mean_ic": -0.0345,
+      "std_ic": 0.1734,
+      "ir": -0.1993,
+      "pos_ratio": 0.4282
+    },
+    {
+      "name": "close_gt_ma20",
+      "category": "trend",
+      "description": "收盘价在MA20上方幅度",
+      "mean_ic": 0.0333,
+      "std_ic": 0.184,
+      "ir": 0.1811,
+      "pos_ratio": 0.5689
+    },
+    {
+      "name": "vol_ratio60",
+      "category": "volume",
+      "description": "60日量比",
+      "mean_ic": 0.031,
+      "std_ic": 0.1552,
+      "ir": 0.1995,
+      "pos_ratio": 0.5847
+    },
+    {
+      "name": "vol_ratio20",
+      "category": "volume",
+      "description": "20日量比",
+      "mean_ic": 0.0268,
+      "std_ic": 0.1422,
+      "ir": 0.1887,
+      "pos_ratio": 0.5865
+    },
+    {
+      "name": "ret10",
+      "category": "momentum",
+      "description": "10日收益率动量",
+      "mean_ic": 0.0259,
+      "std_ic": 0.1851,
+      "ir": 0.1398,
+      "pos_ratio": 0.5629
+    },
+    {
+      "name": "ret20",
+      "category": "momentum",
+      "description": "20日收益率动量",
+      "mean_ic": 0.0254,
+      "std_ic": 0.193,
+      "ir": 0.1318,
+      "pos_ratio": 0.5529
+    },
+    {
+      "name": "reversal20",
+      "category": "reversal",
+      "description": "中期反转",
+      "mean_ic": -0.0254,
+      "std_ic": 0.193,
+      "ir": -0.1318,
+      "pos_ratio": 0.4471
+    },
+    {
+      "name": "ma5_gt_ma10",
+      "category": "trend",
+      "description": "快慢均线关系",
+      "mean_ic": 0.0234,
+      "std_ic": 0.183,
+      "ir": 0.1278,
+      "pos_ratio": 0.5613
+    },
+    {
+      "name": "atr20",
+      "category": "volatility",
+      "description": "平均真实波幅",
+      "mean_ic": 0.0218,
+      "std_ic": 0.2732,
+      "ir": 0.0799,
+      "pos_ratio": 0.5543
+    },
+    {
+      "name": "ts_regression_slope20",
+      "category": "trend",
+      "description": "20日线性回归斜率",
+      "mean_ic": 0.0216,
+      "std_ic": 0.1917,
+      "ir": 0.1124,
+      "pos_ratio": 0.5484
+    },
+    {
+      "name": "ma10_gt_ma20",
+      "category": "trend",
+      "description": "快慢均线关系(10/20)",
+      "mean_ic": 0.021,
+      "std_ic": 0.1895,
+      "ir": 0.111,
+      "pos_ratio": 0.5572
+    },
+    {
+      "name": "ret_std20",
+      "category": "momentum",
+      "description": "20日收益率波动",
+      "mean_ic": 0.0191,
+      "std_ic": 0.2579,
+      "ir": 0.0739,
+      "pos_ratio": 0.5588
+    },
+    {
+      "name": "volatility20",
+      "category": "volatility",
+      "description": "20日收益波动率",
+      "mean_ic": 0.0191,
+      "std_ic": 0.2579,
+      "ir": 0.0739,
+      "pos_ratio": 0.5588
+    },
+    {
+      "name": "vol_ratio5",
+      "category": "volume",
+      "description": "5日量比",
+      "mean_ic": 0.0136,
+      "std_ic": 0.1239,
+      "ir": 0.11,
+      "pos_ratio": 0.5449
+    },
+    {
+      "name": "min_low60",
+      "category": "momentum",
+      "description": "60日最低价距当前比例",
+      "mean_ic": 0.0128,
+      "std_ic": 0.2343,
+      "ir": 0.0545,
+      "pos_ratio": 0.5648
+    },
+    {
+      "name": "turnover20",
+      "category": "volume",
+      "description": "20日换手率均值",
+      "mean_ic": 0.0069,
+      "std_ic": 0.1763,
+      "ir": 0.0394,
+      "pos_ratio": 0.5425
+    },
+    {
+      "name": "ret60",
+      "category": "momentum",
+      "description": "60日收益率动量",
+      "mean_ic": 0.0054,
+      "std_ic": 0.228,
+      "ir": 0.0237,
+      "pos_ratio": 0.56
+    },
+    {
+      "name": "amihud_illiquidity20",
+      "category": "liquidity",
+      "description": "Amihud非流动性指标",
+      "mean_ic": 0.0041,
+      "std_ic": 0.1625,
+      "ir": 0.0251,
+      "pos_ratio": 0.5206
+    },
+    {
+      "name": "vol_price_corr20",
+      "category": "volume",
+      "description": "量价相关性",
+      "mean_ic": -0.0029,
+      "std_ic": 0.1121,
+      "ir": -0.0259,
+      "pos_ratio": 0.4824
+    },
+    {
+      "name": "max_high60",
+      "category": "momentum",
+      "description": "60日最高价距当前比例",
+      "mean_ic": 0.0023,
+      "std_ic": 0.2052,
+      "ir": 0.0113,
+      "pos_ratio": 0.5083
+    },
+    {
+      "name": "ma20_gt_ma60",
+      "category": "trend",
+      "description": "快慢均线关系(20/60)",
+      "mean_ic": -0.0008,
+      "std_ic": 0.231,
+      "ir": -0.0034,
+      "pos_ratio": 0.5449
+    },
+    {
+      "name": "roe_q",
+      "category": "quality",
+      "description": "ROE（来自基本面）",
+      "mean_ic": 0,
+      "std_ic": 0,
+      "ir": 0,
+      "pos_ratio": 0
+    },
+    {
+      "name": "gross_margin_q",
+      "category": "quality",
+      "description": "毛利率",
+      "mean_ic": 0,
+      "std_ic": 0,
+      "ir": 0,
+      "pos_ratio": 0
+    },
+    {
+      "name": "debt_ratio_q",
+      "category": "quality",
+      "description": "资产负债率",
+      "mean_ic": 0,
+      "std_ic": 0,
+      "ir": 0,
+      "pos_ratio": 0
+    },
+    {
+      "name": "net_inflow_5d",
+      "category": "fund_flow",
+      "description": "主力净流入(5日)",
+      "mean_ic": 0,
+      "std_ic": 0,
+      "ir": 0,
+      "pos_ratio": 0
+    },
+    {
+      "name": "net_inflow_1d",
+      "category": "fund_flow",
+      "description": "主力净流入(今日)",
+      "mean_ic": 0,
+      "std_ic": 0,
+      "ir": 0,
+      "pos_ratio": 0
+    }
+  ],
+  "generated_at": "2026-07-04 09:13:24.225862+08:00"
+}

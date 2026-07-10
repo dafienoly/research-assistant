@@ -1,0 +1,5 @@
+{"type": "answer_delta", "session_id": "ac_20260707_174642_fb38f4", "data": "## Claude Code (流式输出)\n\n> 🔄 实时流式输出中，Agent 工作输出会逐行推送。\n\n任务: Auto execute V7.5: Report Center\n\n", "status": "running", "agent": "", "prompt": "", "timestamp": "2026-07-07T17:46:42.101679+08:00"}
+{"type": "error", "session_id": "ac_20260707_174642_fb38f4", "data": "Claude Code 超时", "status": "failed", "agent": "", "prompt": "", "timestamp": "2026-07-07T17:51:42.559461+08:00"}
+{"type": "diagnostic", "session_id": "ac_20260707_174642_fb38f4", "data": "[Claude streaming mode: pty]", "status": "", "agent": "", "prompt": "", "timestamp": "2026-07-07T17:51:42.591699+08:00"}
+{"type": "diagnostic", "session_id": "ac_20260707_174642_fb38f4", "data": "Claude Code failed with returncode=-9", "status": "failed", "agent": "", "prompt": "", "timestamp": "2026-07-07T17:51:42.591963+08:00"}
+{"type": "done", "session_id": "ac_20260707_174642_fb38f4", "data": "", "status": "failed", "agent": "", "prompt": "", "timestamp": "2026-07-07T17:51:42.592142+08:00"}

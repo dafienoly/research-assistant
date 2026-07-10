@@ -1,0 +1,17 @@
+{
+  "strategy": "risk_penalty",
+  "status": "completed",
+  "data_range": {
+    "start": "2025-01-02",
+    "end": "2026-07-03"
+  },
+  "initial_cash": 1000000.0,
+  "final_equity": 1059547.99,
+  "total_return": 0.0595,
+  "annual_return": 0.0595,
+  "max_drawdown": 0.0398,
+  "closed_trades": 85,
+  "total_trades": 172,
+  "universe_size": 15,
+  "created_at": "2026-07-03T17:51:06+08:00"
+}

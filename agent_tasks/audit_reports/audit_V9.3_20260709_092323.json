@@ -1,0 +1,75 @@
+{
+  "version": "V9.3",
+  "status": "failed",
+  "phases_run": [
+    "phase1",
+    "phase2",
+    "phase4"
+  ],
+  "results": {
+    "passed": 13,
+    "failed": 1,
+    "warnings": 8
+  },
+  "fail_items": [
+    {
+      "type": "PROCESS",
+      "file": "tmux",
+      "line": 0,
+      "msg": "窗口缺失: ['gateway', 'auto-loop']"
+    }
+  ],
+  "warn_items": [
+    {
+      "type": "INFRA",
+      "file": "gateway",
+      "line": 0,
+      "msg": "Gateway ticker 不可用"
+    },
+    {
+      "type": "INFRA",
+      "file": "git",
+      "line": 0,
+      "msg": "Git 仓库异常: TIMEOUT"
+    },
+    {
+      "type": "STYLE",
+      "file": "error-handling",
+      "line": 0,
+      "msg": "bare except + pass: /home/ly/.hermes/research-assistant/commands/factor_lab/audit/gate2_stub_detect.py:266:            #"
+    },
+    {
+      "type": "STYLE",
+      "file": "error-handling",
+      "line": 0,
+      "msg": "bare except + pass: /home/ly/.hermes/research-assistant/commands/factor_lab/audit/gate2_stub_detect.py-267-            m"
+    },
+    {
+      "type": "SECURITY",
+      "file": "shell-injection",
+      "line": 0,
+      "msg": "subprocess shell=True 发现: /home/ly/.hermes/research-assistant/commands/factor_lab/leader/audit_push.py:237:    rc, out = _run("
+    },
+    {
+      "type": "ARCH",
+      "file": "timeout",
+      "line": 0,
+      "msg": "1小时超时: /home/ly/.hermes/research-assistant/commands/factor_lab/leader/audit_push.py:247:    rc, out = _run("
+    },
+    {
+      "type": "ARCH",
+      "file": "timeout",
+      "line": 0,
+      "msg": "1小时超时: /home/ly/.hermes/research-assistant/commands/factor_lab/leader/auto_executor.py:326:        _stdout,"
+    },
+    {
+      "type": "ARCH",
+      "file": "timeout",
+      "line": 0,
+      "msg": "1小时超时: /home/ly/.hermes/research-assistant/commands/factor_lab/leader/auto_executor.py:332:        agent_er"
+    }
+  ],
+  "started_at": "2026-07-09T09:23:10.650690+08:00",
+  "finished_at": "2026-07-09T09:23:23.717818+08:00",
+  "report_path": "/home/ly/.hermes/research-assistant/agent_tasks/audit_reports/audit_V9.3_20260709_092323.json"
+}

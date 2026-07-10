@@ -1,0 +1,9 @@
+{
+  "passed": false,
+  "auto_triggered_at": "20260710_092313",
+  "changed_files": [
+    "/home/ly/.hermes/research-assistant/commands/hermes_cli.py",
+    "/home/ly/.hermes/research-assistant/commands/data_pipeline.py"
+  ],
+  "auto_exit_code": -9
+}

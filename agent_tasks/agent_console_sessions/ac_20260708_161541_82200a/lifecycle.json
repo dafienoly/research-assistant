@@ -1,0 +1,8 @@
+{
+  "pid": 19021,
+  "status": "orphaned",
+  "agent": "claude_code",
+  "prompt": "Auto execute V9.0: Cloud/Local Hybrid Runner",
+  "created_at": "2026-07-08T16:15:41.156462+08:00",
+  "orphaned_at": "2026-07-08T16:15:41.916775+08:00"
+}

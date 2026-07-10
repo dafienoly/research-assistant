@@ -1,0 +1,83 @@
+{
+  "report_type": "coverage",
+  "generated_at": "2026-07-09T22:59:20+08:00",
+  "data_dir": "/home/ly/.hermes/research-assistant/data/normalized/market",
+  "total_stocks": 5736,
+  "stocks_with_data": 5735,
+  "empty_files": 1,
+  "empty_file_list": [
+    "601200.SH"
+  ],
+  "total_rows": 6804614,
+  "earliest_date": "1970-01-01",
+  "latest_date": "1970-01-01",
+  "unique_trading_days": 1,
+  "top5_by_rows": [
+    {
+      "ts_code": "000001.SZ",
+      "rows": 1335,
+      "first_date": "1970-01-01",
+      "last_date": "1970-01-01"
+    },
+    {
+      "ts_code": "000002.SZ",
+      "rows": 1335,
+      "first_date": "1970-01-01",
+      "last_date": "1970-01-01"
+    },
+    {
+      "ts_code": "000006.SZ",
+      "rows": 1335,
+      "first_date": "1970-01-01",
+      "last_date": "1970-01-01"
+    },
+    {
+      "ts_code": "000009.SZ",
+      "rows": 1335,
+      "first_date": "1970-01-01",
+      "last_date": "1970-01-01"
+    },
+    {
+      "ts_code": "000011.SZ",
+      "rows": 1335,
+      "first_date": "1970-01-01",
+      "last_date": "1970-01-01"
+    }
+  ],
+  "bottom5_by_rows": [
+    {
+      "ts_code": "920222.BJ",
+      "rows": 8,
+      "first_date": "1970-01-01",
+      "last_date": "1970-01-01"
+    },
+    {
+      "ts_code": "001248.SZ",
+      "rows": 6,
+      "first_date": "1970-01-01",
+      "last_date": "1970-01-01"
+    },
+    {
+      "ts_code": "920193.BJ",
+      "rows": 6,
+      "first_date": "1970-01-01",
+      "last_date": "1970-01-01"
+    },
+    {
+      "ts_code": "920189.BJ",
+      "rows": 2,
+      "first_date": "1970-01-01",
+      "last_date": "1970-01-01"
+    },
+    {
+      "ts_code": "920136.BJ",
+      "rows": 1,
+      "first_date": "1970-01-01",
+      "last_date": "1970-01-01"
+    }
+  ],
+  "summary": {
+    "coverage_pct": 99.98,
+    "empty_pct": 0.02
+  }
+}

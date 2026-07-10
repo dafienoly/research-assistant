@@ -1,0 +1,4 @@
+strategy_name,category,universe,main_factors,hypothesis,risk_controls,status,created_at
+semiconductor_trend_following,trend_following,semiconductor_theme,"ret20, ma20_gt_ma60, vol_ratio20, quality_score",半导体主题在上升趋势中延续动量,"top_n=10, max_weight=0.15, trailing_drawdown",template,2026-07-03T17:51:05+08:00
+breakout_semiconductor,breakout,semiconductor_theme,"high_20, volume_ratio, ret5",半导体股放量突破20日高点后延续上涨,"top_n=5, stop_loss=0.05",candidate,2026-07-03T17:51:05+08:00
+quality_growth_semiconductor,quality_growth,semiconductor_theme,"quality_score, growth_score, roe, eps_growth",高ROE高增长的半导体股长期跑赢,"diversified=10, quarterly_rebalance",candidate,2026-07-03T17:51:05+08:00

@@ -1,0 +1,26 @@
+{
+  "skill_id": "universe-overview",
+  "name": "股票池概览",
+  "description": "构建并显示各股票池的统计信息（数量、样本）",
+  "category": "universe",
+  "params": [
+    {
+      "name": "universes",
+      "type": "list",
+      "label": "股票池列表",
+      "default": "manual_watchlist,today_candidates",
+      "required": false,
+      "description": "股票池名称，多个用逗号分隔",
+      "choices": null
+    }
+  ],
+  "tags": [
+    "universe",
+    "stock-pool",
+    "overview"
+  ],
+  "handler": "factor_lab.research_skill.builtins:_execute_universe_overview",
+  "version": "1.0.0",
+  "created_at": "2026-07-06T15:05:02.018727+08:00",
+  "updated_at": "2026-07-06T15:05:02.019680+08:00"
+}

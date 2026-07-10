@@ -1,0 +1,42 @@
+{
+  "requirements": [
+    {
+      "id": "T1",
+      "title": "拆分 IC/RankIC — Pearson IC + Spearman RankIC",
+      "code_locations": [
+        {"file": "commands/factor_lab/batch_compute.py", "function": "compute_all_and_cache", "line": 189},
+        {"file": "commands/factor_lab/batch_compute.py", "function": "results dict", "line": 246}
+      ],
+      "expected_keywords": ["pearsonr", "spearmanr", "daily_pearson_ics", "daily_spearman_ics", "ic_mean", "rank_ic_mean"],
+      "behavior": "IC 使用 Pearson 线性相关系数逐日均值；RankIC 使用 Spearman 秩相关系数逐日均值；两者值不同"
+    },
+    {
+      "id": "T2",
+      "title": "最大回撤 — 从 top-bottom 净值曲线计算",
+      "code_locations": [
+        {"file": "commands/factor_lab/batch_compute.py", "function": "compute_all_and_cache", "line": 234}
+      ],
+      "expected_keywords": ["daily_spread", "cumprod", "expanding().max()", "max_drawdown"],
+      "behavior": "从 Top-Bottom 逐日收益序列构建净值曲线，用累积峰值法计算最大回撤"
+    },
+    {
+      "id": "T3",
+      "title": "风险暴露 — 波动率/动量/流动性截面暴露",
+      "code_locations": [
+        {"file": "commands/factor_lab/batch_compute.py", "function": "_compute_risk_exposure", "line": 310}
+      ],
+      "expected_keywords": ["vol_20d", "mom_20d", "turnover_rate", "spearmanr", "> 0.3"],
+      "behavior": "截面 Spearman 相关 >0.3 标记为高暴露；覆盖波动率/动量/流动性三个维度"
+    },
+    {
+      "id": "T4",
+      "title": "半导体等权超额收益 — 真实基准",
+      "code_locations": [
+        {"file": "commands/factor_lab/batch_compute.py", "function": "_compute_semiconductor_excess", "line": 367},
+        {"file": "commands/factor_lab/batch_compute.py", "function": "_load_semiconductor_stocks", "line": 344}
+      ],
+      "expected_keywords": ["semiconductor_chain_tags.csv", "benchmarks_v4", "semi_ret", "excess"],
+      "behavior": "从 U3 半导体池或 tags CSV 加载成分股，计算等权基准收益，与 top-bottom 相减得超额"
+    }
+  ]
+}

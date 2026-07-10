@@ -1,0 +1,67 @@
+{
+  "version": "",
+  "passed": false,
+  "gates_run": [
+    "gate1",
+    "gate2",
+    "gate3"
+  ],
+  "findings": [
+    {
+      "gate": "gate1",
+      "severity": "WARN",
+      "category": "NO_TASKS",
+      "file": "",
+      "line": 0,
+      "message": "Plan 文件中未解析到 Task 定义（格式: ### Task N）",
+      "detail": ""
+    },
+    {
+      "gate": "gate1",
+      "severity": "INFO",
+      "category": "CHANGED_FILES",
+      "file": "",
+      "line": 0,
+      "message": "发现 4 个变更文件（无 Task 解析）",
+      "detail": "AGENTS.md\nCLAUDE.md\ncommands/factor_lab/leader/auto_executor.py\ncommands/scripts/pre-push.sh"
+    },
+    {
+      "gate": "gate2",
+      "severity": "INFO",
+      "category": "SCAN_FILES",
+      "file": "",
+      "line": 0,
+      "message": "扫描 1 个 Python 文件",
+      "detail": "commands/factor_lab/leader/auto_executor.py"
+    },
+    {
+      "gate": "gate2",
+      "severity": "WARN",
+      "category": "STUB_TOO_SIMPLE",
+      "file": "commands/factor_lab/leader/auto_executor.py",
+      "line": 27,
+      "message": "函数 '_new_run_id' 名称暗示复杂逻辑但仅有 1 条语句",
+      "detail": "有效代码行数: 1"
+    },
+    {
+      "gate": "gate3",
+      "severity": "INFO",
+      "category": "SOURCE_FILES",
+      "file": "",
+      "line": 0,
+      "message": "发现 1 个源文件需要测试覆盖",
+      "detail": "commands/factor_lab/leader/auto_executor.py"
+    },
+    {
+      "gate": "gate3",
+      "severity": "FAIL",
+      "category": "NO_TEST_FILE",
+      "file": "commands/factor_lab/leader/auto_executor.py",
+      "line": 0,
+      "message": "源文件 auto_executor.py 没有对应的测试文件 (期望: tests/test_auto_executor.py)",
+      "detail": "创建 /home/ly/.hermes/research-assistant/commands/tests/test_auto_executor.py 并编写至少一个测试函数"
+    }
+  ],
+  "started_at": "2026-07-07T18:15:27.308513+08:00",
+  "finished_at": "2026-07-07T18:15:27.373259+08:00"
+}
