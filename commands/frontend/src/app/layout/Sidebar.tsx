@@ -14,6 +14,7 @@ import {
   LineChartOutlined,
   MedicineBoxOutlined,
   RadarChartOutlined,
+  SafetyCertificateOutlined,
   RobotOutlined,
   SwapOutlined,
 } from '@ant-design/icons'
@@ -38,6 +39,7 @@ const RESEARCH_MENU: MenuItem[] = [
   { key: '/vnext/execution', icon: <ControlOutlined />, label: 'miniQMT / 模式' },
   { key: '/vnext/review', icon: <MedicineBoxOutlined />, label: '反脆弱复盘' },
   { key: '/vnext/data-health', icon: <ApiOutlined />, label: '数据健康' },
+  { key: '/decision-loop', icon: <SafetyCertificateOutlined />, label: '量化决策中心' },
 ]
 
 const Sidebar: React.FC<SidebarProps> = ({ collapsed, onOpenAgentOps }) => {

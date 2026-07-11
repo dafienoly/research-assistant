@@ -14,6 +14,7 @@ import PaperDashboard from '../pages/PaperDashboard'
 import LiveGate from '../pages/LiveGate'
 import Reports from '../pages/Reports'
 import Events from '../pages/Events'
+import DecisionCenter from '../pages/DecisionCenter'
 
 // System pages
 import OpsCenter from '../pages/OpsCenter'
@@ -54,6 +55,7 @@ const routes: RouteObject[] = [
       { path: 'vnext/execution', element: <VNextExecution /> },
       { path: 'vnext/review', element: <VNextReview /> },
       { path: 'vnext/data-health', element: <VNextDataHealth /> },
+      { path: 'decision-loop', element: <DecisionCenter /> },
 
       // Legacy research pages remain URL-compatible.
       { path: 'legacy-dashboard', element: <Dashboard /> },

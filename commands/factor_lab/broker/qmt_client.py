@@ -22,7 +22,10 @@ class QMTClient:
     """
 
     def __init__(self, base_url: str = None, timeout: float = 5.0):
-        self.base_url = (base_url or os.environ.get("QMT_BRIDGE_BASE_URL", "")).rstrip("/")
+        configured = (
+            os.environ.get("QMT_BRIDGE_BASE_URL", "") if base_url is None else base_url
+        )
+        self.base_url = configured.rstrip("/")
         self.timeout = timeout
 
     def is_configured(self) -> bool:

@@ -1,90 +1,146 @@
 {
   "requirements": [
     {
-      "id": "R1",
-      "title": "退役自动版本推荐与 Agent 自动化入口",
-      "code_locations": [{"file": "commands/leader_commands.py", "function": "handle", "line": 35}],
-      "expected_keywords": ["audit:code", "leader:ops-health", "architecture:audit", "return False"],
-      "behavior": "CLI 仅保留运维、架构审计和代码审计；Roadmap、任务队列、Agent Runner 与自动推进命令不再注册"
+      "id": "QD-01",
+      "title": "完整量化决策闭环",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/service.py", "function": "status", "line": 35}],
+      "expected_keywords": ["positions", "guard", "notifications", "authorizations", "execution", "opportunities", "parameters"],
+      "behavior": "同一应用服务组合持仓、利润保护、通知、授权、执行、机会和参数学习上下文"
     },
     {
-      "id": "R2",
-      "title": "运维中心收敛为显式本地服务管理",
-      "code_locations": [{"file": "commands/factor_lab/leader/ops_dashboard.py", "function": "health", "line": 248}],
-      "expected_keywords": ["required", "socket.create_connection", "dashboard", "mcp", "vite"],
-      "behavior": "只管理声明服务，必需服务决定整体健康；端口探测适配 WSL，停止操作仅作用于自有 PID 或端口监听者"
+      "id": "QD-02",
+      "title": "2/3 点利润回撤与结构破位保护",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/profit_guard.py", "function": "evaluate", "line": 21}],
+      "expected_keywords": ["giveback >= 2", "giveback >= 3", "structure_confirm_minutes", "exit_remaining", "reentry_eligible"],
+      "behavior": "2点L2、3点减半、跌破上午低点或VWAP持续10分钟退出剩余交易仓，放量重回VWAP仅恢复资格"
     },
     {
-      "id": "R3",
-      "title": "代码审计单写入与同变更复用",
-      "code_locations": [{"file": "commands/factor_lab/audit/coordinator.py", "function": "run", "line": 31}],
-      "expected_keywords": ["fcntl.flock", "change_set_hash", "AuditStore", "已有代码审计正在运行"],
-      "behavior": "协调器使用文件锁实现 single-flight，并按 profile 与 change-set hash 复用已完成审计"
+      "id": "QD-03",
+      "title": "操作卡片与MiniQMT受控执行",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/execution.py", "function": "submit", "line": 57}],
+      "expected_keywords": ["QMT_LIVE_TRADING_ENABLED", "miniqmt_live_not_configured", "authorization_id", "hard_risk_sell"],
+      "behavior": "默认fail-closed；配置Bridge、环境开关和有效日级授权后才可提交MiniQMT"
     },
     {
-      "id": "R4a",
-      "title": "完整档影响分析与定向回归",
-      "code_locations": [{"file": "commands/factor_lab/audit/checks.py", "function": "full_checks", "line": 146}],
-      "expected_keywords": ["selected_tests", "gitnexus", "api-contract-smoke", "pytest"],
-      "behavior": "完整档追加 GitNexus 变更分析、受影响测试和 API 合约冒烟"
+      "id": "QD-04",
+      "title": "分钟监控持仓、推荐与锚定ETF",
+      "code_locations": [{"file": "commands/scripts/decision_guard_once.py", "function": "main", "line": 34}],
+      "expected_keywords": ["watchlist/current.json", "reference_price", "get_quotes", "monitored"],
+      "behavior": "每次只拉取已确认持仓和PassList持久化的推荐/行业锚定ETF，不做全市场分钟扫描"
     },
     {
-      "id": "R4b",
-      "title": "安全档本地静态扫描",
-      "code_locations": [{"file": "commands/factor_lab/audit/checks.py", "function": "security_checks", "line": 189}],
-      "expected_keywords": ["semgrep", "SEMGREP_SEND_METRICS", "llm-advisory", "blocking=False"],
-      "behavior": "安全档执行仓库固定 Semgrep 规则；LLM 语义审查仅作非阻塞提示"
+      "id": "QD-05",
+      "title": "混合机会评分链",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/opportunity.py", "function": "build_pass_list", "line": 26}],
+      "expected_keywords": ["catalyst_score", "industry_fundamental_score", "technical_flow_score", "risk_score"],
+      "behavior": "催化、产业基本面、技术资金与风险按确定权重评分并接受数据置信度调整"
     },
     {
-      "id": "R4c",
-      "title": "统一三档审计 CLI",
-      "code_locations": [{"file": "commands/factor_lab/audit/runner.py", "function": "cmd_main", "line": 72}],
-      "expected_keywords": ["fast", "full", "security", "working-tree", "staged", "compare", "paths"],
-      "behavior": "audit:code 提供显式 profile/scope，旧 anti-cheat 命令仅保留一个兼容周期且不能跳过确定性门禁"
+      "id": "QD-06",
+      "title": "三周期独立账簿",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/models.py", "function": "Book", "line": 18}],
+      "expected_keywords": ["CATALYST", "SWING", "CORE", "thesis", "invalidation"],
+      "behavior": "catalyst/swing/core可持有同一标的，但Position按账簿保存独立论据和失效条件"
     },
     {
-      "id": "R5",
-      "title": "代码审计持久化与保留策略",
-      "code_locations": [{"file": "commands/factor_lab/audit/storage.py", "function": "save", "line": 25}],
-      "expected_keywords": ["report.json", "latest.json", "os.replace", "keep_runs", "keep_days"],
-      "behavior": "每次运行只写一份规范报告到仓库外状态目录，并原子更新 latest 与清理过期运行"
+      "id": "QD-07",
+      "title": "进取型预算与穿透上限",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/portfolio.py", "function": "validate_allocations", "line": 14}],
+      "expected_keywords": ["0.25", "0.50", "0.20", "0.30", "0.15", "0.70", "0.05"],
+      "behavior": "验证25/50/20账簿预算、5%现金、单股15%、单ETF30%和主题穿透70%"
     },
     {
-      "id": "R6a",
-      "title": "本地受控代码审计 API",
-      "code_locations": [{"file": "commands/factor_lab/api_server/routes_code_audit.py", "function": "trigger_code_audit", "line": 47}],
-      "expected_keywords": ["Code audit can only be triggered locally", "Literal", "run_in_threadpool", "scope=body.scope"],
-      "behavior": "API 仅接受本机 typed profile/scope 请求且不暴露任意 shell 或工作目录执行"
+      "id": "QD-08",
+      "title": "组合3/4/10硬熔断",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/portfolio.py", "function": "evaluate_portfolio_risk", "line": 76}],
+      "expected_keywords": ["-3.0", "-4.0", "-10.0", "REDUCE_ONLY", "REDUCE_HIGH_BETA", "NO_NEW_POSITIONS"],
+      "behavior": "按日内高点回撤、当日损失和20日回撤切换禁止开仓、降高Beta和只减仓模式"
     },
     {
-      "id": "R6b",
-      "title": "代码审计前端中心",
-      "code_locations": [{"file": "commands/frontend/src/pages/CodeAudit.tsx", "function": "", "line": 35}],
-      "expected_keywords": ["/api/code-audits/runs", "/api/code-audits/trigger", "fast", "full", "security"],
-      "behavior": "前端展示审计历史、发现与变更集，并可触发三种档位"
+      "id": "QD-09",
+      "title": "样本外加周度人工参数晋级",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/review.py", "function": "weekly_decide", "line": 184}],
+      "expected_keywords": ["oos_status", "weekly_reviewer", "production_history.jsonl", "cannot be promoted"],
+      "behavior": "参数先成为候选，OOS通过且人工批准后才原子更新生产版本并保留历史"
     },
     {
-      "id": "R7a",
-      "title": "操作审计持久化哈希链",
-      "code_locations": [{"file": "commands/factor_lab/api_server/services/audit_service.py", "function": "record", "line": 57}],
-      "expected_keywords": ["prev_hash", "event_hash", "os.fsync", "events.jsonl"],
-      "behavior": "运维/API 操作追加写入仓库外 JSONL，事件以 SHA-256 前向链接"
+      "id": "QD-10",
+      "title": "日级执行授权",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/authorization.py", "function": "create_plan", "line": 29}],
+      "expected_keywords": ["plan_hash", "confirmation_nonce_hash", "expires_at", "max_order_amount", "max_total_amount"],
+      "behavior": "授权绑定交易日、策略、预算、计划订单和参数版本，收盘失效且异常自动撤销"
     },
     {
-      "id": "R7b",
-      "title": "操作审计受控导出",
-      "code_locations": [{"file": "commands/factor_lab/api_server/routes_audit.py", "function": "export_audit_events", "line": 50}],
-      "expected_keywords": ["/audit/export", "limit", "model_dump", "total"],
-      "behavior": "操作账本通过限量 API 导出，与代码审计报告端点保持分离"
+      "id": "QD-11",
+      "title": "Telegram与企业微信双通道",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/notifications.py", "function": "notify", "line": 72}],
+      "expected_keywords": ["telegram", "enterprise_wechat", "ThreadPoolExecutor", "delivery_receipts.jsonl", "digest_queued"],
+      "behavior": "L2入摘要，L3/L4并发双发；共享event_id、独立回执，单通道失败隔离"
     },
     {
-      "id": "R8",
-      "title": "报告中心仅保留投研报告",
-      "code_locations": [{"file": "commands/factor_lab/api_server/routes_reports.py", "function": "list_reports", "line": 109}],
-      "expected_keywords": ["backtest", "strategy", "DISCOVERERS", "Supported report types"],
-      "behavior": "报告中心只发现、读取和删除 backtest/strategy 报告，不再混入版本、会话或路线图报告"
+      "id": "QD-12",
+      "title": "OCR剪贴板CSV持仓差异确认",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/position_ingestion.py", "function": "confirm", "line": 212}],
+      "expected_keywords": ["tesseract", "preview_id", "content_hash", "hash mismatch", "positions/current.json"],
+      "behavior": "所有来源先字段归一和差异预览，只有预览哈希匹配的人为确认才覆盖当前持仓"
+    },
+    {
+      "id": "QD-13",
+      "title": "核心与辅助数据分级门禁",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/data_gate.py", "function": "evaluate_data_gate", "line": 14}],
+      "expected_keywords": ["CORE_DATA", "AUXILIARY_DATA", "BLOCKED", "WATCH_ONLY", "conflicts"],
+      "behavior": "行情/持仓/日历异常阻断；新闻/资金/基本面缺失降为watch-only并保留冲突来源"
+    },
+    {
+      "id": "QD-14",
+      "title": "最多3主5备完整PassList",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/opportunity.py", "function": "build_pass_list", "line": 26}],
+      "expected_keywords": ["[:3]", "[:5]", "primary_threshold", "backup_threshold", "no_opportunity_reason"],
+      "behavior": "只输出通过门槛的0至3个主推荐和最多5个备选，不以ETF或低质量候选凑数"
+    },
+    {
+      "id": "QD-15",
+      "title": "允许空机会清单",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/models.py", "function": "validate_limits", "line": 242}],
+      "expected_keywords": ["empty primary list requires", "no_opportunity_reason", "at most 3 primary and 5 backup"],
+      "behavior": "主推荐为0时必须明确无机会理由和保持现金结论"
+    },
+    {
+      "id": "QD-16",
+      "title": "低打扰交互界面",
+      "code_locations": [{"file": "commands/frontend/src/pages/DecisionCenter.tsx", "function": "", "line": 34}],
+      "expected_keywords": ["量化决策中心", "操作卡片", "双通道确认", "生成差异预览", "Fail-Closed"],
+      "behavior": "单页呈现风险规则、持仓差异、事件确认和授权状态；分钟刷新但只主动推送L3/L4"
+    },
+    {
+      "id": "QD-17",
+      "title": "完整回测和告警评估体系",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/review.py", "function": "calculate_system_metrics", "line": 88}],
+      "expected_keywords": ["max_drawdown_pct", "calmar", "turnover", "capacity_estimate", "alert_precision", "alert_false_positive_rate", "by_book"],
+      "behavior": "输出回撤、Calmar、换手、容量、执行可行性、告警精度/提前量/误报率并按账簿拆分"
+    },
+    {
+      "id": "QD-18",
+      "title": "证据支持的动态基准",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/benchmark.py", "function": "match_instrument", "line": 25}],
+      "expected_keywords": ["benchmark", "tracked_index", "peer_etf", "000300.SH", "None"],
+      "behavior": "个股、ETF和组合按可验证映射选择可交易基准；缺证据返回null而非合成"
+    },
+    {
+      "id": "QD-19",
+      "title": "计划内订单与硬风险SELL边界",
+      "code_locations": [{"file": "commands/factor_lab/decision_loop/execution.py", "function": "_block_reason", "line": 123}],
+      "expected_keywords": ["unplanned_buy_requires_new_approval", "planned_order_payload_changed", "hard_risk_sell_requires_event_id", "max_total_amount_exceeded", "duplicate_order_id"],
+      "behavior": "计划内订单逐字段核对；计划外BUY阻断；仅带事件ID的硬风险SELL可走保护通道"
+    },
+    {
+      "id": "QD-20",
+      "title": "安全链优先并自动调度",
+      "code_locations": [{"file": "commands/scripts/crontab/hermes-crontab", "function": "", "line": 7}],
+      "expected_keywords": ["30-59 9", "0-30 11", "13-14", "decision_guard_once.py", "flush-l2"],
+      "behavior": "分钟守卫只在A股交易时段运行，真实交易日历和核心数据异常时fail-closed，L2午间/收盘汇总"
     }
   ],
-  "source": "用户批准的辅助系统优化计划：退役自动版本推荐，收敛运维并工程化代码审计",
-  "generated_at": "2026-07-11"
+  "source": "grill-with-docs量化需求访谈：安全链→机会链→学习链完整实施",
+  "generated_at": "2026-07-11T15:35:00+08:00"
 }

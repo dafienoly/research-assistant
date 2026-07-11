@@ -1,5 +1,17 @@
-# Hermes maintenance schedule (automatic development runner retired)
-# 每 3 分钟执行一次
+# Hermes maintenance and quantitative decision-loop schedule
 
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# Minute guard: holdings + persisted recommendations/anchor ETFs. The runner is
+# fail-closed unless confirmed positions, MiniQMT quotes, and trade-calendar
+# confirmation are all available. Live orders still require daily authorization.
+30-59 9 * * 1-5 cd /home/ly/.hermes/research-assistant && /usr/bin/python3 commands/scripts/decision_guard_once.py >> ~/.hermes/logs/decision_guard.log 2>&1
+* 10 * * 1-5 cd /home/ly/.hermes/research-assistant && /usr/bin/python3 commands/scripts/decision_guard_once.py >> ~/.hermes/logs/decision_guard.log 2>&1
+0-30 11 * * 1-5 cd /home/ly/.hermes/research-assistant && /usr/bin/python3 commands/scripts/decision_guard_once.py >> ~/.hermes/logs/decision_guard.log 2>&1
+* 13-14 * * 1-5 cd /home/ly/.hermes/research-assistant && /usr/bin/python3 commands/scripts/decision_guard_once.py >> ~/.hermes/logs/decision_guard.log 2>&1
+0 15 * * 1-5 cd /home/ly/.hermes/research-assistant && /usr/bin/python3 commands/scripts/decision_guard_once.py >> ~/.hermes/logs/decision_guard.log 2>&1
+
+# L2 is a digest; L3/L4 are delivered immediately by the guard.
+35 11 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands /usr/bin/python3 -m factor_lab.decision_loop.cli flush-l2 >> ~/.hermes/logs/decision_guard.log 2>&1
+5 15 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands /usr/bin/python3 -m factor_lab.decision_loop.cli flush-l2 >> ~/.hermes/logs/decision_guard.log 2>&1

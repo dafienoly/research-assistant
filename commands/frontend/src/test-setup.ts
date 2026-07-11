@@ -16,8 +16,16 @@ window.matchMedia = window.matchMedia || function matchMedia() {
 const originalGetComputedStyle = window.getComputedStyle
 window.getComputedStyle = (elt, pseudoElt) => {
   try {
-    return originalGetComputedStyle(elt, pseudoElt)
+    return pseudoElt ? originalGetComputedStyle(elt) : originalGetComputedStyle(elt, pseudoElt)
   } catch {
     return {} as CSSStyleDeclaration
   }
 }
+
+class TestResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+globalThis.ResizeObserver = globalThis.ResizeObserver || TestResizeObserver
