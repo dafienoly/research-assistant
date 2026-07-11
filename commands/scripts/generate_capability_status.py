@@ -94,6 +94,7 @@ def main() -> int:
         "parameters/audit.jsonl",
         "parameters/production_history.jsonl",
         "certification/history.jsonl",
+        "scheduler/alerts.jsonl",
     ):
         service.store.archive_jsonl(name, datetime.now().astimezone() - timedelta(days=90))
     print(output)

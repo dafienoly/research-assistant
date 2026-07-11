@@ -90,6 +90,8 @@ raw → staging → normalized → manifest/conflict/freshness
 
 第二轮整改增加 durable outbox、`event_id:channel` 幂等键、指数退避、最大尝试和 dead-letter。L2 摘要改为每通道独立 cursor：Telegram 成功不会掩盖企业微信失败，失败通道下次继续投递。共享确认只接受已登记事件；未知 event_id 返回 `not_found`。实际 crontab 已统一使用 `.venv_quant`，不再混用 `/usr/bin/python3`。
 
+第三轮整改将调度 DAG 的最终 FAILED/BLOCKED 状态写入 `scheduler/alerts.jsonl` 和现有双通道 durable outbox；调度进程不等待网络，通知 worker 负责幂等重试和 dead-letter。相同 `dag_id+trading_date` 不会重复创建消息，运维告警账本纳入 90 日归档。
+
 ## 因子与研究审计
 
 - 因子计算存在硬编码 DataHub 路径，缺少统一 snapshot/version 参数。

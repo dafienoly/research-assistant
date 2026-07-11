@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 
 from factor_lab.scheduling import ScheduleRegistry, ScheduledDagRunner, ScheduledJob
+from factor_lab.decision_loop.storage import DecisionLoopStore
+from scripts.run_scheduled_dag import enqueue_failure_alert
 
 
 def job(job_id: str, *, depends_on: tuple[str, ...] = (), dataset: str | None = None, attempts: int = 1) -> ScheduledJob:
@@ -139,3 +141,20 @@ def test_production_data_dependencies_and_runtime_are_explicit() -> None:
     assert "datahub_live_snapshot.py" in crontab
     assert "datahub_regulatory_events.py" in crontab
     assert "PYTHONPATH=commands .venv_quant/bin/python3" in crontab
+
+
+def test_failed_dag_alert_is_durable_dual_channel_and_idempotent(tmp_path: Path) -> None:
+    store = DecisionLoopStore(tmp_path / "decision-loop")
+    result = {
+        "status": "FAILED", "dag_id": "postmarket", "trading_date": "2026-07-10",
+        "jobs": {"datahub_daily": {"status": "FAILED"}, "factor_pipeline": {"status": "BLOCKED"}},
+    }
+
+    first = enqueue_failure_alert(result, store)
+    second = enqueue_failure_alert(result, store)
+
+    assert first["status"] == "queued"
+    assert second["channels"]["telegram"]["created"] is False
+    assert len(store.read_jsonl("scheduler/alerts.jsonl")) == 1
+    outbox = store.read_jsonl("notifications/outbox.jsonl")
+    assert {row["channel"] for row in outbox} == {"telegram", "enterprise_wechat"}

@@ -11,6 +11,44 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "commands"))
 
 from factor_lab.scheduling import ScheduleRegistry, ScheduledDagRunner  # noqa: E402
+from factor_lab.decision_loop.storage import DecisionLoopStore  # noqa: E402
+
+
+def enqueue_failure_alert(result: dict, store: DecisionLoopStore | None = None) -> dict:
+    """Persist a failed DAG alert for the existing dual-channel outbox worker."""
+    if result.get("status") == "SUCCESS":
+        return {"status": "not_required"}
+    store = store or DecisionLoopStore()
+    dag_id = str(result.get("dag_id") or "unknown")
+    trading_date = str(result.get("trading_date") or "unknown")
+    event_id = f"ops_dag_{dag_id}_{trading_date}"
+    failures = [
+        f"{job_id}={record.get('status')}"
+        for job_id, record in result.get("jobs", {}).items()
+        if record.get("status") not in {"SUCCESS", "SKIPPED"}
+    ]
+    alert_text = f"[Hermes 运维告警] DAG {dag_id} {trading_date} FAILED\n" + "\n".join(failures)
+    queued_at = datetime.now().astimezone().isoformat()
+    store.append_unique_jsonl(
+        "scheduler/alerts.jsonl",
+        {"event_id": event_id, "dag_id": dag_id, "trading_date": trading_date, "failures": failures, "queued_at": queued_at},
+        f"alert:{event_id}",
+    )
+    channels = {}
+    for channel in ("telegram", "enterprise_wechat"):
+        _, created = store.append_unique_jsonl(
+            "notifications/outbox.jsonl",
+            {
+                "event_id": event_id,
+                "channel": channel,
+                "payload": {"event_id": event_id, "text": alert_text},
+                "queued_at": queued_at,
+                "max_attempts": 5,
+            },
+            f"{event_id}:{channel}",
+        )
+        channels[channel] = {"queued": True, "created": created}
+    return {"status": "queued", "event_id": event_id, "channels": channels}
 
 
 def main() -> int:
@@ -34,10 +72,14 @@ def main() -> int:
         print(json.dumps(runner.describe(args.dag_id, args.date), ensure_ascii=False, indent=2))
         return 0
     result = runner.run(args.dag_id, args.date)
+    if result["status"] != "SUCCESS":
+        try:
+            result["operational_alert"] = enqueue_failure_alert(result)
+        except (OSError, ValueError, TimeoutError) as exc:
+            result["operational_alert"] = {"status": "failed", "error": type(exc).__name__}
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result["status"] == "SUCCESS" else 1
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
