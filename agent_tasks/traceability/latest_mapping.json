@@ -830,6 +830,16 @@
       "behavior": "旧 update_kline_daily 可执行入口不再调用 Baostock/RSScast 或逐文件重写 CSV，只委托 canonical DataHub 日增量管线。"
     },
     {
+      "id": "INFRA-REFRESH-KLINE-FACADE-01",
+      "title": "旧 K 线恢复脚本不得拥有 provider、覆盖或清理逻辑",
+      "code_locations": [
+        {"file": "scripts/refresh_kline_data.py", "function": "run", "line": 23},
+        {"file": "commands/tests/test_refresh_kline_facade.py", "line": 1}
+      ],
+      "expected_keywords": ["cmd_update_daily", "canonical DataHub", "delegates_once", "cannot_write_or_delete_market_data"],
+      "behavior": "旧 refresh_kline_data 兼容入口只委托带锁、staging 和审计的 canonical 日增量管线；不直接访问 provider，不覆盖、改 schema 或删除任何行情文件。"
+    },
+    {
       "id": "INFRA-STOCK-CONTEXT-DATAHUB-01",
       "title": "股票研究上下文只读 canonical DataHub",
       "code_locations": [
