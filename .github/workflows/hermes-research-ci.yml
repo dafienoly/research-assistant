@@ -79,6 +79,7 @@ jobs:
           commands/tests/test_etf_holdings_ingestion.py
           commands/tests/test_dive_live_predictor_datahub.py
           commands/tests/test_corporate_event_ingestion.py
+          commands/tests/test_regulatory_event_ingestion.py
           commands/tests/test_semiconductor_events.py
           commands/tests/test_benchmark_projection.py
           commands/tests/test_universes.py

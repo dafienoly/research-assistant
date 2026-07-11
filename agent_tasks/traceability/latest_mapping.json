@@ -470,6 +470,19 @@
       ],
       "expected_keywords": ["client._query", "normalized/events/corporate_events", "atomic_write_frame", "_load_datahub_events", "corporate_event_truth"],
       "behavior": "forecast、holder trade、repurchase、share float、dividend 只在 ingestion 层拉取并长表原子发布；研究加载器只读 canonical 数据和交易日历。"
+    },
+    {
+      "id": "P1-REGULATORY-COVERAGE-01",
+      "title": "监管公告 ingestion 与逐标的覆盖感知门禁",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_ingestion/regulatory_events.py", "function": "RegulatoryEventIngestion", "line": 15},
+        {"file": "commands/factor_lab/risk/regulatory_watchlist.py", "function": "covers", "line": 90},
+        {"file": "commands/factor_lab/risk/pretrade_risk_check.py", "function": "run_pretrade_risk_check", "line": 169},
+        {"file": "commands/scripts/datahub_regulatory_events.py", "line": 1},
+        {"file": "commands/tests/test_regulatory_event_ingestion.py", "line": 1}
+      ],
+      "expected_keywords": ["covered_symbols", "failed_symbols", "coverage_policy", "regulatory truth does not cover", "datahub-global.lock"],
+      "behavior": "公告只在 ingestion 层抓取并分类；快照记录成功/失败覆盖，PreTrade 对未覆盖标的 fail-closed，空事件不等于全市场安全。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

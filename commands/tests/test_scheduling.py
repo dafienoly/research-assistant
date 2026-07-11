@@ -137,4 +137,5 @@ def test_production_data_dependencies_and_runtime_are_explicit() -> None:
     assert "/usr/bin/python3" not in crontab
     assert "decision_notification_worker.py" in crontab
     assert "datahub_live_snapshot.py" in crontab
+    assert "datahub_regulatory_events.py" in crontab
     assert "PYTHONPATH=commands .venv_quant/bin/python3" in crontab

@@ -225,9 +225,12 @@ def run_pretrade_risk_check(
             risk_details.append("ST/*ST 股票")
 
         # ────────── 2. 监管事件检查 ──────────
-        if not regulatory_available:
+        if not regulatory_available or not regulatory_watchlist.covers(sym):
             risk_flags.append("regulatory_truth_unavailable")
-            risk_details.append(regulatory_watchlist.error or "regulatory truth unavailable")
+            risk_details.append(
+                regulatory_watchlist.error
+                or f"regulatory truth does not cover {sym}"
+            )
         else:
             if regulatory_watchlist.is_blacklisted(sym):
                 risk_flags.append("regulatory_blacklist")

@@ -20,6 +20,7 @@ class RegulatoryWatchlist:
         self._events: list[dict] = []
         self._blacklist_symbols: set[str] = set()
         self._warning_symbols: set[str] = set()
+        self._covered_symbols: set[str] = set()
         self._loaded = False
         self._error: str | None = None
 
@@ -42,8 +43,11 @@ class RegulatoryWatchlist:
         code = "".join(character for character in symbol if character.isdigit())[:6]
         return code if len(code) == 6 else ""
 
-    def _build_index(self, records: list[dict]) -> None:
+    def _build_index(self, records: list[dict], covered_symbols: list[str]) -> None:
         self._events = records
+        self._covered_symbols = {
+            code for symbol in covered_symbols if (code := self._normalize_symbol(str(symbol)))
+        }
         self._blacklist_symbols.clear()
         self._warning_symbols.clear()
         for event in records:
@@ -70,10 +74,14 @@ class RegulatoryWatchlist:
             self._error = "canonical regulatory snapshot missing events"
             return False
         status = str(payload.get("status", "OK")).upper()
-        if status not in {"OK", "EMPTY"}:
+        if status not in {"OK", "EMPTY", "PARTIAL"}:
             self._error = f"canonical regulatory snapshot status={status}"
             return False
-        self._build_index(records)
+        covered = payload.get("covered_symbols")
+        if not isinstance(covered, list):
+            self._error = "canonical regulatory snapshot missing covered_symbols"
+            return False
+        self._build_index(records, covered)
         self._loaded = True
         self._error = None
         return True
@@ -85,6 +93,11 @@ class RegulatoryWatchlist:
         if not self._loaded and not self.load_cache():
             return False
         return self._normalize_symbol(symbol) in self._blacklist_symbols
+
+    def covers(self, symbol: str) -> bool:
+        if not self._loaded and not self.load_cache():
+            return False
+        return self._normalize_symbol(symbol) in self._covered_symbols
 
     def has_recent_regulatory_risk(self, symbol: str, days: int = 30) -> bool:
         if not self._loaded and not self.load_cache():
@@ -151,4 +164,5 @@ class RegulatoryWatchlist:
             "n_warning": len(self._warning_symbols),
             "n_notice": sum(1 for event in self._events if event.get("severity") == "notice"),
             "total": len(self._events),
+            "covered_symbols": len(self._covered_symbols),
         }
