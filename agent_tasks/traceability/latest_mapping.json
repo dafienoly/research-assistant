@@ -236,8 +236,19 @@
       ],
       "expected_keywords": ["ALLOWED_NOTIFICATION_HOSTS", "self.sender", "notification transport bypasses"],
       "behavior": "Telegram/企业微信凭据、host allow-list 和 HTTP 发送集中到 transport；VNext/Decision Loop 只创建意图和记录回执，不自行实现网络调用。"
+    },
+    {
+      "id": "INFRA-FACTOR-01",
+      "title": "因子外围统一 DataHub 路径与 Shadow 缺失数据阻断",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_access.py", "function": "daily_kline_path", "line": 34},
+        {"file": "commands/factor_lab/adaptive/shadow_forward.py", "function": "_compute_stock_returns", "line": 474},
+        {"file": "commands/factor_lab/adaptive/shadow_forward.py", "function": "run_daily", "line": 550}
+      ],
+      "expected_keywords": ["daily_kline_path", "incomplete_real_market_returns", "missing_symbols", "BLOCKED"],
+      "behavior": "因子验证和 Standing Shadow 通过 DataHub facade 读取日线；缺少标的或基准真实收益时不再填零，而是阻断并输出 null 指标。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-11T22:35:00+08:00"
+  "generated_at": "2026-07-11T22:48:00+08:00"
 }

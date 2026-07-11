@@ -574,8 +574,9 @@ def load_data() -> pd.DataFrame:
     """Load stock universe and compute factors."""
     from factor_lab.factor_engine import load_stock_kline
     from factor_lab.factor_base import compute_factor, list_factors
+    from factor_lab.datahub_access import daily_kline_root
 
-    kline_dir = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline")
+    kline_dir = daily_kline_root()
     all_syms = sorted([f.stem for f in kline_dir.glob("*.csv")])
 
     # Use first 500 stocks for good cross-section

@@ -12,6 +12,36 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATAHUB_ROOT = Path(os.environ.get("HERMES_DATAHUB_ROOT", PROJECT_ROOT / "data" / "normalized"))
 TRADE_CALENDAR_PATH = DATAHUB_ROOT / "calendar" / "trade_calendar.csv"
+SHARED_DATAHUB_ROOT = Path(
+    os.environ.get("HERMES_SHARED_DATAHUB_ROOT", "/mnt/c/Users/ly/.codex/data/a-share-data-hub")
+)
+
+
+def daily_kline_root() -> Path:
+    candidates = (
+        SHARED_DATAHUB_ROOT / "market" / "daily_kline",
+        PROJECT_ROOT / "data" / "market" / "daily_kline",
+        DATAHUB_ROOT / "market",
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError("canonical DataHub daily kline dataset missing")
+
+
+def daily_kline_path(symbol: str) -> Path:
+    root = daily_kline_root()
+    normalized = symbol.upper()
+    code = normalized.split(".")[0]
+    candidates = (
+        root / f"{normalized}.csv",
+        root / f"{code}.csv",
+        root / f"{code}_daily_kline.csv",
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(f"canonical DataHub daily kline missing for {normalized}")
 
 
 def read_trade_calendar(path: Path | None = None) -> pd.DataFrame:

@@ -76,6 +76,8 @@ raw → staging → normalized → manifest/conflict/freshness
 - 因子发现、评估、OOS、候选、人工晋级、生产版本必须保持单向状态机。
 - 第二个 OOS fold 仍为负，继续禁止生产晋级。
 
+已完成外围整改：`validate_factor` 和 Standing Shadow 不再硬编码共享盘路径，统一通过 DataHub facade 定位日线；Standing Shadow 在任一标的或 CSI300 真实收益缺失时输出 `BLOCKED` 和 null 指标，不再用 `0.0` 伪造有效收益。核心 `factor_engine.load_stock_kline` 因影响 18 个直接调用方和 9 条流程，保留为独立迁移批次。
+
 ## 后续整改顺序
 
 1. 将 VNext snapshot/datasets/event truth 的外部读取迁入 DataHub ingestion。

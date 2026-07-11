@@ -1,9 +1,10 @@
 """Shadow Forward V2.12.0 — 安全审计 + 风控事件 + 决策日志 + 配置快照 + StandingShadowForward 持续运行"""
-import os, json, csv, hashlib
+import csv
+import hashlib
+import json
+import os
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from copy import deepcopy
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -258,7 +259,7 @@ th {{ color:#888; }}
     with open(out_dir / "audit.log", "w") as f:
         f.write(f"=== SHADOW FORWARD AUDIT V2.11.1 ===\n")
         f.write(f"Source: {result['source_dir']}\n")
-        f.write(f"Approved candidates: {len(approved)}\n")
+        f.write(f"Approved candidates: {len(result.get('approved_candidates', []))}\n")
         f.write(f"Shadow only: True\n")
         f.write(f"Auto-apply: False\n")
         f.write(f"Requires human: True\n")
@@ -272,7 +273,6 @@ th {{ color:#888; }}
         f.write(f"=== END ===\n")
 
     # Core framework: MigrationCompat
-    import json as _json, csv as _csv
     from pathlib import Path as _Path
     from factor_lab.core.migration import MigrationCompat as _Compat
     try:
@@ -484,9 +484,7 @@ class StandingShadowForward:
         if not symbols:
             return {}
 
-        KLINE_DIR = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline")
-        if not KLINE_DIR.exists():
-            return {sym: 0.0 for sym in symbols}
+        from factor_lab.datahub_access import daily_kline_path
 
         date_ts = pd.Timestamp(date)
         results = {}
@@ -494,11 +492,7 @@ class StandingShadowForward:
         for sym in symbols:
             try:
                 # 从 "000001.SZ" 提取 "000001"
-                code = sym.replace(".SZ", "").replace(".SH", "").replace(".BJ", "")
-                csv_path = KLINE_DIR / f"{code}.csv"
-                if not csv_path.exists():
-                    results[sym] = 0.0
-                    continue
+                csv_path = daily_kline_path(sym)
 
                 df = pd.read_csv(csv_path)
                 df["date"] = pd.to_datetime(df["date"])
@@ -513,14 +507,12 @@ class StandingShadowForward:
                     prev_close = float(prev_rows.iloc[-1]["close"])
                     ret = (today_close - prev_close) / prev_close if prev_close > 0 else 0.0
                     results[sym] = round(ret, 6)
-                else:
-                    results[sym] = 0.0
             except Exception:
-                results[sym] = 0.0
+                continue
 
         return results
 
-    def _fetch_csi300_return(self, date: str) -> float:
+    def _fetch_csi300_return(self, date: str) -> float | None:
         """获取沪深300在指定日期的日收益率
 
         Returns:
@@ -542,9 +534,9 @@ class StandingShadowForward:
                 match = matches[-1]
                 if abs((date_ts - match).days) <= 3:
                     return float(returns.loc[match])
-            return 0.0
+            return None
         except Exception:
-            return 0.0
+            return None
 
     # ── 核心运行 ────────────────────────────────────────────
 
@@ -585,34 +577,43 @@ class StandingShadowForward:
         stock_returns = self._compute_stock_returns(all_symbols, signal_date)
 
         # 4. 计算策略收益（等权 selected）
-        shadow_ret = 0.0
+        shadow_ret = None
         n_strategy = len(strategy_candidates)
         if n_strategy > 0:
-            valid = [stock_returns.get(s, 0.0) for s in strategy_candidates
-                     if s in stock_returns]
+            valid = [stock_returns[s] for s in strategy_candidates if s in stock_returns]
             if valid:
                 shadow_ret = float(np.mean(valid))
 
         # 5. 计算同池等权收益
-        eq_ret = 0.0
+        eq_ret = None
         n_universe = len(universe)
         if n_universe > 0:
-            valid = [stock_returns.get(s, 0.0) for s in universe
-                     if s in stock_returns]
+            valid = [stock_returns[s] for s in universe if s in stock_returns]
             if valid:
                 eq_ret = float(np.mean(valid))
 
         # 6. 获取沪深300收益
         csi300_ret = self._fetch_csi300_return(signal_date)
 
+        missing_symbols = sorted(set(all_symbols) - set(stock_returns))
+        complete = (
+            shadow_ret is not None
+            and eq_ret is not None
+            and csi300_ret is not None
+            and not missing_symbols
+        )
+
         # 7. 组装结果
         result = {
             "date": signal_date,
-            "shadow_return": round(shadow_ret, 6),
-            "equal_weight_return": round(eq_ret, 6),
-            "csi300_return": round(csi300_ret, 6),
-            "excess_vs_equal": round(shadow_ret - eq_ret, 6),
-            "excess_vs_csi300": round(shadow_ret - csi300_ret, 6),
+            "status": "OK" if complete else "BLOCKED",
+            "blocking_reason": None if complete else "incomplete_real_market_returns",
+            "missing_symbols": missing_symbols,
+            "shadow_return": round(shadow_ret, 6) if complete else None,
+            "equal_weight_return": round(eq_ret, 6) if complete else None,
+            "csi300_return": round(csi300_ret, 6) if complete else None,
+            "excess_vs_equal": round(shadow_ret - eq_ret, 6) if complete else None,
+            "excess_vs_csi300": round(shadow_ret - csi300_ret, 6) if complete else None,
             "n_strategy_stocks": n_strategy,
             "n_universe": n_universe,
             "strategy_name": self.strategy_name,
