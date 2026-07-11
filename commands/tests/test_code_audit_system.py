@@ -1,10 +1,12 @@
 import json
+import os
 import subprocess
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from factor_lab.api_server.main import app
+import factor_lab.api_server.routes_code_audit as code_audit_routes
 from factor_lab.api_server.services.audit_service import AuditService
 from factor_lab.audit.coordinator import AuditCoordinator, AuditRequest
 from factor_lab.audit.storage import AuditStore
@@ -74,9 +76,24 @@ def test_ops_catalog_contains_no_agent_automation():
     assert set(SERVICE_DEFS) == {"dashboard", "mcp", "vite"}
 
 
-def test_code_audit_api_preserves_paths_scope():
+def test_code_audit_api_preserves_paths_scope(monkeypatch):
+    class Report:
+        def __init__(self, request):
+            self.request = request
+
+        def to_dict(self):
+            return {"scope": self.request.scope, "paths": self.request.paths}
+
+    class Coordinator:
+        def run(self, request):
+            return Report(request)
+
+    monkeypatch.setattr(code_audit_routes, "AuditCoordinator", Coordinator)
+    token = os.environ.get("HERMES_UI_TOKEN", "")
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
     response = TestClient(app).post(
         "/api/code-audits/trigger",
+        headers=headers,
         json={
             "profile": "fast",
             "scope": "paths",
@@ -85,3 +102,4 @@ def test_code_audit_api_preserves_paths_scope():
     )
     assert response.status_code == 200
     assert response.json()["data"]["scope"] == "paths"
+    assert response.json()["data"]["paths"] == ["commands/factor_lab/audit/runner.py"]
