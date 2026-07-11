@@ -55,6 +55,31 @@ def test_corporate_ingestion_opens_per_dataset_circuit_and_finishes_manifest(tmp
     assert manifest["results"][-1]["errors"][0]["error"] == "CircuitOpen"
 
 
+def test_corporate_circuit_counts_intermittent_failures_across_empty_successes(tmp_path):
+    class IntermittentClient:
+        def __init__(self):
+            self.forecast_calls = 0
+
+        def _query(self, api_name, **_params):
+            if api_name != "forecast":
+                return pd.DataFrame()
+            self.forecast_calls += 1
+            if self.forecast_calls % 2:
+                raise RuntimeError("flaky upstream")
+            return pd.DataFrame()
+
+    client = IntermittentClient()
+    symbols = [f"68800{index}.SH" for index in range(1, 8)]
+
+    manifest = CorporateEventIngestion(
+        tmp_path, client, circuit_breaker_threshold=3,
+    ).fetch(symbols, "20260701", "20260711")
+
+    assert client.forecast_calls == 5
+    assert manifest["circuits"]["forecast"]["opened_at_symbol"] == "688005.SH"
+    assert "cumulative" in manifest["circuits"]["forecast"]["reason"]
+
+
 def test_semiconductor_engine_reads_canonical_corporate_events(tmp_path, monkeypatch):
     root = tmp_path / "normalized/events/corporate_events"
     root.mkdir(parents=True)

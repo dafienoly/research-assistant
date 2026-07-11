@@ -70,7 +70,6 @@ class CorporateEventIngestion:
                         params.update({"start_date": start_date, "end_date": end_date})
                     frame = client._query(api_name, **params)
                     frame = frame if isinstance(frame, pd.DataFrame) else pd.DataFrame()
-                    failures[dataset] = 0
                     coverage[dataset] = len(frame)
                     rows.extend(self._normalize(frame, symbol, dataset, date_candidates, observed_at, start_date, end_date))
                 except Exception as error:
@@ -81,7 +80,7 @@ class CorporateEventIngestion:
                     if failures[dataset] >= self.circuit_breaker_threshold:
                         circuits[dataset] = {
                             "api_name": api_name,
-                            "reason": f"{failures[dataset]} consecutive {error_name} failures",
+                            "reason": f"{failures[dataset]} cumulative {error_name} failures in this run",
                             "opened_at_symbol": symbol,
                         }
             destination = self.output_root / f"{symbol}.csv"
