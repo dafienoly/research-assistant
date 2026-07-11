@@ -1,8 +1,0 @@
-{
-  "pid": 15347,
-  "status": "orphaned",
-  "agent": "claude_code",
-  "prompt": "Auto execute V7.3: Task Queue/Run History/Logs",
-  "created_at": "2026-07-07T14:01:19.198850+08:00",
-  "orphaned_at": "2026-07-07T14:03:06.998512+08:00"
-}

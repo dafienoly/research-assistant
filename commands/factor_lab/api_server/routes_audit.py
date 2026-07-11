@@ -44,3 +44,13 @@ async def get_audit_by_run(request: Request, run_id: str = Path(..., description
         data={"events": [e.model_dump() for e in events], "total": len(events)},
         request=request,
     )
+
+
+@router.get("/audit/export")
+async def export_audit_events(request: Request, limit: int = Query(1000, ge=1, le=10000)):
+    """Export the operational ledger; code audit reports use /code-audits."""
+    events, total = audit_service.list(limit=limit)
+    return api_success(
+        data={"events": [event.model_dump() for event in events], "total": total},
+        request=request,
+    )

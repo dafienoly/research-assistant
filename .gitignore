@@ -1,5 +1,5 @@
 # 数据文件
-data/market/daily_kline/*.csv
+data/market/
 data/normalized/**/*.csv
 data/fundamentals/*.csv
 data/*.csv
@@ -8,6 +8,17 @@ data/audit/*.json
 data/audit/health/node_modules/**
 data/factor_results.json
 factor_results.json
+data/vnext/
+data/events/
+data/audit/recovery/
+data/universes.json
+artifacts/
+
+# 运行态任务/审计输出不进入 Git；仅保留明确需求追溯映射
+agent_tasks/*
+!agent_tasks/traceability/
+agent_tasks/traceability/*
+!agent_tasks/traceability/latest_mapping.json
 
 # 虚拟环境
 .venv_*/

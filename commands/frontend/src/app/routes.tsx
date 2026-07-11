@@ -15,15 +15,9 @@ import LiveGate from '../pages/LiveGate'
 import Reports from '../pages/Reports'
 import Events from '../pages/Events'
 
-// System pages (accessible via AgentOpsDrawer)
-import AgentConsole from '../pages/AgentConsole'
-import Roadmap from '../pages/Roadmap'
+// System pages
 import OpsCenter from '../pages/OpsCenter'
-import TaskCenter from '../pages/TaskCenter'
-import SessionHistory from '../pages/SessionHistory'
-import Feedback from '../pages/Feedback'
-import Backup from '../pages/Backup'
-import Settings from '../pages/Settings'
+import CodeAudit from '../pages/CodeAudit'
 
 // Legacy / hidden pages (kept for URL compatibility)
 import RiskDashboard from '../pages/RiskDashboard'
@@ -75,15 +69,9 @@ const routes: RouteObject[] = [
       { path: 'reports', element: <Reports /> },
       { path: 'events', element: <Events /> },
 
-      // System pages (AgentOpsDrawer)
-      { path: 'console', element: <AgentConsole /> },
-      { path: 'roadmap', element: <Roadmap /> },
+      // System pages
       { path: 'ops', element: <OpsCenter /> },
-      { path: 'tasks', element: <TaskCenter /> },
-      { path: 'history', element: <SessionHistory /> },
-      { path: 'feedback', element: <Feedback /> },
-      { path: 'backup', element: <Backup /> },
-      { path: 'settings', element: <Settings /> },
+      { path: 'code-audit', element: <CodeAudit /> },
 
       // Legacy routes
       { path: 'risk', element: <RiskDashboard /> },

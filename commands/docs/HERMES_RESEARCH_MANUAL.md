@@ -18,7 +18,7 @@ Hermes A股投研系统是一个面向 A 股量化交易的**全栈投研平台*
 | **回测层** | Walk-Forward、分位数回测、正交性检验 | `backtest:factor-top` / `backtest:walk-forward` |
 | **决策层** | 盘前信号、ETF 选择器、持仓权重、调仓指令 | `factor:daily-premarket` / `factor:order-preview` |
 | **执行层** | QMT 委托、Paper Trading、风控审批、Kill Switch | `broker:qmt-*` / `factor:paper-trade` |
-| **自开发层** | 固定路线图自动开发、Agent 工作循环、版本推进 | `leader:auto-run-once` / `auto_executor.py` |
+| **辅助系统** | 本地运维、快速/完整/安全代码审计 | `leader:ops-*` / `audit:code` |
 
 <!-- SKILLS_COUNT_START -->
 （共 126 个 skill）
@@ -43,7 +43,6 @@ Hermes A股投研系统是一个面向 A 股量化交易的**全栈投研平台*
 | `ashare-data-pipeline` | data-science | 设计并实施 A 股数据源的周期性刷新管线——分层策略(日增量/周维护/季度全量)、Tushare API 优化(按 tr... |
 | `ashare-package-publisher` | a-share-research | A 股数据包发布与发布后完整性验证 — 发布流程、原子写入协议、手动/脚本化验证方法。基于 a-share-packag... |
 | `audiocraft` | — | AudioCraft: MusicGen text-to-music, AudioGen text-to-sound. |
-| `auto-development-orchestration` | — | (no description) |
 | `backtest-engine` | — | Design, implement, and review trading strategy backtests wit... |
 | `baoyu-infographic` | — | Infographics: 21 layouts x 21 styles (信息图, 可视化). |
 | `blogwatcher` | — | Monitor blogs and RSS/Atom feeds via blogwatcher-cli tool. |
@@ -57,6 +56,7 @@ Hermes A股投研系统是一个面向 A 股量化交易的**全栈投研平台*
 | `cron-pipeline-manager` | — | (no description) |
 | `daily-review-report` | quant-ops | Build daily/periodic review reports that aggregate live stat... |
 | `data-provider-authoring` | — | (no description) |
+| `datahub-pipeline-engineering` | — | 全A金融数据管线设计、批量拉取优化、fsync 持久化保障、cron 自动化编排 |
 | `datahub-pipeline` | — | A 股数据管线全生命周期管理：按交易日全量初始化、每日增量更新、每周维护、CSV 持久层设计、Tushare API 限... |
 | `design-md` | — | Architectural minimalism meets journalistic gravitas. |
 | `dogfood` | — | Exploratory QA of web apps: find bugs, evidence, reports. |
@@ -83,16 +83,12 @@ Hermes A股投研系统是一个面向 A 股量化交易的**全栈投研平台*
 | `hermes-agent-skill-authoring` | — | Use when <trigger>. <one-line behavior>. |
 | `hermes-agent` | — | Configure, extend, or contribute to Hermes Agent. |
 | `hermes-daemon` | — | Deploy and maintain Hermes gateway as a reliable background ... |
-| `hermes-frontend-dashboard` | — | Build React+Vite dashboard pages for Hermes auto-version-sys... |
-| `hermes-leader-workloop` | — | Use when working with the Hermes-Leader auto-task-loop: cons... |
 | `himalaya` | — | Himalaya CLI: IMAP/SMTP email from terminal. |
 | `huggingface-hub` | — | HuggingFace hf CLI: search/download/upload models, datasets. |
 | `humanizer` | — | Humanize text: strip AI-isms and add real voice. |
 | `imessage` | — | Send and receive iMessages/SMS via the imsg CLI on macOS. |
 | `interactive-web-ui` | — | Build interactive web UIs with SSE streaming, answer/diagnos... |
 | `jupyter-live-kernel` | — | Iterative Python via live Jupyter kernel (hamelnb). |
-| `leader-driven-automation` | — | Fixed-roadmap continuous auto-development pipeline. Hermes d... |
-| `leader-workloop` | — | Hermes ↔ Leader 自治工作循环 — 自动派发、可插拔后端执行、完成信号、GitHub 同步 |
 | `llama-cpp` | — | llama.cpp local GGUF inference + HF Hub model discovery. |
 | `llm-wiki` | — | Karpathy's LLM Wiki: build/query interlinked markdown KB. |
 | `lm-evaluation-harness` | — | lm-eval-harness: benchmark LLMs (MMLU, GSM8K, etc.). |
@@ -120,6 +116,11 @@ Hermes A股投研系统是一个面向 A 股量化交易的**全栈投研平台*
 | `powerpoint` | — | Create, read, edit .pptx decks, slides, notes, templates. |
 | `pretext` | — | Use when building creative browser demos with @chenglou/pret... |
 | `python-debugpy` | — | Debug Python: pdb REPL + debugpy remote (DAP). |
+| `qmt-bridge-integration` | broker | Connect Hermes (WSL/Linux) to QMT (Windows) via HTTP bridge ... |
+| `qmt-bridge-setup` | — | Use when configuring, debugging, or extending the QMT Bridge... |
+| `qmt-bridge` | infrastructure | QMT Bridge 配置 — Windows QMT Bridge HTTP 服务搭建、Python 版本兼容、xtq... |
+| `qmt-data-bridge` | mlops/data | | |
+| `qmt-trading-infrastructure` | broker | QMT Bridge 部署、配置、Python 兼容性处理、交易数据回退方案。覆盖桥接进程架构、环境变量管理、双 Pyt... |
 | `quant-kb` | — | Compact quantitative finance knowledge base for strategies, ... |
 | `quant-maturity-audit` | quality | 四层量化成熟度模型 — 评估量化交易系统从"野鸡量化"到"生产级量化"的完整成熟度审计方法论。包含分层判断标准、模块级缺... |
 | `react-component-optimization` | software-development | Systematic optimization patterns for React/TypeScript page c... |
@@ -138,7 +139,6 @@ Hermes A股投研系统是一个面向 A 股量化交易的**全栈投研平台*
 | `strategy-lab` | a-share-research | 策略说明 |
 | `subagent-output-verification` | — | Verify subagent (delegate_task) outputs are real data, not h... |
 | `system-architecture-review` | — | Systematic architecture benchmarking — clone benchmark repo,... |
-| `system-audit` | — | Systematic self-audit of the auto version advancement + A-sh... |
 | `systematic-debugging` | — | 4-phase root cause debugging: understand bugs before fixing. |
 | `teams-meeting-pipeline` | — | Operate the Teams meeting summary pipeline via Hermes CLI — ... |
 | `test-driven-development` | — | TDD: enforce RED-GREEN-REFACTOR, tests before code. |
@@ -149,7 +149,7 @@ Hermes A股投研系统是一个面向 A 股量化交易的**全栈投研平台*
 | `v5-ui-optimizer` | — | (no description) |
 | `vllm` | — | vLLM: high-throughput LLM serving, OpenAI API, quantization. |
 | `weights-and-biases` | — | W&B: log ML experiments, sweeps, model registry, dashboards. |
-| `workloop-automation` | — | Agent-Leader automatic workloop: lock → dispatch → consume →... |
+| `wsl-data-persistence` | — | WSL ext4 文件系统在系统崩溃/内存压力下可能丢失未落盘数据。本 skill 定义了 CSV/文件写入的 fsyn... |
 | `xurl` | — | X/Twitter via xurl CLI: post, search, DM, media, v2 API. |
 | `youtube-content` | — | YouTube transcripts to summaries, threads, blogs. |
 | `yuanbao` | — | Yuanbao (元宝) groups: @mention users, query info/members. |
@@ -159,86 +159,17 @@ Hermes A股投研系统是一个面向 A 股量化交易的**全栈投研平台*
 
 ## 二、项目结构
 
-```
-research-assistant/
-├── commands/                          # 主要代码目录
-│   ├── hermes_cli.py                  # CLI 入口（~200 个命令）
-│   ├── config.py                      # 全局配置：路径、常量
-│   ├── leader_commands.py             # leader: 命令实现
-│   ├── factor_commands.py             # factor: 命令实现
-│   ├── rsscast_mcp.py                 # DataHub 数据管线
-│   ├── factor_lab/                    # 因子实验室
-│   │   ├── leader/                    # 自动开发管线
-│   │   │   ├── roadmap.py             # 固定路线图
-│   │   │   ├── roadmap_cursor.py      # 版本游标
-│   │   │   ├── auto_executor.py       # 自动执行器主循环
-│   │   │   ├── task_intake.py         # 任务入口
-│   │   │   ├── agent_runner.py        # Agent 后端执行器
-│   │   │   ├── workloop.py            # 锁 + 完成信号 + 派发
-│   │   │   ├── audit_push.py          # ADR-022 审计门禁
-│   │   │   ├── acceptance.py          # 验收门禁
-│   │   │   ├── version_detail.py      # 版本完成详情
-│   │   │   ├── version_report.py      # 版本报告
-│   │   │   └── version_notify.py      # 版本通知
-│   │   ├── audit/                     # 反偷工减料审计（4 闸门）
-│   │   │   ├── git_utils.py           # 共享 git 工具
-│   │   │   ├── base.py                # AuditFinding/AuditReport
-│   │   │   ├── gate1_traceability.py  # 需求→代码追溯
-│   │   │   ├── gate2_stub_detect.py   # 虚假实现检测
-│   │   │   ├── gate3_test_coverage.py # 测试覆盖检查
-│   │   │   ├── gate4_independent_review.py # 独立需求审计
-│   │   │   └── runner.py              # 统一调度 + CLI
-│   │   ├── alpha/                     # Alpha Factory (V3.x)
-│   │   ├── api_server/                # FastAPI 后端 (:8766)
-│   │   ├── agent_console/             # Agent Console 会话管理
-│   │   ├── factor_mining/             # 因子挖掘引擎
-│   │   ├── research_loop/             # 6 阶段自动研究循环
-│   │   ├── research_skill/            # 投研 Skill 运行时
-│   │   ├── sector_rotation/           # 板块轮动
-│   │   ├── etf/                       # ETF 分析
-│   │   └── ...                        # 30+ 子模块
-│   ├── dive_prediction/               # ETF 跳水预测（XGBoost）
-│   ├── tests/                         # pytest 测试（41+ 个测试文件）
-│   ├── frontend/                      # React + Vite 前端
-│   │   └── src/pages/                 # Dashboard / Agent Console / 路线图 / 报告
-│   ├── scripts/                       # 运维脚本
-│   │   ├── pre-push.sh                # push 前审计 hook
-│   │   ├── pre-commit.sh              # commit 前语法检查
-│   │   ├── crontab/                   # 定时任务
-│   │   └── windows/                   # Windows QMT 桥接
-│   └── strategy_lab/                  # 策略实验室
-├── data/                              # 数据存储
-│   ├── market/                        # 行情数据
-│   ├── fundamentals/                  # 基本面数据
-│   ├── features/                      # 因子数据
-│   ├── etf/                           # ETF 数据
-│   ├── intraday/                      # 盘中快照
-│   ├── positions/                     # 持仓数据
-│   ├── events/                        # 事件数据
-│   └── exports/                       # 导出数据
-├── strategies/                        # 策略仓库
-│   ├── active/                        # 活跃策略
-│   ├── candidates/                    # 候选策略
-│   ├── archived/                      # 归档策略
-│   └── templates/                     # 策略模板
-├── research_outputs/                  # 研究输出
-│   ├── backtests/                     # 回测报告
-│   ├── factor_ic/                     # IC 分析
-│   ├── strategy_mining/               # 策略挖掘
-│   └── strategy_review_material/      # 评审材料
-├── docs/                              # 文档
-│   ├── adr/                           # 架构决策记录
-│   └── gitnexus-wiki/                 # GitNexus 知识图谱
-├── agent_tasks/                       # 自动开发任务状态
-│   ├── audit_reports/                 # 审计报告
-│   ├── agent_logs/                    # Agent 日志
-│   └── archive/                       # 归档
-├── .hermes/                           # Hermes 配置
-│   └── plans/                         # 实施计划（plan.md）
-└── .venv_quant/                       # Python 虚拟环境
+```text
+commands/
+├── factor_lab/vnext/       VNext 投研主链
+├── factor_lab/audit/       代码审计模型、检查、协调与存储
+├── factor_lab/leader/      本地运维
+├── factor_lab/api_server/  FastAPI API
+├── frontend/                 React UI
+└── scripts/                  数据与运维脚本
 ```
 
----
+Agent 自动版本推进、通用任务队列和会话控制台已经退役。运行态写入 `~/.hermes/state/research-assistant/`。
 
 ## 三、CLI 命令全表
 
@@ -369,28 +300,18 @@ research-assistant/
 | `research:loop [--rounds 5]` | 自动因子研究循环 |
 | `research:mcp [--port 8767]` | 启动 MCP 工具服务器 |
 
-### 投资系统管理 (leader:*)
+### 系统运维与代码审计
 
 | 命令 | 说明 |
 |------|------|
-| `leader:automation-status` | 后台自动工作流健康检查 |
-| `leader:roadmap-status` | 路线图进度 |
-| `leader:auto-run-once` | 自动执行器：读取 cursor，执行当前版本 |
-| `leader:auto-status` | 自动执行器详细状态 |
-| `leader:dashboard [--port 8766]` | 启动 Dashboard + Agent Console |
-| `leader:dashboard-json` | 输出 dashboard 状态 JSON |
-| `leader:audit-and-push [--version] [--mode]` | ADR-022 审计 + git push |
-| **`leader:anti-cheat-audit [--skip gate4]`** | **反偷工减料审计（4 闸门）** |
-| `leader:lock-status` | 任务锁状态 |
-| `leader:task-list` | 待办任务 |
-| `leader:task-submit --text --title` | 提交新任务 |
-| `leader:version-report` | 版本开发报告 |
-| `leader:backup-list` | 备份列表 |
-| `leader:recover --backup-id` | 恢复版本状态 |
-| `leader:inspect` | 只读检查 |
-| `leader:dispatch [--dry-run]` | 按路线图生成任务包 |
-| `leader:accept [--full-tests]` | 自动验收 |
-| `leader:github-sync` | 版本完成→提交→推送 |
+| `leader:dashboard` | 启动 Dashboard API |
+| `leader:ops-health` | 服务健康概览 |
+| `leader:ops-diagnostics` | 系统诊断 |
+| `leader:ops-backup` | 配置与日志备份 |
+| `audit:code --profile fast` | 编辑时确定性检查 |
+| `audit:code --profile full` | 影响分析、受影响测试和 API 冒烟 |
+| `audit:code --profile security` | 完整检查加 Semgrep 安全规则 |
+| `leader:anti-cheat-audit` | 一个发布周期内的弃用兼容别名 |
 
 ### 后台任务
 
@@ -459,120 +380,23 @@ hermes factor:paper-trade --date YYYY-MM-DD --plan B
 hermes factor:paper-review --start YYYY-MM-DD --end YYYY-MM-DD
 ```
 
-### 4.4 自动版本开发 (Auto-Development)
+### 4.4 工程质量流程
 
-系统按固定路线图自动推进版本（由 `auto_executor.py` 驱动）：
-
-```bash
-# 查看版本进度
-hermes leader:roadmap-status
-hermes leader:auto-status
-
-# 手动触发一次版本推进
-hermes leader:auto-run-once
-
-# 启动 Dashboard
-hermes leader:dashboard
+```text
+编辑 Python → fast（目标 10 秒内）
+里程碑/pre-push → full（GitNexus + 受影响测试 + API 冒烟）
+CI → security（full + Semgrep）
 ```
 
-每个版本的自动流程：
-1. Task Intake → 读取路线图 cursor
-2. Backend Policy → 选择编码后端
-3. Agent Runner → Claude Code 开发
-4. Test → pytest 验证
-5. **ADR-022 审计** → `leader:audit-and-push`
-6. **Anti-Cheat 审计** → `leader:anti-cheat-audit`（4 闸门）
-7. Advance → 推进 cursor 到下一版本
+审计按变更集哈希去重，只终止自身进程组；报告存储在 `~/.hermes/state/research-assistant/code-audits/`。LLM 语义审查是非阻断建议。
 
-### 4.5 交互式开发（无 plan 文件）
+## 五、代码审计系统
 
-在日常对话中发开发需求时：
-
-```
-你: "帮我实现因子排序功能，按 IC 值降序"
-Agent 会:
-  1. 内部生成需求清单
-  2. 开始实现
-  3. 实现完毕 → 自动运行 anti-cheat 4 闸门
-  4. 有 FAIL → 先修再报告完成
-  5. 全部通过 → "已完成 ✅"
-```
-
-如需手动触发审计：
-
-```bash
-hermes leader:anti-cheat-audit --skip gate4
-```
-
-### 4.6 质量控制流程
-
-```
-开发完成
-    ↓
-requesting-code-review ← 独立 reviewer 审查 git diff
-    ↓
-leader:audit-and-push  ← ADR-022 语法/安全/进程检查
-    ↓
-leader:anti-cheat-audit ← 4 闸门：需求追溯/stub/测试/独立审计
-    ↓
-pytest                  ← 全量测试
-    ↓
-git push (pre-push hook 触发以上全部)
-```
-
----
-
-## 五、反偷工减料审计系统 (Anti-Cheat Audit)
-
-### 5.1 4 道闸门
-
-| 闸门 | 检测什么 | 技术手段 | 触发方式 |
-|------|---------|---------|---------|
-| **Gate 1** 需求→代码追溯 | plan 中的文件/函数是否真实存在 | Plan Markdown 解析 + git diff + 文件系统 | auto/CLI/pre-push |
-| **Gate 2** 虚假实现检测 | pass/硬编码/return 常量/圈复杂度极低 | AST + radon + semgrep | auto/CLI/pre-push |
-| **Gate 3** 测试覆盖检查 | 新代码是否有对应新测试 | AST 函数扫描 + pytest-cov | auto/CLI/pre-push |
-| **Gate 4** 独立需求审计 | 第三方视角审查需求 vs 实现 | delegate_task + 规则引擎 | 仅 Agent 模式 |
-
-### 5.2 使用方式
-
-**方式 A: 自动（推荐）**
-- auto_executor 在 version advance 前自动跑
-- git push 时 pre-push hook 自动跑
-- Agent 完成开发后自动跑
-
-**方式 B: 手动 CLI**
-```bash
-hermes leader:anti-cheat-audit                    # 完整 3 闸门
-hermes leader:anti-cheat-audit --skip gate2       # 跳过某闸门
-hermes leader:anti-cheat-audit --version V3.1     # 指定版本
-hermes leader:anti-cheat-audit --json             # JSON 输出
-```
-
-**方式 C: 阅读审计报告**
-```bash
-cat /home/ly/.hermes/research-assistant/agent_tasks/audit_reports/anti_cheat_latest.json
-```
-
-### 5.3 审计报告示例
-
-```
-═══ Anti-Cheat Audit Report ═══
-Version: V3.1
-Status:  ❌ FAIL
-Gates:   gate1, gate2, gate3
-
-  Gate 1 — 需求→代码追溯: 1 pass | 0 fail | 1 warn
-  Gate 2 — 虚假实现检测: 1 pass | 0 fail | 3 warn
-  Gate 3 — 测试覆盖检查: 1 pass | 6 fail | 0 warn
-
-❌ FAIL Items:
-  ❌ [gate3/NO_TEST_FILE] commands/foo.py — 没有对应测试文件
-  ❌ [gate3/NO_TEST_FILE] commands/bar.py — 没有对应测试文件
-⚠️ WARN Items:
-  ⚠️ [gate2/STUB_TOO_SIMPLE] commands/bar.py:42 — 函数名暗示复杂逻辑但仅 1 条语句
-```
-
----
+- `AuditRequest` 明确 profile、scope、base ref、paths 和触发来源。
+- `AuditFinding` 包含稳定指纹、置信度、阻断属性和证据。
+- `AuditRun` 记录状态、各检查耗时、变更集与运行产物。
+- `/api/code-audits/runs` 查询运行，`/api/code-audits/trigger` 仅允许本机触发。
+- 运维事件审计独立使用 `/api/audit/events`，以追加式哈希链保存。
 
 ## 六、配套 Skill 使用指引
 
@@ -582,14 +406,11 @@ Gates:   gate1, gate2, gate3
 | `a-share-data-collector` | A 股 L0 数据采集 | Agent 自动按策略调用 |
 | `a-share-data-quality` | 数据质量审计 | Agent 自动按策略调用 |
 | `a-share-intraday-monitor` | 盘中实时监测 | Agent 自动按策略调用 |
-| `anti-cheat-audit` | 开发完成后防偷工减料 | `hermes leader:anti-cheat-audit` |
-| `auto-development-orchestration` | 了解自动开发架构 | `load skill auto-development-orchestration` |
 | `etf-dive-warning` | ETF 跳水风险预警 | Agent 自动盘前/盘中运行 |
 | `factor-lab` | 因子挖掘、IC 分析 | `factor:mine` / `factor:validate` |
 | `factor-mining` | 50+ 因子计算、盘前信号 | `factor:list` / `factor:signal` |
 | `hermes-agent` | 配置 Hermes Agent 自身 | `hermes config set ...` |
 | `hermes-daemon` | WSL 守护进程管理 | `bash ~/.hermes/hermes-daemon.sh start` |
-| `leader-driven-automation` | 系统按路线图自动开发 | `hermes leader:auto-run-once` |
 | `mx-data` | 东方财富数据查询 | `mx:data <问句>` |
 | `mx-search` | 资讯搜索（公告/新闻/研报） | `mx:search <关键词>` |
 | `mx-xuangu` | 智能选股（自然语言条件） | `mx:xuangu <条件>` |
@@ -600,10 +421,8 @@ Gates:   gate1, gate2, gate3
 | `spike` | 需要快速验证技术方案 | `/spike "验证 jqdata 的 K 线接口"` |
 | `stock-analyst` | 个股全维度分析 | `stock:context` + Agent 自动调用 |
 | `subagent-output-verification` | delegate_task 完成 | Agent 自动验证子任务输出 |
-| `system-audit` | 需要全面检查系统健康 | `run full audit`（7 Phase） |
 | `systematic-debugging` | 根因分析复杂 Bug | Agent 自动按 4 阶段排查 |
 | `test-driven-development` | 新功能的开发过程 | Agent 自动遵守 RED-GREEN-REFACTOR |
-| `workloop-automation` | 需要派发任务给 Agent | `leader:dispatch` |
 <!-- USAGE_GUIDE_END -->
 
 ---
@@ -622,7 +441,7 @@ Gates:   gate1, gate2, gate3
 | 数据盘 | `/mnt/d/HermesReports/` |
 | 守护进程 | `~/.hermes/hermes-daemon.sh` (tmux 3 窗口) |
 | 任务状态 | `agent_tasks/latest.json` (Hermes cron 驱动) |
-| 版本游标 | `agent_tasks/roadmap_cursor.json` |
+| 代码审计状态 | `~/.hermes/state/research-assistant/code-audits/` |
 | 测试命令 | `cd commands && .venv_quant/bin/python3 -m pytest ...` |
 | 数据发布 | `ashare-package-publisher` skill（原子写入） |
 

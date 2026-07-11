@@ -186,17 +186,7 @@ print(json.dumps(r, ensure_ascii=False))
 # ============================================================
 GET_ENDPOINTS=(
     "/api/health"
-    "/api/version"
     "/api/status"
-    "/api/agent-output"
-    "/api/roadmap"
-    "/api/roadmap/versions"
-    "/api/agent-console/adapters"
-    "/api/agent-console/sessions"
-    "/api/versions/report/detail"
-    "/api/agent-console/backups"
-    "/api/backups"
-    "/api/versions/report"
     "/api/data/health"
     "/api/data/sources"
     "/api/data/overview"
@@ -207,9 +197,6 @@ GET_ENDPOINTS=(
     "/api/reports/health"
     "/api/reports/summary"
     "/api/reports"
-    "/api/reports/backtest"
-    "/api/reports/strategy"
-    "/api/reports/version"
     "/api/reports/recent"
     "/api/risk/overview"
     "/api/risk/alerts"
@@ -222,13 +209,12 @@ GET_ENDPOINTS=(
     "/api/paper/fills"
     "/api/paper/status"
     "/api/shadow/status"
-    "/api/feedback/stats"
-    "/api/feedback"
     "/api/ops/health"
     "/api/ops/diagnostics"
     "/api/ops/ports"
-    "/api/jobs"
     "/api/audit/events"
+    "/api/audit/export"
+    "/api/code-audits/runs"
     "/api/universe"
     "/api/benchmarks"
     "/api/factors"
@@ -247,15 +233,11 @@ GET_ENDPOINTS=(
 
 # All POST endpoints with payloads
 declare -A POST_PAYLOADS
-POST_PAYLOADS["/api/jobs"]='{"name":"test","job_type":"generic","params":{}}'
 POST_PAYLOADS["/api/backtests/run"]='{"strategy":"t","universe":"hs300"}'
 POST_PAYLOADS["/api/portfolio/recommendation/run"]='{"strategy":"multi_factor"}'
 POST_PAYLOADS["/api/live-readiness/run"]='{"mode":"quick"}'
 POST_PAYLOADS["/api/benchmarks/build"]='{"name":"test_bm","constituents":[]}'
 POST_PAYLOADS["/api/factors/validate"]='{"expression":"c>o","name":"t"}'
-POST_PAYLOADS["/api/feedback"]='{"title":"t","content":"c","category":"other"}'
-POST_PAYLOADS["/api/backups"]=""
-POST_PAYLOADS["/api/auto-run"]=""
 POST_PAYLOADS["/api/ops/backup"]=""
 POST_PAYLOADS["/api/paper/reset"]=""
 

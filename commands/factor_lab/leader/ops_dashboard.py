@@ -3,12 +3,7 @@
 提供本地服务健康检查、一键启停、备份、诊断等运维能力。
 所有操作仅限本地，不涉及远程部署。
 
-Services (SERVICE_DEFS):
-  - dashboard: FastAPI API server (port 8766)
-  - auto-loop: 自动版本推进循环 (PID file)
-  - agent-runner: cron 版自动执行器
-  - mcp: MCP 工具服务器 (port 8767)
-  - vite: Vite 前端开发服务器 (port 5173)
+Services (SERVICE_DEFS): dashboard, mcp, vite.
 
 Usage:
   from factor_lab.leader.ops_dashboard import OpsManager
@@ -66,31 +61,7 @@ SERVICE_DEFS = {
         "health_url": "http://127.0.0.1:8766/api/status",
         "depends_on": [],
         "env": {},
-    },
-    "auto-loop": {
-        "name": "Auto Version Loop",
-        "name_zh": "自动版本循环",
-        "port": None,
-        "pid_file": str(LOGS_DIR / "hermes-auto-loop.pid"),
-        "log_file": str(LOGS_DIR / "hermes-auto-loop.log"),
-        "command": [
-            "bash", str(BASE_DIR / "scripts" / "hermes_auto_loop_daemon.sh"),
-        ],
-        "health_url": None,
-        "depends_on": [],
-        "env": {},
-    },
-    "agent-runner": {
-        "name": "Agent Runner (cron)",
-        "name_zh": "代理执行器",
-        "port": None,
-        "pid_file": None,
-        "log_file": "/tmp/hermes_agent_runner.log",
-        "command": None,
-        "health_url": None,
-        "depends_on": [],
-        "env": {},
-        "cron_check": True,
+        "required": True,
     },
     "mcp": {
         "name": "MCP Server",
@@ -104,6 +75,7 @@ SERVICE_DEFS = {
         "health_url": "http://127.0.0.1:8767/health",
         "depends_on": [],
         "env": {},
+        "required": False,
     },
     "vite": {
         "name": "Vite Dev Server",
@@ -115,6 +87,7 @@ SERVICE_DEFS = {
         "health_url": None,
         "depends_on": [],
         "env": {},
+        "required": False,
     },
 }
 
@@ -142,7 +115,12 @@ def _check_port(port: Optional[int]) -> dict:
                     "pid": conn.pid,
                     "process_name": proc.name() if proc else None,
                 }
-    except ImportError:
+    except (ImportError, OSError):
+        pass
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.25):
+            return {"port": port, "in_use": True, "pid": None, "process_name": "listener"}
+    except OSError:
         pass
     return {"port": port, "in_use": False, "pid": None, "process_name": None}
 
@@ -170,7 +148,7 @@ def _check_cron_job() -> dict:
             capture_output=True, text=True, timeout=10,
         )
         if result.returncode == 0:
-            found = "hermes" in result.stdout.lower() or "agent_runner" in result.stdout.lower()
+            found = "hermes" in result.stdout.lower()
             return {"registered": found, "cron_output": result.stdout[:500]}
         return {"registered": False, "error": result.stderr[:200]}
     except Exception as e:
@@ -270,12 +248,12 @@ class OpsManager:
     def health(self) -> dict:
         """返回所有服务的健康状态概览"""
         services = {}
-        all_running = True
+        required_running = True
         for sid, sdef in self._service_defs.items():
             status = self.service_status(sid)
             services[sid] = status
-            if not status.get("running", False):
-                all_running = False
+            if sdef.get("required", False) and not status.get("running", False):
+                required_running = False
 
         port_map = {}
         for sid, sdef in self._service_defs.items():
@@ -286,8 +264,8 @@ class OpsManager:
 
         return {
             "timestamp": _now_str(),
-            "overall": "healthy" if all_running else "degraded",
-            "all_running": all_running,
+            "overall": "healthy" if required_running else "degraded",
+            "all_running": required_running,
             "n_services": len(services),
             "n_running": sum(1 for s in services.values() if s.get("running", False)),
             "services": services,
@@ -332,6 +310,7 @@ class OpsManager:
             "name": sdef["name"],
             "name_zh": sdef["name_zh"],
             "port": sdef["port"],
+            "required": sdef.get("required", False),
             "running": running,
             "detected_by": source,
             "pid_status": pid_status,
@@ -445,6 +424,7 @@ class OpsManager:
             }
 
         killed = []
+        killed_pids: set[int] = set()
 
         # 方式1: kill 进程 (通过 PID 文件)
         pid_status = status.get("pid_status", {})
@@ -453,34 +433,19 @@ class OpsManager:
             try:
                 os.kill(pid, signal.SIGTERM)
                 killed.append(f"PID {pid} (SIGTERM)")
+                killed_pids.add(pid)
             except (OSError, ProcessLookupError):
                 pass
 
         # 方式2: kill 进程 (通过端口)
         port_status = status.get("port_status", {})
-        if port_status and port_status.get("pid") and port_status["pid"] not in [p.get("pid") for p in killed if hasattr(p, 'get')]:
+        if port_status and port_status.get("pid") and port_status["pid"] not in killed_pids:
             pid = port_status["pid"]
             try:
                 os.kill(pid, signal.SIGTERM)
                 killed.append(f"PID {pid} (port {port_status['port']})")
+                killed_pids.add(pid)
             except (OSError, ProcessLookupError):
-                pass
-
-        # 方式3: pkill 作为 fallback
-        pkill_patterns = {
-            "dashboard": ["leader:dashboard", "api_server.main"],
-            "auto-loop": ["auto_loop_daemon", "auto-loop"],
-            "mcp": ["research:mcp"],
-        }
-        pattern_list = pkill_patterns.get(service_id, [service_id])
-        for pat in pattern_list:
-            try:
-                subprocess.run(
-                    ["pkill", "-f", pat],
-                    capture_output=True, timeout=5,
-                )
-                killed.append(f"pkill -f '{pat}'")
-            except Exception:
                 pass
 
         return {
@@ -506,22 +471,10 @@ class OpsManager:
     # ── Backup ──
 
     def backup(self) -> dict:
-        """触发一键备份: 状态备份 + 版本备份"""
+        """备份当前运维配置与服务日志。"""
         results = {}
 
-        # 1. Roadmap 状态备份
-        try:
-            from factor_lab.leader.roadmap_backup import auto_backup
-            b = auto_backup()
-            results["roadmap_backup"] = {
-                "success": True,
-                "backup_id": b.get("backup_id", "unknown"),
-                "path": str(b.get("path", "")),
-            }
-        except Exception as e:
-            results["roadmap_backup"] = {"success": False, "error": str(e)}
-
-        # 2. 配置文件备份
+        # 1. 配置文件备份
         try:
             config_backup_dir = LOGS_DIR / "config_backups"
             config_backup_dir.mkdir(parents=True, exist_ok=True)
@@ -544,7 +497,7 @@ class OpsManager:
         except Exception as e:
             results["config_backup"] = {"success": False, "error": str(e)}
 
-        # 3. 备份日志轮转 (简单截断复制)
+        # 2. 备份日志轮转
         try:
             log_backup_dir = LOGS_DIR / "log_backups"
             log_backup_dir.mkdir(parents=True, exist_ok=True)

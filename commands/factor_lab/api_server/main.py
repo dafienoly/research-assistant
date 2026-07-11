@@ -40,24 +40,20 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_500_INTERNAL_SERVER_ERROR
 
 # ──────────────────────────────────────────────
-# 旧路由（保持兼容）
+# 核心路由
 # ──────────────────────────────────────────────
 from factor_lab.api_server.routes_status import router as status_router
-from factor_lab.api_server.routes_roadmap import router as roadmap_router
-from factor_lab.api_server.routes_console import router as console_router
-from factor_lab.api_server.routes_backup import router as backup_router
 from factor_lab.api_server.routes_data import router as data_router
 from factor_lab.api_server.routes_reports import router as reports_router
 from factor_lab.api_server.routes_risk import router as risk_router
 from factor_lab.api_server.routes_paper import router as paper_router
-from factor_lab.api_server.routes_feedback import router as feedback_router
 from factor_lab.api_server.routes_ops import router as ops_router
 
 # ──────────────────────────────────────────────
 # 新路由 (V5.0)
 # ──────────────────────────────────────────────
-from factor_lab.api_server.routes_jobs import router as jobs_router
 from factor_lab.api_server.routes_audit import router as audit_router
+from factor_lab.api_server.routes_code_audit import router as code_audit_router
 from factor_lab.api_server.routes_universe import router as universe_router
 from factor_lab.api_server.routes_benchmark import router as benchmark_router
 from factor_lab.api_server.routes_factor import router as factor_router
@@ -339,21 +335,17 @@ app.add_middleware(
     expose_headers=["X-Run-Id", "X-Response-Time-Ms"],
 )
 
-# ── 旧路由（保持兼容） ────────────────────────
+# ── 核心路由 ─────────────────────────────────
 app.include_router(status_router, prefix="/api")
-app.include_router(roadmap_router, prefix="/api")
-app.include_router(console_router, prefix="/api")
-app.include_router(backup_router, prefix="/api")
 app.include_router(data_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
 app.include_router(risk_router, prefix="/api")
 app.include_router(paper_router, prefix="/api")
-app.include_router(feedback_router, prefix="/api")
 app.include_router(ops_router, prefix="/api")
 
 # ── 新路由 (V5.0) ─────────────────────────────
-app.include_router(jobs_router, prefix="/api")
 app.include_router(audit_router, prefix="/api")
+app.include_router(code_audit_router, prefix="/api")
 app.include_router(universe_router, prefix="/api")
 app.include_router(benchmark_router, prefix="/api")
 app.include_router(factor_router, prefix="/api")
@@ -387,6 +379,17 @@ async def health_check(request: Request):
             "version": "5.0.0",
             "timestamp": datetime.now(CST).isoformat(),
         },
+        request=request,
+    )
+
+
+@app.api_route("/api/{missing_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], include_in_schema=False)
+async def api_not_found(missing_path: str, request: Request):
+    """Keep removed and unknown API paths out of the SPA/static mount."""
+    return api_error(
+        code="NOT_FOUND",
+        message=f"路径不存在: /api/{missing_path}",
+        status_code=404,
         request=request,
     )
 

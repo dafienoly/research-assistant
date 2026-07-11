@@ -179,21 +179,9 @@ python3 hermes_cli.py <命令> [参数]
 | `wechat:test` | 测试 webhook |
 | `wechat:send-digest` | 发送摘要 |
 
-### 2.12 Leader 自动工作循环
+### 2.12 已退役的自动开发系统
 
-| 命令 | 说明 |
-|------|------|
-| `leader:dispatch --from-latest-completion` | 从完成信号派发下一轮 |
-| `leader:consume-latest-task` | 消费 latest.json 任务 |
-| `leader:agent-runner --once` | Hermes 自动执行器 |
-| `leader:loop-once` | Leader 循环单次 tick |
-| `leader:audit-and-push` | 审计变更并推送 GitHub |
-| `leader:lock-status` | 任务锁状态 |
-| `leader:automation-status` | 后台工作流健康状态 |
-| `leader:roadmap-status` | 固定路线图进度 |
-| `leader:task-list` | 待办任务 |
-| `leader:version-report` | 版本开发报告 |
-| `leader:dashboard` | Dashboard + Agent Console 页面 |
+Leader 自动工作循环、固定路线图、Agent Runner、Agent Console 和版本报告命令已于 2026-07-11 退役。历史材料已归档，不再作为可执行操作入口。
 
 ### 2.13 一键本地运维
 
@@ -400,26 +388,19 @@ python3 hermes_cli.py alpha:retire --alpha-id alpha_001
 python3 hermes_cli.py factor:sync --dry-run
 ```
 
-### 4.8 Leader 自动工作循环
+### 4.8 辅助系统
 
 ```bash
-# 查看版本路线图
-python3 hermes_cli.py leader:roadmap-status
-
-# 查看任务列表
-python3 hermes_cli.py leader:task-list
-
-# 查看版本开发报告
-python3 hermes_cli.py leader:version-report
-
-# 审计变更并推送 GitHub
-python3 hermes_cli.py leader:audit-and-push --version V4.12 --mode full
+# 运维健康与诊断
+python3 hermes_cli.py leader:ops-health
+python3 hermes_cli.py leader:ops-diagnostics
 
 # 一键启动 Dashboard
 python3 hermes_cli.py leader:dashboard
 
-# 一键启动全部核心服务
-python3 hermes_cli.py leader:ops-all
+# 代码审计
+python3 hermes_cli.py audit:code --profile fast
+python3 hermes_cli.py audit:code --profile full
 ```
 
 ---

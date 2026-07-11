@@ -233,16 +233,14 @@ def _execute_market_snapshot(ctx, params: dict) -> dict:
     except Exception as e:
         results["alphas"] = {"error": str(e)}
 
-    # 获取工具与模块检查
+    # 获取只读运维状态（Agent 自动规划系统已退役）
     try:
-        from factor_lab.leader.planner import inspect_system
-        inspection = inspect_system()
-        s = inspection.get("summary", {})
+        from factor_lab.leader.ops_dashboard import OpsManager
+        health = OpsManager().health()
         results["system"] = {
-            "modules": s.get("modules", 0),
-            "cli_handlers": s.get("cli_handlers", 0),
-            "test_files": s.get("test_files", 0),
-            "stage": inspection.get("stage", {}).get("current", "unknown"),
+            "services": health.get("n_services", 0),
+            "running": health.get("n_running", 0),
+            "status": health.get("overall", "unknown"),
         }
     except Exception as e:
         results["system"] = {"error": str(e)}

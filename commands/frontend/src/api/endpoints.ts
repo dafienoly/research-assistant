@@ -3,11 +3,7 @@ import {
 } from './client'
 import type {
   HealthData,
-  Job,
-  JobDetail,
-  JobArtifact,
   DataHealthData,
-  UniverseData,
   UniverseListResponse,
   UniverseDetailResponse,
   UniverseAuditResponse,
@@ -41,32 +37,6 @@ import type {
 // ─── Health ─────────────────────────────────────────────────────
 export function health() {
   return get<HealthData>('/api/health')
-}
-
-// ─── Jobs ───────────────────────────────────────────────────────
-export function getJobs() {
-  return get<Job[]>('/api/jobs')
-}
-
-/** Trigger a job run */
-export function postJobRun(type: string, params: Record<string, unknown> = {}) {
-  return post<Job>('/api/jobs/run', { type, params })
-}
-
-/** SSE stream for a running job */
-export function getJobStreamUrl(runId: string): string {
-  const base = import.meta.env.VITE_API_BASE ?? ''
-  return `${base}/api/jobs/${runId}/stream`
-}
-
-/** Get job detail */
-export function getJobDetail(runId: string) {
-  return get<JobDetail>(`/api/jobs/${runId}`)
-}
-
-/** Re-run a job */
-export function postJobRerun(runId: string) {
-  return post<Job>(`/api/jobs/${runId}/rerun`)
 }
 
 // ─── Data Health ────────────────────────────────────────────────

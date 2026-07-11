@@ -57,7 +57,7 @@ def test_data_overview_endpoint():
     """GET /api/data/overview 返回 200 且包含 summary"""
     resp = client.get("/api/data/overview")
     assert resp.status_code == 200
-    data = resp.json()
+    data = resp.json()["data"]
     assert "summary" in data
     assert "checked_at" in data
     s = data["summary"]
@@ -130,7 +130,7 @@ def test_provider_health_has_required_fields():
 def test_data_overview_summary_counts():
     """overview 的计数应合理"""
     resp = client.get("/api/data/overview")
-    data = resp.json()
+    data = resp.json()["data"]
     s = data["summary"]
     assert s["total_sources"] >= 0
     total = s["active"] + s["degraded"] + s["inactive"] + s["unchecked"]

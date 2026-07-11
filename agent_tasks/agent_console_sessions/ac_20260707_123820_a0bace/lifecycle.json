@@ -1,8 +1,0 @@
-{
-  "pid": 23968,
-  "status": "orphaned",
-  "agent": "claude_code",
-  "prompt": "Auto execute V7.2: AgentOps Control Tower",
-  "created_at": "2026-07-07T12:38:20.205396+08:00",
-  "orphaned_at": "2026-07-07T12:40:21.570966+08:00"
-}

@@ -31,7 +31,6 @@ ENDPOINTS = [
     ("GET", "/api/data/health"),
     ("GET", "/api/reports"),
     ("GET", "/api/reports/summary"),
-    ("GET", "/api/roadmap"),
     ("GET", "/api/versions/report/detail"),
 ]
 

@@ -1,6 +1,5 @@
-"""Alpha Factory Leader — roadmap inspection and task dispatch."""
+"""Hermes local operations support."""
 
-from factor_lab.leader.planner import dispatch_tasks, inspect_system
-from factor_lab.leader.roadmap import ALPHA_FACTORY_ROADMAP
+from factor_lab.leader.ops_dashboard import OpsManager
 
-__all__ = ["ALPHA_FACTORY_ROADMAP", "dispatch_tasks", "inspect_system"]
+__all__ = ["OpsManager"]

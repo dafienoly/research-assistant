@@ -14,6 +14,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -35,6 +37,11 @@ jobs:
         env:
           PYTHONPATH: commands
         run: python commands/vnext_ci_gate.py --root .
+
+      - name: Deterministic full and security code audit
+        env:
+          PYTHONPATH: commands
+        run: python commands/hermes_cli.py audit:code --profile security --scope compare --base origin/main
 
       - name: VNext security, contract and integration tests
         env:

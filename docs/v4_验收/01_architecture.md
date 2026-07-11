@@ -61,8 +61,8 @@
 | 门禁引擎 | `commands/factor_lab/core/gate.py` | ~500 | GateEngine / GateCheck / GateResult |
 | 数据采集 | `commands/data_pipeline.py` | ~300 | 数据拉取/更新 CLI |
 | 数据审计 | `commands/data_audit.py` | ~200 | 新鲜度/覆盖率/缺口审计 |
-| 前端监控 | `commands/frontend/` | JSX | React 看板 (Dashboard/AgentConsole/Roadmap) |
-| Leader 工作循环 | `commands/leader_commands.py` | ~2000 | 自动任务派发/审计/提交 |
+| 前端监控 | `commands/frontend/` | TSX | React 看板（投研、运维、代码审计） |
+| 辅助系统 | `commands/leader_commands.py` | — | 本地运维与确定性代码审计；自动工作循环已退役 |
 
 ---
 

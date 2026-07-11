@@ -1,6 +1,0 @@
-{
-  "agent": "claude_code",
-  "prompt": "\u7248\u672c V8.2: Auto Bugfix Loop",
-  "version": "V8.2",
-  "created_at": "2026-07-08T10:55:08.826389+08:00"
-}

@@ -2,110 +2,89 @@
   "requirements": [
     {
       "id": "R1",
-      "title": "统一契约与不可绕过审批",
-      "code_locations": [{"file": "commands/factor_lab/vnext/contracts.py", "function": "MarketDataEnvelope", "line": 189}],
-      "expected_keywords": ["ApprovedOrderEnvelope", "TargetPortfolioWeights", "one_time_nonce", "signature"],
-      "behavior": "研究、权重、订单草案、签名审批和执行事件严格分层"
+      "title": "退役自动版本推荐与 Agent 自动化入口",
+      "code_locations": [{"file": "commands/leader_commands.py", "function": "handle", "line": 35}],
+      "expected_keywords": ["audit:code", "leader:ops-health", "architecture:audit", "return False"],
+      "behavior": "CLI 仅保留运维、架构审计和代码审计；Roadmap、任务队列、Agent Runner 与自动推进命令不再注册"
     },
     {
       "id": "R2",
-      "title": "无静默 fallback 的 Provider 与不可变快照",
-      "code_locations": [{"file": "commands/factor_lab/vnext/providers.py", "function": "ProviderRouter", "line": 338}],
-      "expected_keywords": ["silent_fallback_used", "content_hash", "raw_snapshot_id", "alternative_observation_only_primary_failed"],
-      "behavior": "真实来源生成内容哈希和 manifest，次级源不冒充主源成功"
-    },
-    {
-      "id": "R2b",
-      "title": "U0 代码集合数据覆盖审计",
-      "code_locations": [{"file": "commands/factor_lab/vnext/data_audit.py", "function": "_dataset_coverage", "line": 58}],
-      "expected_keywords": ["missing_symbols", "extra_symbols", "matched_expected_symbols"],
-      "behavior": "当前 U0 缺失代码按集合核对，历史或退市额外文件不能抵消当前缺口"
+      "title": "运维中心收敛为显式本地服务管理",
+      "code_locations": [{"file": "commands/factor_lab/leader/ops_dashboard.py", "function": "health", "line": 248}],
+      "expected_keywords": ["required", "socket.create_connection", "dashboard", "mcp", "vite"],
+      "behavior": "只管理声明服务，必需服务决定整体健康；端口探测适配 WSL，停止操作仅作用于自有 PID 或端口监听者"
     },
     {
       "id": "R3",
-      "title": "统一目标组合权重主链",
-      "code_locations": [{"file": "commands/factor_lab/vnext/target_weights.py", "function": "DailyArtifactTargetWeightAdapter", "line": 248}],
-      "expected_keywords": ["TargetPortfolioWeights", "restricted_weight_zero", "watch_only_weight_zero", "order_drafts_generated"],
-      "behavior": "领域预算、可交易性和 ETF substitution 形成同一权重簿"
+      "title": "代码审计单写入与同变更复用",
+      "code_locations": [{"file": "commands/factor_lab/audit/coordinator.py", "function": "run", "line": 31}],
+      "expected_keywords": ["fcntl.flock", "change_set_hash", "AuditStore", "已有代码审计正在运行"],
+      "behavior": "协调器使用文件锁实现 single-flight，并按 profile 与 change-set hash 复用已完成审计"
     },
     {
-      "id": "R4",
-      "title": "隔离 vectorbt Fast Lane",
-      "code_locations": [{"file": "commands/factor_lab/vnext/vectorbt_adapter.py", "function": "VectorbtFastLaneAdapter", "line": 53}],
-      "expected_keywords": ["immutable", "boundary_audit", "data_download_used", "real_broker_called"],
-      "behavior": "只读快照和权重，参数扫描/成本/Walk-Forward 不接数据下载或 Broker"
+      "id": "R4a",
+      "title": "完整档影响分析与定向回归",
+      "code_locations": [{"file": "commands/factor_lab/audit/checks.py", "function": "full_checks", "line": 146}],
+      "expected_keywords": ["selected_tests", "gitnexus", "api-contract-smoke", "pytest"],
+      "behavior": "完整档追加 GitNexus 变更分析、受影响测试和 API 合约冒烟"
+    },
+    {
+      "id": "R4b",
+      "title": "安全档本地静态扫描",
+      "code_locations": [{"file": "commands/factor_lab/audit/checks.py", "function": "security_checks", "line": 189}],
+      "expected_keywords": ["semgrep", "SEMGREP_SEND_METRICS", "llm-advisory", "blocking=False"],
+      "behavior": "安全档执行仓库固定 Semgrep 规则；LLM 语义审查仅作非阻塞提示"
+    },
+    {
+      "id": "R4c",
+      "title": "统一三档审计 CLI",
+      "code_locations": [{"file": "commands/factor_lab/audit/runner.py", "function": "cmd_main", "line": 72}],
+      "expected_keywords": ["fast", "full", "security", "working-tree", "staged", "compare", "paths"],
+      "behavior": "audit:code 提供显式 profile/scope，旧 anti-cheat 命令仅保留一个兼容周期且不能跳过确定性门禁"
     },
     {
       "id": "R5",
-      "title": "A股 Event Truth 与真实规则",
-      "code_locations": [{"file": "commands/factor_lab/vnext/event_truth.py", "function": "AShareEventTruthLane", "line": 286}],
-      "expected_keywords": ["t_plus_one", "partial", "cancel", "price_limit"],
-      "behavior": "事件顺序处理权限、涨跌停、停牌、整手、容量、冲击与成交生命周期"
+      "title": "代码审计持久化与保留策略",
+      "code_locations": [{"file": "commands/factor_lab/audit/storage.py", "function": "save", "line": 25}],
+      "expected_keywords": ["report.json", "latest.json", "os.replace", "keep_runs", "keep_days"],
+      "behavior": "每次运行只写一份规范报告到仓库外状态目录，并原子更新 latest 与清理过期运行"
     },
     {
-      "id": "R6",
-      "title": "领域决策进入目标权重",
-      "code_locations": [{"file": "commands/factor_lab/vnext/domain_engine.py", "function": "DomainDecisionOrchestrator", "line": 134}],
-      "expected_keywords": ["policy_put", "breadth_divergence", "style_rotation", "semiconductor_mainline"],
-      "behavior": "Policy/Semi/Regime/Style 统一输出风险、半导体、防守和现金预算"
+      "id": "R6a",
+      "title": "本地受控代码审计 API",
+      "code_locations": [{"file": "commands/factor_lab/api_server/routes_code_audit.py", "function": "trigger_code_audit", "line": 47}],
+      "expected_keywords": ["Code audit can only be triggered locally", "Literal", "run_in_threadpool", "scope=body.scope"],
+      "behavior": "API 仅接受本机 typed profile/scope 请求且不暴露任意 shell 或工作目录执行"
     },
     {
-      "id": "R7",
-      "title": "六种受约束组合优化",
-      "code_locations": [{"file": "commands/factor_lab/vnext/optimization.py", "function": "PortfolioOptimizationLab", "line": 208}],
-      "expected_keywords": ["risk_parity", "minimum_variance", "robust_max_sharpe", "cost_aware"],
-      "behavior": "硬预算/上限/主题约束下输出优化与风险诊断，不输出订单"
+      "id": "R6b",
+      "title": "代码审计前端中心",
+      "code_locations": [{"file": "commands/frontend/src/pages/CodeAudit.tsx", "function": "", "line": 35}],
+      "expected_keywords": ["/api/code-audits/runs", "/api/code-audits/trigger", "fast", "full", "security"],
+      "behavior": "前端展示审计历史、发现与变更集，并可触发三种档位"
+    },
+    {
+      "id": "R7a",
+      "title": "操作审计持久化哈希链",
+      "code_locations": [{"file": "commands/factor_lab/api_server/services/audit_service.py", "function": "record", "line": 57}],
+      "expected_keywords": ["prev_hash", "event_hash", "os.fsync", "events.jsonl"],
+      "behavior": "运维/API 操作追加写入仓库外 JSONL，事件以 SHA-256 前向链接"
+    },
+    {
+      "id": "R7b",
+      "title": "操作审计受控导出",
+      "code_locations": [{"file": "commands/factor_lab/api_server/routes_audit.py", "function": "export_audit_events", "line": 50}],
+      "expected_keywords": ["/audit/export", "limit", "model_dump", "total"],
+      "behavior": "操作账本通过限量 API 导出，与代码审计报告端点保持分离"
     },
     {
       "id": "R8",
-      "title": "时点 ML Ranker 治理",
-      "code_locations": [{"file": "commands/factor_lab/vnext/ml_governance.py", "function": "MLRankerGovernanceLab", "line": 155}],
-      "expected_keywords": ["purged_embargo_split", "XGBRanker", "promotion_status", "direct_buy_sell_output"],
-      "behavior": "Ridge 基线和 XGB OOS 对比，数据门禁优先，模型不输出买卖"
-    },
-    {
-      "id": "R9",
-      "title": "Paper Shadow LiveDryRun 安全认证",
-      "code_locations": [{"file": "commands/factor_lab/vnext/execution_certification.py", "function": "ExecutionCertificationLab", "line": 32}],
-      "expected_keywords": ["PAPER_FILLED", "SHADOW_RECORDED", "approval_nonce_reused", "real_broker_called"],
-      "behavior": "真实快照绑定签名封套和审计账本，重放阻断且不传输真实订单"
-    },
-    {
-      "id": "R10",
-      "title": "稳定 run snapshot reconciliation API",
-      "code_locations": [{"file": "commands/factor_lab/api_server/routes_vnext.py", "function": "vnext_run_detail", "line": 202}],
-      "expected_keywords": ["/runs/{run_id}", "/snapshots/{snapshot_id}", "/reconciliation/{run_id}", "api_success"],
-      "behavior": "只读白名单工件，不接受任意文件路径"
-    },
-    {
-      "id": "R11",
-      "title": "七层 Antifragile Review",
-      "code_locations": [{"file": "commands/factor_lab/vnext/review_orchestrator.py", "function": "ArtifactAntifragileReview", "line": 21}],
-      "expected_keywords": ["layer_attribution", "correlation_id", "unexplained_discrepancy_count", "promotion_status"],
-      "behavior": "统一快照/权重/审批/执行归因，无法计算指标保持 null 并阻断晋级"
-    },
-    {
-      "id": "R12a",
-      "title": "CycloneDX SBOM 生成",
-      "code_locations": [{"file": "commands/factor_lab/vnext/sbom.py", "function": "CycloneDXGenerator", "line": 40}],
-      "expected_keywords": ["CycloneDX", "bomFormat", "components"],
-      "behavior": "对隔离的 core 和 vectorbt 环境生成可重复审计的 CycloneDX 1.5 SBOM"
-    },
-    {
-      "id": "R12b",
-      "title": "依赖、Secret 与 Broker 边界 CI 门禁",
-      "code_locations": [{"file": "commands/vnext_ci_gate.py", "function": "VNextCIGate", "line": 34}],
-      "expected_keywords": ["LOCK_HASH_MISMATCH", "SECRET_LEAK_PATTERN", "UI_API_BROKER_BOUNDARY_VIOLATION"],
-      "behavior": "锁哈希、许可证、secret、UI/API Broker 边界和生产 mock/fallback 证据均 fail-closed"
-    },
-    {
-      "id": "R12c",
-      "title": "正式验收证据包",
-      "code_locations": [{"file": "commands/factor_lab/vnext/acceptance.py", "function": "AcceptanceEvidenceBuilder", "line": 21}],
-      "expected_keywords": ["acceptance_manifest", "evidence_paths", "promotion_status"],
-      "behavior": "24 项正式证据按内容哈希打包并明确记录 PARTIAL/BLOCKED 外部阻塞"
+      "title": "报告中心仅保留投研报告",
+      "code_locations": [{"file": "commands/factor_lab/api_server/routes_reports.py", "function": "list_reports", "line": 109}],
+      "expected_keywords": ["backtest", "strategy", "DISCOVERERS", "Supported report types"],
+      "behavior": "报告中心只发现、读取和删除 backtest/strategy 报告，不再混入版本、会话或路线图报告"
     }
   ],
-  "source": "goal-objective.md and docs/vnext/hermes_vnext_open_source_upgrade_implementation_plan_2026-07-10.md",
+  "source": "用户批准的辅助系统优化计划：退役自动版本推荐，收敛运维并工程化代码审计",
   "generated_at": "2026-07-11"
 }

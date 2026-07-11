@@ -76,8 +76,8 @@ def test_reports_structured():
     _test_structured_response("GET", "/api/reports")
 
 
-def test_auto_run_returns_task_id():
-    """长任务 POST 应返回 task_id 或不阻塞"""
+def test_retired_auto_run_is_not_available():
+    """自动版本入口已退役并返回结构化 404。"""
     resp = client.post("/api/auto-run")
     body_str = resp.text
     try:
@@ -86,5 +86,6 @@ def test_auto_run_returns_task_id():
         assert False, f"/api/auto-run 响应非 JSON: {body_str[:200]}"
     # 无 traceback
     assert "Traceback" not in body_str
-    # 返回结构化响应
-    assert "ok" in data
+    assert resp.status_code == 404
+    assert data["ok"] is False
+    assert data["error"]["code"] == "NOT_FOUND"

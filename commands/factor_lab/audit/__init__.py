@@ -13,9 +13,10 @@
 """
 
 from .base import AuditFinding, AuditReport, Severity
-from .runner import run_all_gates, cmd_main
+from .runner import run_all_gates, run_code_audit, cmd_main
+from .coordinator import AuditCoordinator, AuditRequest
 
 __all__ = [
     "AuditFinding", "AuditReport", "Severity",
-    "run_all_gates", "cmd_main",
+    "run_all_gates", "run_code_audit", "cmd_main", "AuditCoordinator", "AuditRequest",
 ]

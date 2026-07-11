@@ -62,8 +62,6 @@ interface BackupResultData {
 
 const SERVICE_ICONS: Record<string, React.ReactNode> = {
   dashboard: <ApiOutlined />,
-  'auto-loop': <SyncOutlined />,
-  'agent-runner': <CloudServerOutlined />,
   mcp: <ExperimentOutlined />,
   vite: <CodeOutlined />,
 }
@@ -642,7 +640,7 @@ export default function OpsCenter() {
               执行备份
             </Button>
             <Text style={{ color: '#64748B', fontSize: 12 }}>
-              备份内容包括: 路线图状态、配置文件、服务日志
+              备份内容包括：配置文件与服务日志
             </Text>
           </Space>
         </Card>

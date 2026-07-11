@@ -1,8 +1,0 @@
-{
-  "pid": 15197,
-  "status": "orphaned",
-  "agent": "claude_code",
-  "prompt": "Auto execute V8.6: Release Manager",
-  "created_at": "2026-07-08T14:19:46.556097+08:00",
-  "orphaned_at": "2026-07-08T14:19:47.132258+08:00"
-}

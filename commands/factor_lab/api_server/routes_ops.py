@@ -40,7 +40,7 @@ def ops_health():
 def ops_service_status(service_id: str):
     """GET /api/ops/status/{service_id} — 单个服务详细状态
 
-    service_id: dashboard | auto-loop | agent-runner | mcp | vite
+    service_id: dashboard | mcp | vite
     """
     mgr = get_manager()
     status = mgr.service_status(service_id)

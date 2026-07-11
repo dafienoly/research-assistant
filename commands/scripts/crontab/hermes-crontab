@@ -1,7 +1,5 @@
-# Schedule Hermes auto runner via WSL crontab
+# Hermes maintenance schedule (automatic development runner retired)
 # 每 3 分钟执行一次
 
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-
-*/3 * * * * /home/ly/.hermes/research-assistant/commands/scripts/run_hermes_agent_runner.sh

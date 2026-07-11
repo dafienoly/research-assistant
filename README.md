@@ -1,6 +1,6 @@
 # Hermes 量化投研系统
 
-自动化因子挖掘 · 策略回测 · 信号生成 · 版本推进
+自动化因子挖掘 · 策略回测 · 信号生成 · 可审计运维
 
 ---
 
@@ -8,7 +8,7 @@
 
 1. [系统概览](#系统概览)
 2. [投研系统（核心功能）](#投研系统核心功能)
-3. [自动版本推进系统（开发运维）](#自动版本推进系统开发运维)
+3. [辅助系统](#辅助系统)
 4. [快速开始](#快速开始)
 5. [前端页面](#前端页面)
 6. [数据平台](#数据平台)
@@ -19,16 +19,14 @@
 
 ## 系统概览
 
-Hermes 由两个子系统组成，职责分离：
+Hermes 将投研主链与辅助能力严格分离：
 
 | 子系统 | 职责 | 用户 |
 |--------|------|------|
 | **投研系统** | 因子挖掘、策略回测、信号生成、盘前分析 | 量化研究员 |
-| **自动版本推进系统** | 按路线图自动开发、测试、部署 Hermes 本身 | Hermes 自身 |
+| **辅助系统** | 本地服务运维、确定性代码审计、操作审计 | 工程维护者 |
 
-两者通过同一个 FastAPI 后端和前端页面呈现，但互不依赖：
-- 投研系统可以独立运行，不需要版本推进
-- 版本推进系统开发的是 Hermes 自身的功能，不影响投研系统运行
+两者通过同一个 FastAPI 后端和前端页面呈现，但互不依赖。自动版本推进、Roadmap、Agent Console、任务队列与通用 Runner 已退役。
 
 ---
 
@@ -117,84 +115,14 @@ hermes alpha:migrate-existing-factors       # 现有因子迁入 Registry
 
 ---
 
-## 自动版本推进系统（开发运维）
+## 辅助系统
 
-用于 Hermes 自身的持续开发和版本管理。
+投研主链之外仅保留运维中心与代码审计中心。自动版本推进、Roadmap、Agent Console、任务队列和通用 Runner 已退役；历史归档位于 `~/.hermes/archive/research-assistant/`。
 
-### 当前路线图进度
-
-```bash
-hermes leader:roadmap-status
-```
-
-输出示例：
-```
-Version: V6.6
-Status: running
-Completed: 38 versions
-Auto allowed until: V8.9
-```
-
-### 路线图覆盖
-
-| 系列 | 版本 | 状态 | 说明 |
-|------|------|------|------|
-| V3.x | V3.0-V3.9 | ✅ | Alpha Factory |
-| V4.x | V4.0-V4.9 | ✅ | 受控执行治理 |
-| V5.x | V5.0-V5.9 | ✅ | 数据平台 |
-| V6.x | V6.0-V6.5 | ✅ | 投研自动化 |
-| V6.x | V6.6-V6.9 | ⏸️ | 因子挖掘Agent/新闻/行业轮动/看板 |
-| V7.x-V8.x | V7.0-V8.9 | ⏸️ | 产品UI/Agent生态 |
-| V9.x | V9.0-V9.4 | ⏸️ | Backlog |
-
-### 自动推进系统命令
-
-```bash
-# ===== 状态查看 =====
-hermes leader:roadmap-status               # 路线图进度
-hermes leader:automation-status            # 自动推进健康检查
-hermes leader:version-report               # 版本开发报告
-
-# ===== 版本操作 =====
-hermes leader:backup-list                  # 列出备份
-hermes leader:recover --backup-id <id>     # 从备份恢复
-
-# ===== 手动触发 =====
-hermes leader:auto-run-once                # 触发一次版本推进
-hermes leader:task-list                    # 待办任务
-
-# ===== 前端页面 =====
-hermes leader:dashboard --port 8766       # 启动 FastAPI 后端
-```
-
-### 自动推进工作流
-
-```
-cron (每3分钟)
-  → run_hermes_agent_runner.sh
-    → tick() 心跳 (auto_loop_state.json)
-    → leader:auto-run-once
-      → 读取 roadmap_cursor (当前 V6.6)
-      → 获取当前版本定义
-      → 创建 Agent Console session
-      → 运行 agent-runner (Claude/dry-run)
-      → 运行测试
-      → 通过则: advance cursor + git commit + 备份
-      → 失败则: partial + 记录错误
-    → leader:loop-once (派发下一版本)
-```
-
-### 暂停 / 恢复
-
-```bash
-# 暂停（投研系统不受影响）
-crontab -r
-
-# 恢复
-crontab scripts/crontab/hermes-crontab
-```
-
----
+- 运维：`hermes leader:ops-health`、`hermes leader:ops-diagnostics`
+- 快速审计：`hermes audit:code --profile fast`
+- 完整审计：`hermes audit:code --profile full`
+- 安全审计：`hermes audit:code --profile security`
 
 ## 快速开始
 
@@ -208,7 +136,7 @@ cd /home/ly/.hermes/research-assistant/commands
 访问:
 - 前端页面: http://127.0.0.1:8766
 - API 文档: http://127.0.0.1:8766/docs
-- Agent Console: http://127.0.0.1:8766/console
+- 代码审计中心: http://127.0.0.1:8766/code-audit
 
 ### 启动 React 前端（开发模式）
 
@@ -217,13 +145,14 @@ cd commands/frontend && npm run dev
 # http://localhost:5173（热更新）
 ```
 
-### 一键脚本
+### 守护进程
 
 ```bash
-bash scripts/start_hermes_auto_version.sh    # 启动
-bash scripts/stop_hermes_auto_version.sh     # 停止
-bash scripts/restart_hermes_auto_version.sh  # 重启
+bash ~/.hermes/hermes-daemon.sh start
+bash ~/.hermes/hermes-daemon.sh status
 ```
+
+守护进程只维护 Gateway 与 Dashboard。
 
 ---
 
@@ -231,11 +160,10 @@ bash scripts/restart_hermes_auto_version.sh  # 重启
 
 | 路由 | 页面 | 说明 |
 |------|------|------|
-| `/` | 总览 | 版本推进状态、系统健康、版本列表 |
-| `/console` | Agent Console | Session 列表 + 实时输出查看 |
-| `/roadmap` | 路线图编辑 | V3-V9 版本列表、手动标记完成/失败 |
-| `/reports` | 版本报告 | 完成版本详情、Git 记录、Agent 输出、备份 |
-| `/history` | Session 历史 | 全部 session + 备份/恢复 |
+| `/` | VNext 总览 | 投研系统状态与证据 |
+| `/reports` | 投研报告 | 回测和策略报告 |
+| `/ops` | 运维中心 | 服务、端口、诊断与备份 |
+| `/code-audit` | 代码审计中心 | fast/full/security 审计记录 |
 
 ---
 
@@ -282,69 +210,15 @@ data/                                    # 项目根目录
 
 ## 目录结构
 
+```text
+research-assistant/
+├── commands/factor_lab/vnext/      VNext 投研主链
+├── commands/factor_lab/audit/      双速代码审计
+├── commands/factor_lab/leader/     本地运维实现
+├── commands/factor_lab/api_server/ FastAPI API
+├── commands/frontend/                React 前端
+├── configs/audit/                    本地安全规则
+└── agent_tasks/traceability/         明确需求的追溯映射
 ```
-/home/ly/.hermes/research-assistant/
-├── README.md                    ← 本文档
-├── data/                        投研数据 CSV 文件
-│
-├── commands/                    可执行代码
-│   ├── hermes_cli.py            CLI 入口（投研 + 版本推进全部命令）
-│   ├── factor_lab/              投研系统核心
-│   │   ├── factor_base.py       142 因子注册表
-│   │   ├── factor_engine.py     因子计算引擎
-│   │   ├── alpha/               Alpha Factory (registry, packs, lifecycle)
-│   │   ├── strategy/            策略层
-│   │   ├── live/                盘前信号
-│   │   ├── paper/               Paper trading
-│   │   ├── portfolio/           组合分析
-│   │   ├── broker/              Broker 适配器
-│   │   ├── approval/            审批/风控
-│   │   ├── backtest/            回测引擎
-│   │   ├── data_contract.py     数据契约 V5.5
-│   │   ├── data_health.py       数据健康 V5.8
-│   │   ├── leader/              自动版本推进系统
-│   │   │   ├── roadmap.py       固定路线图
-│   │   │   ├── roadmap_cursor.py 进度追踪
-│   │   │   ├── auto_executor.py  自动执行器
-│   │   │   ├── workloop.py       工作循环
-│   │   │   ├── agent_runner.py   Agent 执行后端
-│   │   │   ├── version_report.py 版本报告
-│   │   │   ├── version_detail.py 版本完成详情
-│   │   │   ├── roadmap_backup.py 备份/恢复
-│   │   │   └── auto_health.py    健康检查
-│   │   ├── api_server/          FastAPI 后端
-│   │   ├── agent_console/       Agent Console
-│   │   ├── data_source_registry/ 数据源注册
-│   │   ├── realtime_market/     实时行情框架
-│   │   ├── minute_storage/      分钟线存储
-│   │   ├── data_lineage/        数据血缘
-│   │   ├── paid_data/           付费数据源接口
-│   │   ├── event/               事件驱动因子
-│   │   ├── review/              审核队列
-│   │   ├── promotion/           晋级/退役
-│   │   └── miniqmt/             MiniQMT 沙箱
-│   │
-│   ├── frontend/                React 前端
-│   │   └── src/pages/
-│   │       ├── Dashboard.jsx    总览
-│   │       ├── AgentConsole.jsx Agent Console
-│   │       ├── Roadmap.jsx      路线图
-│   │       ├── Reports.jsx      版本报告
-│   │       └── SessionHistory.jsx 历史
-│   │
-│   ├── DESIGN.md                设计规范
-│   └── scripts/                 运维脚本
-│       ├── run_hermes_agent_runner.sh  cron 入口
-│       ├── start/stop/restart*.sh      一键脚本
-│       └── windows/                    Windows schtasks
-│
-├── agent_tasks/                 运行时状态 (不提交)
-│   ├── latest.json              当前任务
-│   ├── roadmap_cursor.json      路线图进度
-│   └── agent_console_sessions/  Console session
-│
-└── /mnt/d/HermesReports/        报告输出
-    ├── version_reports/         版本开发报告
-    ├── roadmap_backups/         路线图备份
-    └── session_backups/         Console session 备份
-```
+
+运行态审计写入 `~/.hermes/state/research-assistant/`，不写入 Git 工作树。

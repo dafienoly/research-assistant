@@ -3,7 +3,7 @@
 # Usage: bash hermes_ops.sh <command> [service]
 #   Commands:
 #     health       — 所有服务健康状态
-#     start <svc>  — 启动服务 (dashboard|auto-loop|mcp)
+#     start <svc>  — 启动服务 (dashboard|mcp)
 #     stop <svc>   — 停止服务
 #     restart <svc> — 重启服务
 #     backup       — 一键备份
@@ -22,13 +22,13 @@ show_usage() {
   echo ""
   echo "命令:"
   echo "  health              查看所有服务健康状态"
-  echo "  start <service>     启动服务: dashboard | auto-loop | mcp"
+  echo "  start <service>     启动服务: dashboard | mcp"
   echo "  stop <service>      停止服务"
   echo "  restart <service>   重启服务"
   echo "  backup              一键备份 (状态+配置+日志)"
   echo "  diag                全面诊断报告"
   echo "  ports               端口占用扫描"
-  echo "  all                 启动全部核心服务 (dashboard+auto-loop)"
+  echo "  all                 启动全部核心服务 (dashboard+mcp)"
   exit 0
 }
 
@@ -44,7 +44,7 @@ case "$CMD" in
 
   start)
     if [ -z "$SERVICE" ]; then
-      echo "❌ 请指定服务: dashboard | auto-loop | mcp"
+      echo "❌ 请指定服务: dashboard | mcp"
       echo "用法: bash hermes_ops.sh start dashboard"
       exit 1
     fi
@@ -54,7 +54,7 @@ case "$CMD" in
 
   stop)
     if [ -z "$SERVICE" ]; then
-      echo "❌ 请指定服务: dashboard | auto-loop | mcp"
+      echo "❌ 请指定服务: dashboard | mcp"
       echo "用法: bash hermes_ops.sh stop dashboard"
       exit 1
     fi
@@ -64,7 +64,7 @@ case "$CMD" in
 
   restart)
     if [ -z "$SERVICE" ]; then
-      echo "❌ 请指定服务: dashboard | auto-loop | mcp"
+      echo "❌ 请指定服务: dashboard | mcp"
       echo "用法: bash hermes_ops.sh restart dashboard"
       exit 1
     fi
@@ -98,8 +98,8 @@ case "$CMD" in
     $VENV $CLI leader:ops-start dashboard
     sleep 2
     echo ""
-    echo ">>> 2/3: Auto Version Loop"
-    $VENV $CLI leader:ops-start auto-loop
+    echo ">>> 2/3: MCP service"
+    $VENV $CLI leader:ops-start mcp
     echo ""
     echo ">>> 3/3: 验证启动状态"
     $VENV $CLI leader:ops-health | $VENV -c "

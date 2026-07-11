@@ -1,8 +1,0 @@
-{
-  "pid": 511,
-  "status": "orphaned",
-  "agent": "claude_code",
-  "prompt": "Auto execute V8.5: Documentation Generator",
-  "created_at": "2026-07-08T14:08:40.539721+08:00",
-  "orphaned_at": "2026-07-08T14:08:42.808770+08:00"
-}

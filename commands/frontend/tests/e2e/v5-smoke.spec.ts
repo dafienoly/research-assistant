@@ -6,8 +6,7 @@ const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:8766';
 const PAGES = [
   { path: '/', name: 'Home' },
   { path: '/data', name: 'DataCenter' },
-  { path: '/console', name: 'AgentConsole' },
-  { path: '/roadmap', name: 'Roadmap' },
+  { path: '/code-audit', name: 'CodeAudit' },
   { path: '/reports', name: 'Reports' },
   { path: '/risk', name: 'LiveGate' },
   { path: '/paper', name: 'Paper' },

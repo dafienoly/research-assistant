@@ -1,0 +1,12 @@
+rules:
+  - id: hermes-subprocess-shell
+    languages: [python]
+    severity: ERROR
+    message: Avoid shell=True; pass an argument vector and own the child process group.
+    patterns:
+      - pattern: subprocess.$FUNC(..., shell=True, ...)
+  - id: hermes-global-pkill
+    languages: [bash]
+    severity: ERROR
+    message: Do not use global pkill -f; terminate only a recorded PID or process group.
+    pattern-regex: 'pkill\s+(-[^ ]+\s+)*-f'

@@ -1,8 +1,0 @@
-{
-  "passed": false,
-  "auto_triggered_at": "20260708_234022",
-  "changed_files": [
-    "/home/ly/.hermes/research-assistant/commands/intraday_monitor.py"
-  ],
-  "auto_exit_code": 1
-}

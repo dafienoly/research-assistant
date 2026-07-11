@@ -23,32 +23,6 @@ export interface HealthData {
   timestamp: string
 }
 
-// ─── Job ────────────────────────────────────────────────────────
-export interface Job {
-  id: string
-  type: string
-  status: 'pending' | 'running' | 'completed' | 'failed'
-  params: Record<string, unknown>
-  created_at: string
-  updated_at: string
-  result?: unknown
-}
-
-export interface JobArtifact {
-  name: string
-  path: string
-  size?: number
-}
-
-export interface JobDetail extends Job {
-  run_id?: string
-  duration?: string
-  stdout_tail?: string[]
-  stderr_tail?: string[]
-  artifacts?: JobArtifact[]
-  error?: string
-}
-
 // ─── Data Health ────────────────────────────────────────────────
 export interface DataHealthItem {
   name: string

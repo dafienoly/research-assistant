@@ -1,8 +1,0 @@
-{
-  "pid": 15640,
-  "status": "orphaned",
-  "agent": "claude_code",
-  "prompt": "Auto execute V7.6: Risk Dashboard",
-  "created_at": "2026-07-07T21:41:42.670413+08:00",
-  "orphaned_at": "2026-07-07T21:43:21.551340+08:00"
-}
