@@ -46,6 +46,19 @@ def test_same_change_hash_reuses_completed_run(tmp_path):
     assert second.run_id == first.run_id
 
 
+def test_same_failed_change_hash_is_retried(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _repo(repo)
+    (repo / "broken.py").write_text("def broken(:\n", encoding="utf-8")
+    coordinator = AuditCoordinator(AuditStore(tmp_path / "state"))
+    request = AuditRequest(repo_root=repo, profile="fast", paths=["broken.py"])
+    first = coordinator.run(request)
+    second = coordinator.run(request)
+    assert first.state == second.state == "failed"
+    assert second.run_id != first.run_id
+
+
 def test_operational_ledger_survives_restart_and_has_hash_chain(tmp_path):
     path = tmp_path / "events.jsonl"
     service = AuditService(path=path)

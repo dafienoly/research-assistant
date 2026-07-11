@@ -33,7 +33,7 @@ class AuditCoordinator:
         files = changed_files(root, request.scope, request.base_ref, request.paths)
         digest = change_hash(root, files, request.profile, request.scope)
         existing = next((item for item in self.store.list_runs() if item.get("change_set_hash") == digest and item.get("profile") == request.profile), None)
-        if existing and existing.get("state") in {"passed", "failed"}:
+        if existing and existing.get("state") == "passed":
             return self._from_dict(existing)
 
         self.store.root.mkdir(parents=True, exist_ok=True)

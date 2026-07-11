@@ -887,6 +887,16 @@
       "behavior": "kill switch、risk sentinel 和盘中监控等遗留业务调用不执行网络请求；内容哈希事件以单次加锁批量方式写入 Telegram 与企业微信 outbox，重复调用幂等，worker 独立重试并 dead-letter。"
     },
     {
+      "id": "P1-AUDIT-RETRY-01",
+      "title": "代码审计失败结果不得永久缓存",
+      "code_locations": [
+        {"file": "commands/factor_lab/audit/coordinator.py", "function": "run", "line": 31},
+        {"file": "commands/tests/test_code_audit_system.py", "function": "test_same_failed_change_hash_is_retried", "line": 49}
+      ],
+      "expected_keywords": ["existing.get(\"state\") == \"passed\"", "test_same_failed_change_hash_is_retried", "second.run_id != first.run_id"],
+      "behavior": "相同 change-set 只复用通过的审计；失败或环境异常必须生成新 run 并重新执行门禁，避免临时盘等瞬态故障永久阻断。"
+    },
+    {
       "id": "P1-REGULATORY-COVERAGE-01",
       "title": "监管公告 ingestion 与逐标的覆盖感知门禁",
       "code_locations": [
