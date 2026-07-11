@@ -75,6 +75,14 @@ def test_announcement_parser_is_read_only_datahub_consumer():
     assert "regulatory_watchlist.json" in source
     assert "AnnouncementProvider" not in source
     assert "provider_matrix" not in source
+
+
+def test_legacy_market_commands_delegate_to_datahub_owners():
+    source = (ROOT / "commands/market_fetcher.py").read_text(encoding="utf-8")
+    assert "LiveSnapshotIngestion" in source
+    assert "datahub_cron.sh" in source
+    for forbidden in ("rsscast_mcp", "fetch_kline", "akshare", "stock_board_industry", "to_csv("):
+        assert forbidden not in source
     assert "._query(" not in source
 
 

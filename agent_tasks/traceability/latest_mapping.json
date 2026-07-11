@@ -470,6 +470,17 @@
       "behavior": "训练和回测跨股票/基金 canonical 根读取 DataHub 日线，盘中读取 DataHub snapshot；159516 进入统一 fund_daily ingestion；不调用 AkShare，不写 _hist.csv，canonical 缺失时明确失败。"
     },
     {
+      "id": "INFRA-LEGACY-MARKET-CLI-01",
+      "title": "旧市场与财务 CLI 只委托 DataHub ingestion owner",
+      "code_locations": [
+        {"file": "commands/market_fetcher.py", "function": "MarketDataFetcher", "line": 15},
+        {"file": "commands/market_fetcher.py", "function": "_run_daily_datahub", "line": 29},
+        {"file": "commands/tests/test_datahub_architecture.py", "function": "test_legacy_market_commands_delegate_to_datahub_owners", "line": 80}
+      ],
+      "expected_keywords": ["LiveSnapshotIngestion", "read_live_snapshot", "datahub_cron.sh", "canonical DataHub"],
+      "behavior": "兼容 CLI 只调用 canonical DataHub 实时或日级 ingestion；不再自行访问 RSScast/Sina/AkShare，也不写平行行情、分钟、板块和财务副本。"
+    },
+    {
       "id": "P0-EVENT-TRUTH-PRESERVE-01",
       "title": "Event Truth 上游失败时保留旧快照并发布运行断点",
       "code_locations": [
