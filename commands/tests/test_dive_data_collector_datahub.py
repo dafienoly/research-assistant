@@ -20,6 +20,7 @@ def test_historical_collector_reads_canonical_datahub_without_writing(tmp_path, 
 
     assert len(frame) == 1
     assert {"日期", "volume", "change_pct"}.issubset(frame.columns)
+    assert frame.iloc[0]["日期"].strftime("%Y-%m-%d") == "2026-07-10"
     assert list(tmp_path.glob("*_hist.csv")) == []
 
 

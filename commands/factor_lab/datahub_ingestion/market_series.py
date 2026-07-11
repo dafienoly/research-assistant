@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +20,18 @@ class MarketSeriesIngestion:
 
     def fetch(self, datasets: dict[str, list[str]], start_date: str, end_date: str) -> dict:
         client = self.client or self._client()
-        results = []
+        manifest_path = self.output_root / "manifest.json"
+        previous = self._read_manifest(manifest_path)
+        result_index = {
+            (row.get("dataset"), row.get("symbol")): row
+            for row in previous.get("results", [])
+            if row.get("dataset") and row.get("symbol")
+        }
+        generated_at = datetime.now().astimezone().isoformat()
+        EventTruthIngestion._atomic_json(
+            manifest_path,
+            self._manifest(result_index, start_date, end_date, generated_at, "IN_PROGRESS"),
+        )
         for api_name, symbols in datasets.items():
             category = "index" if api_name == "index_daily" else "fund"
             for symbol in symbols:
@@ -32,18 +45,49 @@ class MarketSeriesIngestion:
                     combined["trade_date"] = combined["trade_date"].astype("string").str.replace(r"\.0$", "", regex=True)
                     combined = combined.drop_duplicates("trade_date", keep="last").sort_values("trade_date")
                     EventTruthIngestion._atomic_frame(destination, combined)
-                    results.append({"dataset": api_name, "symbol": symbol, "status": "OK", "rows": len(combined), "path": str(destination)})
+                    row = {"dataset": api_name, "symbol": symbol, "status": "OK", "rows": len(combined), "path": str(destination)}
                 except Exception as exc:
-                    results.append({"dataset": api_name, "symbol": symbol, "status": "MISSING", "rows": 0, "error": type(exc).__name__})
-        manifest = {
+                    row = {"dataset": api_name, "symbol": symbol, "status": "MISSING", "rows": 0, "error": type(exc).__name__}
+                result_index[(api_name, symbol)] = row
+                EventTruthIngestion._atomic_json(
+                    manifest_path,
+                    self._manifest(result_index, start_date, end_date, generated_at, "IN_PROGRESS"),
+                )
+        manifest = self._manifest(result_index, start_date, end_date, generated_at, "COMPLETE")
+        EventTruthIngestion._atomic_json(manifest_path, manifest)
+        return manifest
+
+    @staticmethod
+    def _read_manifest(path: Path) -> dict:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            return payload if isinstance(payload, dict) else {}
+        except (OSError, json.JSONDecodeError):
+            return {}
+
+    @staticmethod
+    def _manifest(
+        result_index: dict[tuple[object, object], dict],
+        start_date: str,
+        end_date: str,
+        generated_at: str,
+        run_status: str,
+    ) -> dict:
+        results = sorted(result_index.values(), key=lambda row: (row.get("dataset", ""), row.get("symbol", "")))
+        return {
             "source": "tushare_official_structured_gateway",
+            "generated_at": generated_at,
             "start_date": start_date,
             "end_date": end_date,
             "results": results,
-            "status": "OK" if results and all(row["status"] == "OK" for row in results) else "PARTIAL",
+            "status": (
+                "IN_PROGRESS"
+                if run_status == "IN_PROGRESS"
+                else ("OK" if results and all(row["status"] == "OK" for row in results) else "PARTIAL")
+            ),
+            "run_status": run_status,
+            "merge_policy": "upsert manifest rows by dataset and symbol; never erase unrequested coverage",
         }
-        EventTruthIngestion._atomic_json(self.output_root / "manifest.json", manifest)
-        return manifest
 
     @staticmethod
     def _client():

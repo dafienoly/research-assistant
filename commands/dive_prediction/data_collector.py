@@ -31,7 +31,9 @@ def _read_canonical_history(code: str, days: int) -> pd.DataFrame:
     if date_column is None:
         raise ValueError(f"canonical DataHub daily kline has no date column: {path}")
     frame = frame.rename(columns={date_column: "日期"})
-    frame["日期"] = pd.to_datetime(frame["日期"], errors="coerce")
+    raw_dates = frame["日期"].astype("string").str.replace(r"\.0$", "", regex=True).str.strip()
+    compact = raw_dates.str.replace("-", "", regex=False)
+    frame["日期"] = pd.to_datetime(compact, format="%Y%m%d", errors="coerce")
     frame = frame.dropna(subset=["日期"]).sort_values("日期", kind="stable")
     if frame.empty:
         raise ValueError(f"canonical DataHub daily kline is empty: {path}")
