@@ -584,6 +584,29 @@
       "behavior": "五类公司事件只在 ingestion 层拉取并原子发布；累计三次异常触发熔断；合法空结果标记 EMPTY 而非 MISSING；每个标的后原子更新运行中 manifest。"
     },
     {
+      "id": "INFRA-PROVIDER-BOUNDARY-GATE-01",
+      "title": "全仓 provider SDK 边界成为阻断门禁",
+      "code_locations": [
+        {
+          "file": "commands/tests/test_provider_boundary_architecture.py",
+          "function": "test_provider_sdks_exist_only_at_datahub_ingestion_boundaries",
+          "line": 22
+        },
+        {
+          "file": "commands/factor_lab/data_source/registry.py",
+          "line": 40
+        }
+      ],
+      "expected_keywords": [
+        "PROVIDER_MODULES",
+        "ALLOWED_PREFIXES",
+        "provider SDK outside DataHub boundary",
+        "network_policy",
+        "adapter_owned"
+      ],
+      "behavior": "AST 扫描 commands 全仓，AkShare/Baostock/JoinQuant/Tushare 只能出现在 ingestion/data-source/provider 边界；全局 DNS monkeypatch 与截断重复因子文件已删除，新增旁路将直接使测试失败。"
+    },
+    {
       "id": "INFRA-BAOSTOCK-FACADE-RETIRE-01",
       "title": "退役 Baostock 平行数据与特征写入系统",
       "code_locations": [

@@ -8,19 +8,14 @@ in HermesData.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from factor_lab.data_source.spec import (
     DataSourceSpec,
-    DataSourceCategory,
-    DataSourceCapability,
     DataSourceStatus,
     validate_spec,
-    VALID_CATEGORIES,
-    VALID_CAPABILITIES,
     VALID_STATUSES,
 )
 
@@ -87,7 +82,7 @@ DEFAULT_SOURCES = [
         category="fundamental",
         capabilities=["fundamental", "kline_daily", "kline_minute"],
         priority=1,
-        config={"requires_dns_patch": True, "note": "需要DNS修补绕过Akamai"},
+        config={"network_policy": "adapter_owned", "note": "连接与代理策略由 ingestion adapter 管理"},
     ),
     DataSourceSpec(
         source_id="announcement",
