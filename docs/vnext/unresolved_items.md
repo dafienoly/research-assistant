@@ -18,6 +18,7 @@
 - QMT Bridge 已配置且行情侧可用，但 `XtQuantTrader connect failed: -1`，账户/持仓不能连续读取；订单通道继续 DISABLED。
 - 应用内浏览器运行时可加载，但本轮 `agent.browsers.list()` 返回空列表；HTTP、DOM、lint、Vitest 和生产构建已通过，真实浏览器 console/点击证据仍 BLOCKED。
 - `scripts/mx_fetch_step.py` 曾包含硬编码高熵凭据，现已改为 `MX_APIKEY` 环境变量；旧凭据必须在提供方撤销/轮换，代码删除不能清除 Git 历史。
+- `dive_prediction/datahub_supplement.py` 曾明文保存 JoinQuant 账号密码，现已物理删除并退役直连入口；该 JoinQuant 密码同样必须在提供方轮换，Git 历史按泄露凭据处理。
 
 ## 供应链与产品化剩余风险
 

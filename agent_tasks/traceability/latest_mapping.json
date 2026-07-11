@@ -584,6 +584,29 @@
       "behavior": "五类公司事件只在 ingestion 层拉取并原子发布；累计三次异常触发熔断；合法空结果标记 EMPTY 而非 MISSING；每个标的后原子更新运行中 manifest。"
     },
     {
+      "id": "P0-DIVE-SUPPLEMENT-DATAHUB-01",
+      "title": "跳水预测补充入口退役直连 provider 与破坏性写入",
+      "code_locations": [
+        {
+          "file": "commands/dive_prediction/datahub_supplement.py",
+          "function": "main",
+          "line": 46
+        },
+        {
+          "file": "commands/tests/test_dive_datahub_supplement.py",
+          "line": 1
+        }
+      ],
+      "expected_keywords": [
+        "datahub_cron.sh",
+        "MarketSeriesIngestion",
+        "datahub_write_lock",
+        "931743.CSI",
+        "daily-incremental"
+      ],
+      "behavior": "旧 dive supplement 的股票/资金流参数只触发一次 canonical daily ingestion，指数由 MarketSeriesIngestion 在全局锁内拉取；源码不再包含 JoinQuant 凭据、代理环境删除、unlink 或 CSV 直写。"
+    },
+    {
       "id": "P2-DATAHUB-PYTHON-WRITE-LOCK-01",
       "title": "独立 Python DataHub writer 与备份恢复共享全局锁",
       "code_locations": [

@@ -4,8 +4,14 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from factor_lab.datahub_ingestion.factor_inputs import FactorInputProjection
+
+
+@pytest.fixture(autouse=True)
+def isolated_datahub_lock(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HERMES_LOCK_DIR", str(tmp_path / "locks"))
 
 
 def test_legacy_rebuilder_is_only_a_datahub_facade() -> None:
