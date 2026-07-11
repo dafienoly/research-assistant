@@ -16,7 +16,9 @@ import uuid
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping, Protocol
+from typing import Any, Callable, Mapping, Protocol
+
+from factor_lab.notification_transport import telegram_sender
 
 from .contracts import (
     ApprovedOrderEnvelope,
@@ -424,6 +426,7 @@ class TelegramApprovalGate:
         *,
         signing_secret: str | None = None,
         approval_ttl_seconds: int = 300,
+        sender: Callable[[dict], dict] | None = None,
     ) -> None:
         self.directory = Path(directory)
         self.directory.mkdir(parents=True, exist_ok=True)
@@ -432,6 +435,7 @@ class TelegramApprovalGate:
         if approval_ttl_seconds < 1:
             raise ValueError("approval_ttl_seconds must be positive")
         self.approval_ttl_seconds = approval_ttl_seconds
+        self.sender = sender or telegram_sender
 
     def create(self, order: OrderDraft, *, kill_switch: bool, miniqmt_mode: str) -> dict[str, Any]:
         record = {
@@ -504,25 +508,16 @@ class TelegramApprovalGate:
             result = {"status": "DRY_RUN", "approval_id": approval_id, "message": message, "sent": False}
             self.journal.append("telegram_dry_run", result)
             return result
-        token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-        chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
-        if not token or not chat_id:
-            result = {"status": DataStatus.MISSING.value, "sent": False, "reason": "Telegram credentials missing"}
-            self.journal.append("telegram_send_blocked", {"approval_id": approval_id, **result})
-            return result
-        import urllib.parse
-        import urllib.request
-
-        body = urllib.parse.urlencode({"chat_id": chat_id, "text": message}).encode("utf-8")
-        request = urllib.request.Request(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            data=body,
-            method="POST",
-        )
         try:
-            with urllib.request.urlopen(request, timeout=10) as response:
-                sent = response.status == 200
-            result = {"status": "SENT" if sent else "FAILED", "sent": sent, "approval_id": approval_id}
+            transport = self.sender({"event_id": approval_id, "text": message})
+            sent = bool(transport.get("ok"))
+            reason = transport.get("error")
+            result = {
+                "status": "SENT" if sent else (DataStatus.MISSING.value if reason == "not_configured" else "FAILED"),
+                "sent": sent,
+                "approval_id": approval_id,
+                "reason": reason,
+            }
         except Exception as exc:
             result = {"status": "FAILED", "sent": False, "approval_id": approval_id, "reason": type(exc).__name__}
         self.journal.append("telegram_send", result)

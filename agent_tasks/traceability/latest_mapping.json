@@ -225,8 +225,19 @@
       ],
       "expected_keywords": ["data:incremental-update", "data:audit", "data:gap-plan", "flock -n", "factor-pipeline.lock"],
       "behavior": "15:45 数据增量先于复盘、realized、Event Truth、认证和因子任务；关键任务使用独立锁，周度维护单独调度。"
+    },
+    {
+      "id": "INFRA-NOTIFY-01",
+      "title": "通知网络传输统一与业务模块解耦",
+      "code_locations": [
+        {"file": "commands/factor_lab/notification_transport.py", "function": "post_json", "line": 18},
+        {"file": "commands/factor_lab/vnext/execution.py", "function": "send", "line": 499},
+        {"file": "commands/tests/test_datahub_architecture.py", "function": "test_vnext_and_decision_loop_do_not_implement_notification_networking", "line": 49}
+      ],
+      "expected_keywords": ["ALLOWED_NOTIFICATION_HOSTS", "self.sender", "notification transport bypasses"],
+      "behavior": "Telegram/企业微信凭据、host allow-list 和 HTTP 发送集中到 transport；VNext/Decision Loop 只创建意图和记录回执，不自行实现网络调用。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-11T22:18:00+08:00"
+  "generated_at": "2026-07-11T22:35:00+08:00"
 }

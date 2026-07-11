@@ -67,6 +67,8 @@ raw → staging → normalized → manifest/conflict/freshness
 - 遗留脚本仍可能直接调用企业微信或其他发送函数，需迁移为 NotificationCenter 事件投递。
 - 业务模块只允许创建 notification intent，不负责网络发送、重试或关闭状态。
 
+已完成第一轮整改：Telegram 与企业微信的网络传输、HTTPS host allow-list 和凭据读取迁移至 `factor_lab.notification_transport`；VNext 审批发送器通过注入的中央 transport 投递；架构测试禁止 VNext/Decision Loop 再次实现 `urllib/requests/httpx` 网络发送。
+
 ## 因子与研究初步发现
 
 - 因子计算存在硬编码 DataHub 路径，缺少统一 snapshot/version 参数。

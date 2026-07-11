@@ -44,3 +44,20 @@ def test_runtime_modules_do_not_bypass_datahub():
         for path in root.rglob("*.py"):
             violations.extend(provider_imports(path))
     assert violations == [], "runtime provider bypasses:\n" + "\n".join(violations)
+
+
+def test_vnext_and_decision_loop_do_not_implement_notification_networking():
+    violations = []
+    for root in (ROOT / "commands/factor_lab/vnext", ROOT / "commands/factor_lab/decision_loop"):
+        for path in root.rglob("*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    names = [alias.name for alias in node.names]
+                elif isinstance(node, ast.ImportFrom):
+                    names = [node.module or ""]
+                else:
+                    continue
+                if any(name.startswith(("urllib", "requests", "httpx")) for name in names):
+                    violations.append(f"{path.relative_to(ROOT)}:{node.lineno}:{','.join(names)}")
+    assert violations == [], "notification transport bypasses:\n" + "\n".join(violations)
