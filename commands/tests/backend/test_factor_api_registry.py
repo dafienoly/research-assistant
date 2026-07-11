@@ -152,7 +152,8 @@ class TestFactorRegistryService:
 
 class TestFactorApiEndpoints:
 
-    client = TestClient(app)
+    _token = os.environ.get("HERMES_UI_TOKEN", "")
+    client = TestClient(app, headers={"Authorization": f"Bearer {_token}"} if _token else {})
 
     def test_list_factors_ge_100(self):
         """GET /api/factors 返回 >= 100 个因子"""

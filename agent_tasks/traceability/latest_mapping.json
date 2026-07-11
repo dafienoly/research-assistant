@@ -584,6 +584,29 @@
       "behavior": "五类公司事件只在 ingestion 层拉取并原子发布；累计三次异常触发熔断；合法空结果标记 EMPTY 而非 MISSING；每个标的后原子更新运行中 manifest。"
     },
     {
+      "id": "P2-DATAHUB-PYTHON-WRITE-LOCK-01",
+      "title": "独立 Python DataHub writer 与备份恢复共享全局锁",
+      "code_locations": [
+        {
+          "file": "commands/factor_lab/datahub_ingestion/locking.py",
+          "function": "datahub_write_lock",
+          "line": 18
+        },
+        {
+          "file": "commands/tests/test_datahub_write_lock.py",
+          "line": 1
+        }
+      ],
+      "expected_keywords": [
+        "datahub-global.lock",
+        "LOCK_EX",
+        "LOCK_NB",
+        "DataHubLockBusy",
+        "HERMES_LOCK_DIR"
+      ],
+      "behavior": "FactorInputProjection 和标签维护的独立 CLI 写入与 shell cron、D 盘备份、恢复共用同一个非阻塞跨进程锁；竞争时 fail-closed，不进入写区。"
+    },
+    {
       "id": "INFRA-TAG-MAINTAINER-DATAHUB-01",
       "title": "标签维护只读 canonical reference 并原子发布",
       "code_locations": [
@@ -621,6 +644,16 @@
           "line": 14
         },
         {
+          "file": "commands/factor_lab/datahub_access.py",
+          "function": "read_fund_flow_partitions",
+          "line": 116
+        },
+        {
+          "file": "commands/factor_lab/factor_engine.py",
+          "function": "load_fund_flow",
+          "line": 173
+        },
+        {
           "file": "commands/tests/test_factor_input_projection.py",
           "line": 1
         }
@@ -631,9 +664,11 @@
         "normalized/fund_flow",
         "regulatory_watchlist.json",
         "atomic_write_frame",
-        "FactorInputProjection"
+        "FactorInputProjection",
+        "read_fund_flow_partitions",
+        "PARTITIONED"
       ],
-      "behavior": "基本面、资金流和公告情绪宽表只由 DataHub projection owner 从 canonical normalized 快照原子物化并记录 SHA/coverage manifest；旧 data_hub_rebuilder CLI 不再拥有 MX/Baostock/provider 或 CSV 写入逻辑。"
+      "behavior": "基本面与公告情绪宽表由 DataHub projection owner 从 canonical normalized 快照原子物化并记录 SHA/coverage manifest；资金流保持按标的分区，因子入口只读取当前 universe 分区，不再重建 460 万行全市场宽表；旧 CLI 不拥有 provider 或 CSV 写入逻辑。"
     },
     {
       "id": "INFRA-LEGACY-KLINE-OWNER-01",

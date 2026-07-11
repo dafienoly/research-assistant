@@ -393,7 +393,9 @@ def reset_service():
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    token = os.environ.get("HERMES_UI_TOKEN", "")
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    return TestClient(app, headers=headers)
 
 
 class TestPaperAPI:
@@ -404,7 +406,7 @@ class TestPaperAPI:
     def test_get_balance(self, client):
         resp = client.get("/api/paper/balance")
         assert resp.status_code == 200
-        d = resp.json()
+        d = resp.json()["data"]
         assert d["cash"] == 1_000_000.0
         assert d["total_value"] == 1_000_000.0
         assert d["total_pnl"] == 0.0
@@ -416,7 +418,7 @@ class TestPaperAPI:
     def test_get_positions_empty(self, client):
         resp = client.get("/api/paper/positions")
         assert resp.status_code == 200
-        d = resp.json()
+        d = resp.json()["data"]
         assert d["total"] == 0
         assert d["positions"] == []
 
@@ -425,7 +427,7 @@ class TestPaperAPI:
         service.place_order(symbol="000001", side="buy", quantity=1000, price=10.0)
         resp = client.get("/api/paper/positions")
         assert resp.status_code == 200
-        d = resp.json()
+        d = resp.json()["data"]
         assert d["total"] == 1
         assert d["positions"][0]["symbol"] == "000001"
 
@@ -434,7 +436,7 @@ class TestPaperAPI:
         service.place_order(symbol="000001", side="buy", quantity=1000, price=10.0)
         resp = client.get("/api/paper/positions?symbol=000001")
         assert resp.status_code == 200
-        d = resp.json()
+        d = resp.json()["data"]
         assert d["total"] == 1
 
     # ── Place order ──
@@ -442,35 +444,37 @@ class TestPaperAPI:
     def test_place_order(self, client):
         resp = client.post("/api/paper/orders?symbol=000001&side=buy&quantity=1000&price=10.0")
         assert resp.status_code == 200
-        d = resp.json()
+        d = resp.json()["data"]
         assert d["order_id"].startswith("paper_")
         assert d["status"] in ("filled", "partial")
         assert d["symbol"] == "000001"
 
     def test_place_order_invalid_side(self, client):
         resp = client.post("/api/paper/orders?symbol=000001&side=invalid&quantity=1000&price=10.0")
-        assert resp.status_code == 200
+        assert resp.status_code == 400
         d = resp.json()
-        assert "error" in d
+        assert d["ok"] is False
+        assert d["error"]["code"] == "ORDER_FAILED"
 
     def test_place_order_market(self, client):
         resp = client.post("/api/paper/orders?symbol=000001&side=buy&quantity=1000&price=10.0&order_type=market")
         assert resp.status_code == 200
-        d = resp.json()
+        d = resp.json()["data"]
         assert d["status"] == "filled"
 
     def test_place_order_sell_rejected_no_position(self, client):
         resp = client.post("/api/paper/orders?symbol=000001&side=sell&quantity=100&price=10.0")
-        assert resp.status_code == 200
+        assert resp.status_code == 400
         d = resp.json()
-        assert "error" in d
+        assert d["ok"] is False
+        assert d["error"]["code"] == "ORDER_FAILED"
 
     def test_place_order_sell_ok(self, client):
         service = _get_service()
         service.place_order(symbol="000001", side="buy", quantity=1000, price=10.0)
         resp = client.post("/api/paper/orders?symbol=000001&side=sell&quantity=500&price=11.0")
         assert resp.status_code == 200
-        d = resp.json()
+        d = resp.json()["data"]
         assert d["side"] == "sell"
         assert d["status"] == "filled"
 
@@ -481,14 +485,14 @@ class TestPaperAPI:
         service.place_order(symbol="000001", side="buy", quantity=1000, price=10.0)
         resp = client.get("/api/paper/orders")
         assert resp.status_code == 200
-        d = resp.json()
+        d = resp.json()["data"]
         assert d["total"] >= 1
         assert len(d["orders"]) >= 1
 
     def test_get_orders_empty(self, client):
         resp = client.get("/api/paper/orders")
         assert resp.status_code == 200
-        d = resp.json()
+        d = resp.json()["data"]
         assert d["total"] == 0
 
     def test_get_orders_filter(self, client):
@@ -496,7 +500,7 @@ class TestPaperAPI:
         service.place_order(symbol="000001", side="buy", quantity=1000, price=10.0)
         resp = client.get("/api/paper/orders?status=filled")
         assert resp.status_code == 200
-        d = resp.json()
+        d = resp.json()["data"]
         for o in d["orders"]:
             assert o["status"] == "filled"
 
@@ -506,7 +510,7 @@ class TestPaperAPI:
             service.place_order(symbol="000001", side="buy", quantity=100, price=10.0)
         resp = client.get("/api/paper/orders?limit=3")
         assert resp.status_code == 200
-        d = resp.json()
+        d = resp.json()["data"]
         assert len(d["orders"]) == 3
 
     # ── Cancel order ──
@@ -520,14 +524,15 @@ class TestPaperAPI:
         if result["status"] == "pending":
             resp = client.delete(f"/api/paper/orders/{result['order_id']}")
             assert resp.status_code == 200
-            d = resp.json()
+            d = resp.json()["data"]
             assert d["status"] == "canceled"
 
     def test_cancel_nonexistent(self, client):
         resp = client.delete("/api/paper/orders/nonexistent")
         assert resp.status_code == 400
         d = resp.json()
-        assert "error" in d
+        assert d["ok"] is False
+        assert d["error"]["code"] == "ORDER_CANCEL_FAILED"
 
     # ── Fills ──
 
@@ -536,14 +541,14 @@ class TestPaperAPI:
         service.place_order(symbol="000001", side="buy", quantity=1000, price=10.0)
         resp = client.get("/api/paper/fills")
         assert resp.status_code == 200
-        d = resp.json()
+        d = resp.json()["data"]
         assert d["total"] >= 1
         assert len(d["fills"]) >= 1
 
     def test_get_fills_empty(self, client):
         resp = client.get("/api/paper/fills")
         assert resp.status_code == 200
-        d = resp.json()
+        d = resp.json()["data"]
         assert d["total"] == 0
 
     def test_get_fills_filter(self, client):
@@ -552,7 +557,7 @@ class TestPaperAPI:
         service.place_order(symbol="000002", side="buy", quantity=500, price=20.0)
         resp = client.get("/api/paper/fills?symbol=000001")
         assert resp.status_code == 200
-        d = resp.json()
+        d = resp.json()["data"]
         for f in d["fills"]:
             assert f["symbol"] == "000001"
 
@@ -563,7 +568,7 @@ class TestPaperAPI:
         service.place_order(symbol="000001", side="buy", quantity=1000, price=10.0)
         resp = client.post("/api/paper/reset")
         assert resp.status_code == 200
-        d = resp.json()
+        d = resp.json()["data"]
         assert d["status"] == "ok"
 
         bal = _get_service().get_balance()

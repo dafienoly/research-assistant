@@ -16,19 +16,18 @@
     df = get_enriched_data(symbols=["000001", "000002"])
 """
 
-import csv, os, json
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from typing import Optional
 
-import numpy as np
 import pandas as pd
+
+from factor_lab.datahub_access import DATAHUB_ROOT, read_fund_flow_partitions
 
 CST = timezone(timedelta(hours=8))
 
 # ─── 路径 ─────────────────────────────────────────────────────────
-HERMES_DATA = Path("/home/ly/.hermes/research-assistant/data")
-FUND_FLOW_PATH = HERMES_DATA / "fundamentals" / "fund_flow_timeseries.csv"
+HERMES_DATA = Path(__file__).resolve().parents[3] / "data"
+FUND_FLOW_PATH = DATAHUB_ROOT / "fund_flow"
 NORTH_FLOW_PATH = HERMES_DATA / "fundamentals" / "north_flow_timeseries.csv"
 MARGIN_PATH = HERMES_DATA / "fundamentals" / "margin_timeseries.csv"
 
@@ -72,13 +71,11 @@ def load_fund_flow(symbols: list = None) -> pd.DataFrame:
         pd.DataFrame (列: FUND_FLOW_COLUMNS)
         文件不存在时返回空 DataFrame。
     """
-    if not FUND_FLOW_PATH.exists():
+    if not symbols or not FUND_FLOW_PATH.exists():
         return pd.DataFrame(columns=FUND_FLOW_COLUMNS)
     try:
-        df = pd.read_csv(FUND_FLOW_PATH, encoding="utf-8-sig")
+        df = read_fund_flow_partitions([str(symbol) for symbol in symbols], root=FUND_FLOW_PATH)
         df.columns = [c.strip().lower() for c in df.columns]
-        if symbols:
-            df = df[df["symbol"].astype(str).isin(symbols)]
         # 确保列存在
         for col in FUND_FLOW_COLUMNS:
             if col not in df.columns:
@@ -195,7 +192,8 @@ def merge_enriched(df: pd.DataFrame) -> pd.DataFrame:
     if "date" in result.columns:
         result["date"] = result["date"].astype(str)
 
-    enriched = get_enriched_data()
+    symbols = result["symbol"].dropna().astype(str).unique().tolist() if "symbol" in result else []
+    enriched = get_enriched_data(symbols)
 
     # 资金流
     if enriched["has_fund_flow"]:
@@ -242,9 +240,9 @@ def merge_enriched(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
-def load_fund_flow_timeseries() -> pd.DataFrame:
-    """便捷函数: 直接返回 fund_flow_timeseries.csv 内容"""
-    return load_fund_flow()
+def load_fund_flow_timeseries(symbols: list | None = None) -> pd.DataFrame:
+    """Compatibility helper requiring an explicit symbol scope."""
+    return load_fund_flow(symbols)
 
 
 def data_enrichment_status() -> dict:
@@ -264,9 +262,8 @@ def data_enrichment_status() -> dict:
 
 
 if __name__ == "__main__":
-    import json
     status = data_enrichment_status()
-    print(f"Data Enrichment Data Sources:")
+    print("Data Enrichment Data Sources:")
     print(f"  Fund Flow:     {'✅' if status['fund_flow_exists'] else '❌'} {status['fund_flow_path']}")
     print(f"  North Flow:    {'✅' if status['north_flow_exists'] else '❌'} {status['north_flow_path']}")
     print(f"  Margin:        {'✅' if status['margin_exists'] else '❌'} {status['margin_path']}")

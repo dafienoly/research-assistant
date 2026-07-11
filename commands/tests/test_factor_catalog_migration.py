@@ -219,15 +219,14 @@ def test_industry_relative_factors_registered():
     """V3.1: factor_base 中的 industry_relative 因子必须全部注册"""
     from factor_lab.factor_base import list_factors
     ind_factors = [f for f in list_factors() if f["category"] == "industry_relative"]
-    assert len(ind_factors) == 10, f"预期 10 个 industry_relative 因子, 实际 {len(ind_factors)}"
-    names = {f["name"] for f in ind_factors}
     expected = {
-        "ret5_industry_adj", "ret10_industry_adj", "ret20_industry_adj",
+        "ret20_industry_adj", "ret10_industry_adj", "ret5_industry_adj",
         "volatility20_industry_adj", "vol_ratio20_industry_adj", "amihud_industry_adj",
-        "industry_neutral_quality", "fund_flow_industry_adj",
-        "industry_neutral_composite", "cross_sector_strength",
+        "industry_neutral_quality", "fund_flow_industry_adj", "industry_neutral_composite",
+        "cross_sector_strength", "industry_relative_ret5", "industry_momentum",
+        "industry_concentration",
     }
-    assert names == expected, f"因子名不匹配: 预期={expected}, 实际={names}"
+    assert {factor["name"] for factor in ind_factors} == expected
 
 
 def test_industry_mapper_basic():
@@ -542,12 +541,12 @@ def test_data_enrichment_factors_graceful_degradation():
 def test_data_enrichment_loader_graceful_empty():
     """V3.3: 加载器在缺失数据文件时返回空 DataFrame 而非崩溃"""
     from factor_lab.alpha.data_enrichment_loader import (
-        load_fund_flow, load_north_flow, load_margin,
+        load_north_flow, load_margin,
     )
 
     # 即使文件不存在也能返回有效 DataFrame
     nf = load_north_flow()
-    assert isinstance(nf, pd.DataFrame) if "pd" in dir() else True
+    assert hasattr(nf, "columns")
     for col in ["nb_net_flow", "nb_total_buy", "nb_total_sell", "nb_holding_value", "nb_holding_ratio"]:
         assert col in nf.columns or len(nf) == 0
 

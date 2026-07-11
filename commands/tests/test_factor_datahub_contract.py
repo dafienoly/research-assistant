@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from factor_lab import factor_engine
-from factor_lab.datahub_access import factor_input_locations, read_stock_industry_map
+from factor_lab.datahub_access import factor_input_locations, read_fund_flow_partitions, read_stock_industry_map
 
 
 def test_factor_input_locations_support_isolated_datahub_root(monkeypatch, tmp_path: Path) -> None:
@@ -104,6 +104,50 @@ def test_industry_map_is_read_from_canonical_stock_reference(tmp_path: Path) -> 
     mapping = read_stock_industry_map(source)
 
     assert mapping == {"000001": "银行", "000002": "房地产"}
+
+
+def test_fund_flow_reads_only_requested_canonical_partitions(tmp_path: Path) -> None:
+    pd.DataFrame({
+        "ts_code": ["688012.SH"], "trade_date": [20260710], "net_mf_amount": [10.0],
+        "buy_elg_amount": [7.0], "sell_elg_amount": [2.0],
+    }).to_csv(tmp_path / "688012.SH.csv", index=False)
+    pd.DataFrame({
+        "ts_code": ["000001.SZ"], "trade_date": [20260710], "net_mf_amount": [99.0],
+    }).to_csv(tmp_path / "000001.SZ.csv", index=False)
+
+    frame = read_fund_flow_partitions(["688012"], root=tmp_path)
+
+    assert frame["symbol"].unique().tolist() == ["688012"]
+    assert frame.iloc[0]["net_main_force"] == 10.0
+    assert frame.iloc[0]["net_super_large"] == 5.0
+
+
+def test_stock_loader_requests_only_active_fund_flow_partitions(monkeypatch, tmp_path: Path) -> None:
+    kline_root = tmp_path / "daily"
+    kline_root.mkdir()
+    pd.DataFrame({
+        "date": ["2026-07-09", "2026-07-10"], "open": [10, 11], "high": [11, 12],
+        "low": [9, 10], "close": [10.5, 11.5], "volume": [100, 200], "amount": [1000, 2300],
+    }).to_csv(kline_root / "688012.csv", index=False)
+    monkeypatch.setattr(factor_engine, "KLINE", kline_root)
+    for name in ("FUND_CSV", "NORTH_CSV", "MARGIN_CSV", "EVENT_CSV", "SENTIMENT_CSV"):
+        monkeypatch.setattr(factor_engine, name, tmp_path / f"missing-{name}.csv")
+    requested: list[list[str]] = []
+
+    def read_partitions(symbols: list[str]) -> pd.DataFrame:
+        requested.append(symbols)
+        return pd.DataFrame({
+            "symbol": ["688012"], "date": [20260710], "net_main_force": [12.0],
+        })
+
+    monkeypatch.setattr(factor_engine, "read_fund_flow_partitions", read_partitions)
+
+    frame = factor_engine.load_stock_kline(
+        ["688012", "000001"], start_date="2026-07-09", end_date="2026-07-10", min_days=2,
+    )
+
+    assert requested == [["688012"]]
+    assert frame.loc[frame["date"] == pd.Timestamp("2026-07-10"), "net_main_force"].iloc[0] == 12.0
 
 
 def test_incompatible_auxiliary_schema_is_visible_and_not_broadcast(tmp_path: Path, capsys) -> None:

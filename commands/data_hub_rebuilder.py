@@ -42,7 +42,7 @@ def main() -> int:
     results = {target: targets[target]() for target in requested}
     for target, result in results.items():
         print(f"{target}: {result['status']} rows={result['rows']}")
-    return 0 if all(result["status"] in {"OK", "EMPTY"} for result in results.values()) else 1
+    return 0 if all(result["status"] in {"OK", "EMPTY", "PARTITIONED"} for result in results.values()) else 1
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ import pandas as pd
 
 from data_recovery import atomic_write_frame
 from factor_lab.datahub_ingestion.event_truth import EventTruthIngestion
+from factor_lab.datahub_ingestion.locking import datahub_write_lock
 
 
 POSITIVE_TERMS = (
@@ -43,9 +44,21 @@ class FactorInputProjection:
         self.manifest_path = self.root / "data/audit/manifests/factor_input_projection.json"
 
     def build(self, target: str) -> dict[str, Any]:
+        with datahub_write_lock():
+            return self._build_locked(target)
+
+    def _build_locked(self, target: str) -> dict[str, Any]:
+        if target == "fund-flow":
+            partition_root = self.normalized / "fund_flow"
+            files = list(partition_root.glob("*.csv"))
+            return self._record(target, "PARTITIONED", 0, evidence={
+                "input_files": len(files),
+                "source": "normalized/fund_flow",
+                "path": str(partition_root.relative_to(self.root)),
+                "policy": "consumers read only requested symbol partitions",
+            })
         builders = {
             "fundamentals": self._fundamentals,
-            "fund-flow": self._fund_flow,
             "sentiment": self._sentiment,
         }
         if target not in builders:
@@ -66,8 +79,8 @@ class FactorInputProjection:
                 continue
             result = pd.DataFrame({
                 "symbol": source["ts_code"].astype("string").str.extract(r"(\d{6})", expand=False),
-                "report_date": source["end_date"],
-                "pub_date": source["ann_date"],
+                "report_date": self._normalize_dates(source["end_date"]),
+                "pub_date": self._normalize_dates(source["ann_date"]),
             })
             aliases = {
                 "roe": "roe",
@@ -91,33 +104,13 @@ class FactorInputProjection:
         combined = combined.drop_duplicates(["symbol", "report_date"], keep="last")
         return combined, {"input_files": len(files), "source": "normalized/fundamentals"}
 
-    def _fund_flow(self) -> tuple[pd.DataFrame, dict[str, Any]]:
-        frames: list[pd.DataFrame] = []
-        files = sorted((self.normalized / "fund_flow").glob("*.csv"))
-        for path in files:
-            source = pd.read_csv(path, encoding="utf-8-sig", dtype={"ts_code": "string"}, low_memory=False)
-            required = {"ts_code", "trade_date", "net_mf_amount"}
-            if source.empty or not required.issubset(source.columns):
-                continue
-            result = pd.DataFrame({
-                "symbol": source["ts_code"].astype("string").str.extract(r"(\d{6})", expand=False),
-                "date": source["trade_date"],
-                "net_main_force": source["net_mf_amount"],
-            })
-            for prefix, output in (
-                ("elg", "net_super_large"), ("lg", "net_large"),
-                ("md", "net_medium"), ("sm", "net_small"),
-            ):
-                buy, sell = f"buy_{prefix}_amount", f"sell_{prefix}_amount"
-                if buy in source and sell in source:
-                    result[output] = pd.to_numeric(source[buy], errors="coerce") - pd.to_numeric(source[sell], errors="coerce")
-            frames.append(result)
-        columns = ["symbol", "date", "net_main_force", "net_super_large", "net_large", "net_medium", "net_small"]
-        if not frames:
-            return pd.DataFrame(columns=columns), {"reason": "canonical_fund_flow_missing", "input_files": 0}
-        combined = pd.concat(frames, ignore_index=True).dropna(subset=["symbol", "date"])
-        combined = combined.sort_values(["symbol", "date"], kind="stable").drop_duplicates(["symbol", "date"], keep="last")
-        return combined, {"input_files": len(files), "source": "normalized/fund_flow"}
+    @staticmethod
+    def _normalize_dates(values: pd.Series) -> pd.Series:
+        text = values.astype("string").str.replace(r"\.0$", "", regex=True).str.strip()
+        compact = text.str.fullmatch(r"\d{8}", na=False)
+        parsed = pd.to_datetime(text.where(compact), format="%Y%m%d", errors="coerce")
+        parsed = parsed.fillna(pd.to_datetime(text.where(~compact), format="mixed", errors="coerce"))
+        return parsed.dt.strftime("%Y-%m-%d")
 
     def _sentiment(self) -> tuple[pd.DataFrame, dict[str, Any]]:
         source_path = self.normalized / "events/regulatory_watchlist.json"
@@ -172,7 +165,7 @@ class FactorInputProjection:
         result = {
             "status": status,
             "rows": rows,
-            "path": str(self.outputs[target].relative_to(self.root)),
+            "path": (evidence or {}).get("path", str(self.outputs[target].relative_to(self.root))),
             "sha256": sha256,
             "observed_at": datetime.now().astimezone().isoformat(),
             "source": "canonical_datahub_projection",

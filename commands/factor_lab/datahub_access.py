@@ -109,6 +109,40 @@ def read_stock_name_map(path: Path | None = None) -> dict[str, str]:
     return dict(zip(usable["symbol"], usable["name"], strict=False))
 
 
+def read_fund_flow_partitions(symbols: list[str], root: Path | None = None) -> pd.DataFrame:
+    """Read only requested canonical fund-flow partitions."""
+    source_root = root or DATAHUB_ROOT / "fund_flow"
+    frames: list[pd.DataFrame] = []
+    for raw_symbol in sorted({str(symbol) for symbol in symbols}):
+        digits = "".join(character for character in raw_symbol if character.isdigit())[:6]
+        if len(digits) != 6:
+            continue
+        suffix = "SH" if digits.startswith(("6", "9")) else "BJ" if digits.startswith(("8", "4")) else "SZ"
+        path = source_root / f"{digits}.{suffix}.csv"
+        if not path.exists():
+            continue
+        frame = pd.read_csv(path, encoding="utf-8-sig", dtype={"ts_code": "string"}, low_memory=False)
+        required = {"trade_date", "net_mf_amount"}
+        if frame.empty or not required.issubset(frame.columns):
+            continue
+        projected = pd.DataFrame({
+            "symbol": digits,
+            "date": frame["trade_date"],
+            "net_main_force": frame["net_mf_amount"],
+        })
+        for prefix, output in (
+            ("elg", "net_super_large"), ("lg", "net_large"),
+            ("md", "net_medium"), ("sm", "net_small"),
+        ):
+            buy, sell = f"buy_{prefix}_amount", f"sell_{prefix}_amount"
+            if buy in frame and sell in frame:
+                projected[output] = pd.to_numeric(frame[buy], errors="coerce") - pd.to_numeric(frame[sell], errors="coerce")
+        frames.append(projected)
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True).sort_values(["symbol", "date"], kind="stable")
+
+
 def read_etf_holdings(etf_code: str, path: Path | None = None) -> pd.DataFrame:
     """Read the latest holdings disclosure for one ETF from canonical DataHub."""
     source = path or ETF_HOLDINGS_PATH

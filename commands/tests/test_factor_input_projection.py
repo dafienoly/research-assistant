@@ -38,12 +38,14 @@ def test_projection_materializes_canonical_fundamentals_and_fund_flow(tmp_path: 
     flow_result = projection.build("fund-flow")
 
     assert fundamental_result["status"] == "OK"
-    assert flow_result["status"] == "OK"
+    assert flow_result["status"] == "PARTITIONED"
     fundamental_frame = pd.read_csv(tmp_path / fundamental_result["path"], dtype={"symbol": "string"})
-    flow_frame = pd.read_csv(tmp_path / flow_result["path"])
     assert fundamental_frame.iloc[0]["symbol"] == "688012"
-    assert flow_frame.iloc[0]["net_super_large"] == 5.0
-    assert fundamental_result["sha256"] and flow_result["sha256"]
+    assert fundamental_frame.iloc[0]["report_date"] == "2026-03-31"
+    assert fundamental_frame.iloc[0]["pub_date"] == "2026-04-28"
+    assert flow_result["path"] == "data/normalized/fund_flow"
+    assert flow_result["evidence"]["policy"] == "consumers read only requested symbol partitions"
+    assert fundamental_result["sha256"]
 
 
 def test_sentiment_projection_uses_only_verified_regulatory_snapshot(tmp_path: Path) -> None:

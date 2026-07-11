@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "datasets": {
+    "fundamentals": {
+      "status": "OK",
+      "rows": 113762,
+      "path": "data/fundamentals/fundamentals_timeseries.csv",
+      "sha256": "fb62986c309b9412e380b8de1469f12333f7b6318d31b55f6084d93f8082fd2c",
+      "observed_at": "2026-07-12T05:27:06.164405+08:00",
+      "source": "canonical_datahub_projection",
+      "evidence": {
+        "input_files": 5528,
+        "source": "normalized/fundamentals"
+      }
+    },
+    "fund-flow": {
+      "status": "PARTITIONED",
+      "rows": 0,
+      "path": "data/normalized/fund_flow",
+      "sha256": null,
+      "observed_at": "2026-07-12T05:27:17.240060+08:00",
+      "source": "canonical_datahub_projection",
+      "evidence": {
+        "input_files": 5606,
+        "source": "normalized/fund_flow",
+        "path": "data/normalized/fund_flow",
+        "policy": "consumers read only requested symbol partitions"
+      }
+    },
+    "sentiment": {
+      "status": "OK",
+      "rows": 1,
+      "path": "data/news_sentiment_timeseries.csv",
+      "sha256": "f642d92de612d65b16a29d8927b49980ceded7f464b32271dc6fc26d1c1c8e78",
+      "observed_at": "2026-07-12T05:19:10.975268+08:00",
+      "source": "canonical_datahub_projection",
+      "evidence": {
+        "verified_empty": false,
+        "source": "normalized/events/regulatory_watchlist.json",
+        "covered_symbols": [
+          "688012"
+        ]
+      }
+    }
+  },
+  "generated_at": "2026-07-12T05:27:17.240060+08:00"
+}

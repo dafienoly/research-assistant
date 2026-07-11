@@ -7,7 +7,12 @@ import numpy as np
 from pathlib import Path
 from datetime import timedelta, timezone
 
-from factor_lab.datahub_access import daily_kline_path, factor_input_locations, read_stock_industry_map
+from factor_lab.datahub_access import (
+    daily_kline_path,
+    factor_input_locations,
+    read_fund_flow_partitions,
+    read_stock_industry_map,
+)
 
 CST = timezone(timedelta(hours=8))
 _INPUTS = factor_input_locations()
@@ -165,7 +170,17 @@ def merge_fundamentals(kline_df: pd.DataFrame, fund_df: pd.DataFrame) -> pd.Data
 
 # ─── 资金流向 ──────────────────
 
-def load_fund_flow() -> pd.DataFrame:
+def load_fund_flow(symbols: list[str] | None = None) -> pd.DataFrame:
+    if symbols:
+        frame = read_fund_flow_partitions(symbols)
+        if frame.empty:
+            return frame
+        for column in FLOW_FIELDS:
+            if column in frame:
+                frame[column] = pd.to_numeric(frame[column], errors="coerce")
+        raw_dates = frame["date"].astype("string").str.replace(r"\.0$", "", regex=True)
+        frame["date"] = pd.to_datetime(raw_dates, format="%Y%m%d", errors="coerce")
+        return frame.dropna(subset=["date"])
     return _load_csv(FLOW_CSV, FLOW_FIELDS)
 
 
@@ -261,9 +276,13 @@ def load_stock_kline(symbols: list, start_date: str = "2025-01-01",
     if not fund_df.empty:
         all_df = merge_fundamentals(all_df, fund_df)
 
-    # 日频数据：左连接 symbol+date
+    # 资金流按当前有效标的读取 canonical 分区，禁止加载/重建全市场宽表。
+    flow = load_fund_flow([str(symbol) for symbol in keep])
+    if not flow.empty:
+        all_df = merge_fund_flow(all_df, flow)
+
+    # 其余日频数据：左连接 symbol+date
     for loader, merger, label in [
-        (load_fund_flow, merge_fund_flow, "资金流向"),
         (load_north_bound, merge_north_bound, "北向资金"),
         (load_margin_trading, merge_margin_trading, "两融数据"),
         (load_events, merge_events, "事件数据"),

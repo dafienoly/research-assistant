@@ -8,6 +8,7 @@ from config import PATHS, append_jsonl, now_str
 from data_recovery import atomic_write_frame
 from factor_lab.datahub_access import read_stock_industry_map, read_stock_name_map
 from factor_lab.datahub_ingestion.factor_inputs import FactorInputProjection
+from factor_lab.datahub_ingestion.locking import datahub_write_lock
 
 
 # ========== 标签维护 ==========
@@ -61,6 +62,10 @@ class TagMaintainer:
 
     def update_semiconductor_tags(self):
         """更新半导体产业链标签"""
+        with datahub_write_lock():
+            return self._update_semiconductor_tags_locked()
+
+    def _update_semiconductor_tags_locked(self):
         path = PATHS["tags"] / "semiconductor_chain_tags.csv"
         fieldnames = ["code", "name", "chain_position", "sub_sector", "product", "notes"]
         frame = pd.DataFrame(SEMICONDUCTOR_CHAIN_STOCKS)
@@ -70,6 +75,10 @@ class TagMaintainer:
 
     def update_theme_tags(self):
         """更新主题标签"""
+        with datahub_write_lock():
+            return self._update_theme_tags_locked()
+
+    def _update_theme_tags_locked(self):
         path = PATHS["tags"] / "stock_theme_tags.csv"
         fieldnames = ["code", "name", "theme", "weight", "notes"]
         name_map = read_stock_name_map()
@@ -98,6 +107,10 @@ class TagMaintainer:
 
     def update_industry_tags(self):
         """更新全产业链标签（手动语义 + canonical 行业分类）。"""
+        with datahub_write_lock():
+            return self._update_industry_tags_locked()
+
+    def _update_industry_tags_locked(self):
         path = PATHS["tags"] / "industry_chain_tags.csv"
         fieldnames = ["code", "name", "chain", "sub_chain", "notes", "baostock_industry", "industry_source"]
 
