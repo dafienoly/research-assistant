@@ -91,6 +91,73 @@ def _daily_files() -> list[Path]:
     return sorted(by_code.values())
 
 
+def _reference_stocks() -> list[dict[str, Any]]:
+    """Load canonical security status without triggering an external provider."""
+
+    path = NORMALIZED_DIR / "reference" / "stock_basic.csv"
+    if not path.exists():
+        return []
+    try:
+        frame = pd.read_csv(path, encoding="utf-8-sig", dtype="string")
+    except (OSError, UnicodeError, pd.errors.ParserError):
+        return []
+    required = {"ts_code", "list_status"}
+    if frame.empty or not required.issubset(frame.columns):
+        return []
+    frame = frame.dropna(subset=["ts_code"]).copy()
+    frame["ts_code"] = frame["ts_code"].str.strip().str.upper()
+    frame["list_status"] = frame["list_status"].fillna("").str.strip().str.upper()
+    return frame.to_dict(orient="records")
+
+
+def _active_reference_codes(reference: list[dict[str, Any]]) -> set[str]:
+    return {str(row["ts_code"]) for row in reference if row.get("list_status") == "L"}
+
+
+def _active_daily_scope() -> tuple[list[Path], list[Path], list[dict[str, Any]]]:
+    all_files = _daily_files()
+    reference = _reference_stocks()
+    active_codes = _active_reference_codes(reference)
+    if not active_codes:
+        return all_files, all_files, reference
+    by_code = {_code_from_path(path): path for path in all_files}
+    return [by_code[code] for code in sorted(active_codes & set(by_code))], all_files, reference
+
+
+def _data_roots(files: list[Path]) -> list[str]:
+    return sorted({str(path.parent) for path in files})
+
+
+def _latest_open_day() -> datetime:
+    calendar = NORMALIZED_DIR / "calendar" / "trade_calendar.csv"
+    if calendar.exists():
+        try:
+            frame = pd.read_csv(calendar, encoding="utf-8-sig")
+            dates = pd.to_datetime(frame.get("cal_date"), format="%Y%m%d", errors="coerce")
+            is_open = pd.to_numeric(frame.get("is_open"), errors="coerce")
+            today = datetime.now(CST).replace(tzinfo=None, hour=0, minute=0, second=0, microsecond=0)
+            eligible = dates[(is_open == 1) & (dates <= today)].dropna()
+            if not eligible.empty:
+                return eligible.max().to_pydatetime()
+        except (OSError, UnicodeError, pd.errors.ParserError, TypeError, ValueError):
+            pass
+    return datetime.now(CST).replace(tzinfo=None, hour=0, minute=0, second=0, microsecond=0)
+
+
+def _current_suspended_codes(as_of: datetime) -> set[str]:
+    source = NORMALIZED_DIR / "suspend" / "records.csv"
+    if not source.exists():
+        return set()
+    try:
+        frame = _normalize_trade_date(pd.read_csv(source, encoding="utf-8-sig", dtype={"ts_code": "string"}))
+    except (OSError, UnicodeError, pd.errors.ParserError):
+        return set()
+    if frame.empty or not {"ts_code", "trade_date"}.issubset(frame.columns):
+        return set()
+    current = frame[frame["trade_date"] == pd.Timestamp(as_of.date())]
+    return set(current["ts_code"].dropna().astype("string").str.strip().str.upper())
+
+
 def _code_from_path(path: Path) -> str:
     stem = path.stem.replace("_daily_kline", "")
     if "." in stem:
@@ -135,9 +202,10 @@ def coverage() -> dict[str, Any]:
     """
     _ensure_dirs()
 
-    daily_files = _daily_files()
-
-    total_files = len(daily_files)
+    daily_files, all_daily_files, reference = _active_daily_scope()
+    active_codes = _active_reference_codes(reference)
+    total_files = len(active_codes) if active_codes else len(daily_files)
+    pulled_codes = {_code_from_path(path) for path in daily_files}
     total_rows = 0
     earliest_date: Optional[str] = None
     latest_date: Optional[str] = None
@@ -209,9 +277,14 @@ def coverage() -> dict[str, Any]:
     report = {
         "report_type": "coverage",
         "generated_at": _now_str(),
-        "data_dir": str(DAILY_DIR),
+        "data_dir": _data_roots(daily_files)[0] if len(_data_roots(daily_files)) == 1 else "multiple",
+        "data_roots": _data_roots(daily_files),
+        "universe_status": "OK" if active_codes else "UNKNOWN",
+        "universe_source": "data/normalized/reference/stock_basic.csv" if active_codes else None,
         "total_stocks": total_files,
         "stocks_with_data": len(stocks_with_data),
+        "active_missing_files": len(active_codes - pulled_codes) if active_codes else None,
+        "historical_files_outside_active": len(all_daily_files) - len(daily_files),
         "empty_files": len(empty_files),
         "empty_file_list": empty_files[:20],  # 最多列出 20 个
         "total_rows": total_rows,
@@ -255,9 +328,11 @@ def freshness() -> dict[str, Any]:
     """
     _ensure_dirs()
 
-    daily_files = _daily_files()
-    today = datetime.now(CST).replace(tzinfo=None)
+    daily_files, all_daily_files, reference = _active_daily_scope()
+    active_codes = _active_reference_codes(reference)
+    today = _latest_open_day()
     today_ymd = today.strftime("%Y%m%d")
+    suspended_codes = _current_suspended_codes(today)
 
     stock_freshness: list[dict[str, Any]] = []
     total_lag_days = 0
@@ -267,6 +342,8 @@ def freshness() -> dict[str, Any]:
     min_lag = 999999
     min_lag_code = ""
     future_date_stocks: list[dict[str, Any]] = []
+    suspended_stocks: list[dict[str, Any]] = []
+    lag_observations = 0
 
     for f in daily_files:
         ts_code = _code_from_path(f)
@@ -289,7 +366,10 @@ def freshness() -> dict[str, Any]:
                     "days_in_future": abs(lag_days),
                 })
 
-            total_lag_days += lag_days
+            is_suspended = ts_code in suspended_codes
+            if not is_suspended:
+                total_lag_days += lag_days
+                lag_observations += 1
             if lag_days > max_lag:
                 max_lag = lag_days
                 max_lag_code = ts_code
@@ -298,7 +378,16 @@ def freshness() -> dict[str, Any]:
                 min_lag_code = ts_code
 
             # 新鲜度分级
-            if lag_days <= 7:
+            if is_suspended:
+                freshness_level = "suspended"
+                suspended_stocks.append(
+                    {
+                        "ts_code": ts_code,
+                        "latest_date": latest_date.strftime("%Y-%m-%d"),
+                        "suspended_through": today.strftime("%Y-%m-%d"),
+                    }
+                )
+            elif lag_days <= 7:
                 freshness_level = "fresh"
             elif lag_days <= 30:
                 freshness_level = "stale"
@@ -325,16 +414,28 @@ def freshness() -> dict[str, Any]:
     stale_count = sum(1 for s in stock_freshness if s["freshness_level"] == "stale")
     old_count = sum(1 for s in stock_freshness if s["freshness_level"] == "old")
     ancient_count = sum(1 for s in stock_freshness if s["freshness_level"] == "ancient")
+    suspended_count = sum(1 for s in stock_freshness if s["freshness_level"] == "suspended")
 
-    avg_lag = round(total_lag_days / count_with_data, 1) if count_with_data > 0 else 0
+    avg_lag = round(total_lag_days / lag_observations, 1) if lag_observations > 0 else 0
+    active_missing = len(active_codes - {_code_from_path(path) for path in daily_files}) if active_codes else 0
+    blocking_stocks = [
+        row for row in stock_freshness if row["freshness_level"] in {"stale", "old", "ancient"}
+    ]
 
     report = {
         "report_type": "freshness",
         "generated_at": _now_str(),
         "today": today_ymd,
-        "data_dir": str(DAILY_DIR),
-        "total_stocks": len(daily_files),
+        "as_of_open_date": today.strftime("%Y-%m-%d"),
+        "data_dir": _data_roots(daily_files)[0] if len(_data_roots(daily_files)) == 1 else "multiple",
+        "data_roots": _data_roots(daily_files),
+        "universe_status": "OK" if active_codes else "UNKNOWN",
+        "total_stocks": len(active_codes) if active_codes else len(daily_files),
         "stocks_with_data": count_with_data,
+        "active_missing_files": active_missing if active_codes else None,
+        "historical_files_excluded": len(all_daily_files) - len(daily_files),
+        "status": "OK" if active_codes and not active_missing and not blocking_stocks and not future_date_stocks else "PARTIAL",
+        "blocking_stock_count": active_missing + len(blocking_stocks) + len(future_date_stocks),
         "average_lag_days": avg_lag,
         "max_lag_days": max_lag,
         "max_lag_code": max_lag_code,
@@ -347,9 +448,12 @@ def freshness() -> dict[str, Any]:
             "stale (8-30d)": stale_count,
             "old (31-90d)": old_count,
             "ancient (>90d)": ancient_count,
+            "suspended (canonical)": suspended_count,
         },
+        "suspended_stocks": suspended_stocks[:100],
         "stale_stocks": [s for s in stock_freshness if s["freshness_level"] == "stale"][:20],
         "old_stocks": [s for s in stock_freshness if s["freshness_level"] == "old"][:20],
+        "ancient_stocks": [s for s in stock_freshness if s["freshness_level"] == "ancient"][:20],
     }
 
     report_path = HEALTH_DIR / "freshness.json"
@@ -376,19 +480,11 @@ def missing() -> dict[str, Any]:
     """
     _ensure_dirs()
 
-    # 1) 获取 U0 全A池
-    u0_codes: set[str] = set()
-    u0_total = 0
-    try:
-        from universes import get_universe
-        u = get_universe("U0")
-        stocks = u.get("stocks", [])
-        u0_codes = {s["ts_code"] for s in stocks if s.get("ts_code")}
-        u0_total = len(stocks)
-    except Exception as e:
-        logger.warning(f"无法获取 U0 基础池: {e}")
-        # fallback: 用文件系统已有数据估算
-        pass
+    # 1) 从 canonical DataHub reference 获取当前活跃全 A 池。
+    # 审计是 read-only consumer，禁止在这里调用 universes/provider 拉取。
+    reference = _reference_stocks()
+    u0_codes = _active_reference_codes(reference)
+    u0_total = len(u0_codes)
 
     # 2) 扫描已拉取的日线
     daily_files = _daily_files()
@@ -446,7 +542,10 @@ def missing() -> dict[str, Any]:
     report = {
         "report_type": "missing",
         "generated_at": _now_str(),
-        "data_dir": str(DAILY_DIR),
+        "data_dir": _data_roots(daily_files)[0] if len(_data_roots(daily_files)) == 1 else "multiple",
+        "data_roots": _data_roots(daily_files),
+        "universe_source": "data/normalized/reference/stock_basic.csv" if u0_codes else None,
+        "reference_total_all_statuses": len(reference),
         "u0_total": u0_total,
         "u0_codes_in_universe": len(u0_codes),
         "universe_status": "OK" if u0_codes else "UNKNOWN",
@@ -494,28 +593,26 @@ def survivorship_check() -> dict[str, Any]:
     daily_files = _daily_files()
     pulled_codes = {_code_from_path(f) for f in daily_files}
 
-    # 1) 获取 U0 池中的股票信息
-    u0_stocks: list[dict] = []
-    try:
-        from universes import get_universe
-        u = get_universe("U0")
-        u0_stocks = u.get("stocks", [])
-    except Exception as e:
-        logger.warning(f"无法获取 U0 基础池: {e}")
-
-    u0_map = {s["ts_code"]: s for s in u0_stocks}
+    # 1) 读取 canonical reference 中全部 L/P/D 状态，保留退市历史口径。
+    reference = _reference_stocks()
+    reference_map = {str(row["ts_code"]): row for row in reference}
 
     # 2) 分析已拉取股票的状态
     delisted: list[dict[str, Any]] = []
     st_stocks: list[dict[str, Any]] = []
     suspended: list[dict[str, Any]] = []
     normal: list[dict[str, Any]] = []
+    unknown: list[dict[str, Any]] = []
 
     for ts_code in sorted(pulled_codes):
-        info = u0_map.get(ts_code, {})
-        is_listed = info.get("is_listed", True)
-        name = info.get("name", "")
-        board = info.get("board", "")
+        info = reference_map.get(ts_code)
+        if info is None:
+            unknown.append({"ts_code": ts_code, "reason": "outside_canonical_reference"})
+            continue
+        list_status = str(info.get("list_status") or "").upper()
+        is_listed = list_status == "L"
+        name = str(info.get("name") or "")
+        board = str(info.get("market") or "")
 
         # 判断 ST
         is_st = False
@@ -526,7 +623,8 @@ def survivorship_check() -> dict[str, Any]:
 
         # 判断退市
         delist_date = info.get("delist_date", "")
-        is_delisted = not is_listed or bool(delist_date)
+        is_delisted = list_status == "D"
+        is_suspended = list_status == "P"
 
         record = {
             "ts_code": ts_code,
@@ -534,11 +632,14 @@ def survivorship_check() -> dict[str, Any]:
             "board": board,
             "is_listed": is_listed,
             "is_st": is_st,
+            "list_status": list_status,
             "delist_date": str(delist_date) if delist_date else "",
         }
 
         if is_delisted:
             delisted.append(record)
+        elif is_suspended:
+            suspended.append(record)
         elif is_st:
             st_stocks.append(record)
         else:
@@ -550,12 +651,17 @@ def survivorship_check() -> dict[str, Any]:
     report = {
         "report_type": "survivorship",
         "generated_at": _now_str(),
-        "data_dir": str(DAILY_DIR),
+        "data_dir": _data_roots(daily_files)[0] if len(_data_roots(daily_files)) == 1 else "multiple",
+        "data_roots": _data_roots(daily_files),
+        "universe_status": "OK" if reference else "UNKNOWN",
+        "universe_source": "data/normalized/reference/stock_basic.csv" if reference else None,
         "total_pulled": total_pulled,
         "normal_stocks": len(normal),
         "delisted_stocks": len(delisted),
         "st_stocks": len(st_stocks),
         "suspended_stocks": len(suspended),
+        "unknown_stocks": len(unknown),
+        "unknown_list": unknown[:30],
         "survivorship_bias_risk": round(
             (len(delisted) + len(st_stocks)) / total_pulled * 100, 2
         ) if total_pulled > 0 else 0,

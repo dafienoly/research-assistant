@@ -3,14 +3,11 @@
 包含新鲜度检查 (freshness-checker) 和数据缺口报告 (data-gap-reporter)。
 """
 
-import json
 import csv
-from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from config import (
-    PATHS, now_str, now_cst, ensure_dirs, safe_write_json, append_jsonl,
-    file_rows,
+    PATHS, append_jsonl, now_cst, now_str, safe_write_json,
 )
 
 
@@ -20,11 +17,11 @@ class FreshnessChecker:
     """检查各数据文件的新鲜度和完整性"""
 
     THRESHOLDS = {
-        "market/pool.csv": {"max_age_minutes": 1440, "critical": False},
-        "market/live_snapshot.csv": {"max_age_seconds": 60, "critical": True},
-        "fundamentals/financial_snapshot.csv": {"max_age_days": 7, "critical": False},
-        "events/preopen_events.csv": {"max_age_hours": 18, "critical": False},
-        "intraday/live_snapshot_priority.csv": {"max_age_seconds": 60, "critical": True},
+        "market/pool.csv": {"max_age_minutes": 1440, "gate_scope": "auxiliary"},
+        "market/live_snapshot.csv": {"max_age_seconds": 60, "gate_scope": "auxiliary_intraday"},
+        "fundamentals/financial_snapshot.csv": {"max_age_days": 7, "gate_scope": "auxiliary"},
+        "events/preopen_events.csv": {"max_age_hours": 18, "gate_scope": "auxiliary"},
+        "intraday/live_snapshot_priority.csv": {"max_age_seconds": 60, "gate_scope": "auxiliary_intraday"},
     }
 
     def check_all(self) -> dict:
@@ -47,13 +44,13 @@ class FreshnessChecker:
                 "last_updated": None,
                 "max_age_seconds": 0,
                 "actual_age_seconds": 0,
+                "gate_scope": thresholds.get("gate_scope", "auxiliary"),
                 "note": "",
             }
 
             if not abs_path.exists():
                 entry["status"] = "missing"
                 entry["note"] = "文件不存在"
-                report["blocking"] = True
                 report["files"].append(entry)
                 continue
 
@@ -69,8 +66,6 @@ class FreshnessChecker:
                 if age_seconds > max_age:
                     entry["status"] = "stale"
                     entry["note"] = f"延迟 {int(age_seconds)}s > 阈值 {max_age}s"
-                    if thresholds.get("critical"):
-                        report["blocking"] = True
                 else:
                     entry["status"] = "ok"
             elif "max_age_minutes" in thresholds:
@@ -105,6 +100,7 @@ class FreshnessChecker:
             report["overall_status"] = "stale"
         else:
             report["overall_status"] = "ok"
+        report["auxiliary_degraded"] = report["overall_status"] != "ok"
 
         return report
 

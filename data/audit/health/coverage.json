@@ -1,17 +1,22 @@
 {
   "report_type": "coverage",
-  "generated_at": "2026-07-11T21:36:27+08:00",
-  "data_dir": "/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline",
-  "total_stocks": 5740,
-  "stocks_with_data": 5739,
-  "empty_files": 1,
-  "empty_file_list": [
-    "empty_stock"
+  "generated_at": "2026-07-12T00:17:39+08:00",
+  "data_dir": "/home/ly/.hermes/research-assistant/data/normalized/market",
+  "data_roots": [
+    "/home/ly/.hermes/research-assistant/data/normalized/market"
   ],
-  "total_rows": 6811535,
+  "universe_status": "OK",
+  "universe_source": "data/normalized/reference/stock_basic.csv",
+  "total_stocks": 5530,
+  "stocks_with_data": 5530,
+  "active_missing_files": 0,
+  "historical_files_outside_active": 210,
+  "empty_files": 0,
+  "empty_file_list": [],
+  "total_rows": 6676743,
   "earliest_date": "2021-01-04",
-  "latest_date": "2026-07-17",
-  "unique_trading_days": 1348,
+  "latest_date": "2026-07-10",
+  "unique_trading_days": 1343,
   "top5_by_rows": [
     {
       "ts_code": "600519.SH",
@@ -46,10 +51,10 @@
   ],
   "bottom5_by_rows": [
     {
-      "ts_code": "999999.SZ",
-      "rows": 5,
-      "first_date": "2026-07-13",
-      "last_date": "2026-07-17"
+      "ts_code": "920193.BJ",
+      "rows": 7,
+      "first_date": "2026-07-02",
+      "last_date": "2026-07-10"
     },
     {
       "ts_code": "920189.BJ",
@@ -77,7 +82,7 @@
     }
   ],
   "summary": {
-    "coverage_pct": 99.98,
-    "empty_pct": 0.02
+    "coverage_pct": 100.0,
+    "empty_pct": 0.0
   }
 }

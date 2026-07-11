@@ -1,14 +1,576 @@
 {
   "report_type": "survivorship",
-  "generated_at": "2026-07-11T21:36:53+08:00",
-  "data_dir": "/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline",
+  "generated_at": "2026-07-12T00:18:08+08:00",
+  "data_dir": "/home/ly/.hermes/research-assistant/data/normalized/market",
+  "data_roots": [
+    "/home/ly/.hermes/research-assistant/data/normalized/market"
+  ],
+  "universe_status": "OK",
+  "universe_source": "data/normalized/reference/stock_basic.csv",
   "total_pulled": 5740,
-  "normal_stocks": 5740,
-  "delisted_stocks": 0,
-  "st_stocks": 0,
+  "normal_stocks": 5319,
+  "delisted_stocks": 207,
+  "st_stocks": 211,
   "suspended_stocks": 0,
-  "survivorship_bias_risk": 0.0,
-  "delisted_list": [],
-  "st_list": [],
+  "unknown_stocks": 3,
+  "unknown_list": [
+    {
+      "ts_code": "300114.SZ",
+      "reason": "outside_canonical_reference"
+    },
+    {
+      "ts_code": "999999.SZ",
+      "reason": "outside_canonical_reference"
+    },
+    {
+      "ts_code": "empty_stock",
+      "reason": "outside_canonical_reference"
+    }
+  ],
+  "survivorship_bias_risk": 7.28,
+  "delisted_list": [
+    {
+      "ts_code": "000005.SZ",
+      "name": "ST星源(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000023.SZ",
+      "name": "*ST深天(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000038.SZ",
+      "name": "大通退(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": false,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000040.SZ",
+      "name": "*ST旭蓝(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000046.SZ",
+      "name": "*ST泛海(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000150.SZ",
+      "name": "*ST宜康(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000413.SZ",
+      "name": "ST旭电(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000416.SZ",
+      "name": "*ST民控(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000502.SZ",
+      "name": "绿景退(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": false,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000540.SZ",
+      "name": "*ST中天(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000584.SZ",
+      "name": "工智退(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": false,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000585.SZ",
+      "name": "东电退(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": false,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000587.SZ",
+      "name": "*ST金洲(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000606.SZ",
+      "name": "顺利退(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": false,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000611.SZ",
+      "name": "天首退(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": false,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000613.SZ",
+      "name": "东海A退(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": false,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000616.SZ",
+      "name": "*ST海投(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000622.SZ",
+      "name": "恒立退(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": false,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000627.SZ",
+      "name": "*ST天茂(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000638.SZ",
+      "name": "*ST万方",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000662.SZ",
+      "name": "天夏退(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": false,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000666.SZ",
+      "name": "经纬纺机(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": false,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000667.SZ",
+      "name": "ST美置(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000671.SZ",
+      "name": "ST阳光城(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000673.SZ",
+      "name": "当代退(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": false,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000687.SZ",
+      "name": "华讯退(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": false,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000732.SZ",
+      "name": "ST泰禾(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000760.SZ",
+      "name": "斯太退(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": false,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000780.SZ",
+      "name": "ST平能(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": true,
+      "list_status": "D",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000806.SZ",
+      "name": "银河退(退)",
+      "board": "主板",
+      "is_listed": false,
+      "is_st": false,
+      "list_status": "D",
+      "delist_date": ""
+    }
+  ],
+  "st_list": [
+    {
+      "ts_code": "000010.SZ",
+      "name": "*ST美丽",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000016.SZ",
+      "name": "*ST康佳A",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000056.SZ",
+      "name": "*ST皇庭",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000078.SZ",
+      "name": "ST海王",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000488.SZ",
+      "name": "ST晨鸣",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000609.SZ",
+      "name": "*ST中迪",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000610.SZ",
+      "name": "*ST西旅",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000615.SZ",
+      "name": "*ST美谷",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000632.SZ",
+      "name": "ST三木",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000639.SZ",
+      "name": "ST西王",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000669.SZ",
+      "name": "ST金鸿",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000677.SZ",
+      "name": "ST海龙",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000698.SZ",
+      "name": "ST沈化",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000711.SZ",
+      "name": "ST京蓝",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000752.SZ",
+      "name": "*ST西发",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000793.SZ",
+      "name": "*ST华闻",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000820.SZ",
+      "name": "*ST节能",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000821.SZ",
+      "name": "ST京机",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000826.SZ",
+      "name": "*ST启环",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000838.SZ",
+      "name": "*ST发展",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000903.SZ",
+      "name": "ST云动",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000909.SZ",
+      "name": "*ST数源",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "000911.SZ",
+      "name": "*ST广糖",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "002005.SZ",
+      "name": "ST德豪",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "002024.SZ",
+      "name": "ST易购",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "002055.SZ",
+      "name": "ST得润",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "002082.SZ",
+      "name": "ST万邦",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "002102.SZ",
+      "name": "ST能特",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "002109.SZ",
+      "name": "ST兴化",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    },
+    {
+      "ts_code": "002122.SZ",
+      "name": "ST汇洲",
+      "board": "主板",
+      "is_listed": true,
+      "is_st": true,
+      "list_status": "L",
+      "delist_date": ""
+    }
+  ],
   "note": "生存偏差风险: 若仅分析当前上市股票而忽略已退市/ST股票，回测结果会被高估。建议保留所有历史数据。"
 }

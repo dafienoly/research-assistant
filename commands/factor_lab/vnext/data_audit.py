@@ -224,8 +224,10 @@ def export_vnext_data_audit(
     source_audit = root / "data" / "audit"
     source_gap_path = source_audit / "data_gap_report.json"
     source_freshness_path = source_audit / "data_freshness_report.json"
+    canonical_freshness_path = source_audit / "health" / "freshness.json"
     source_gap = _load_json(source_gap_path)
     source_freshness = _load_json(source_freshness_path)
+    canonical_freshness = _load_json(canonical_freshness_path)
     expected_stocks, expected_source = _expected_stock_count(root)
     reference = root / "data/normalized/reference/stock_basic.csv"
     if reference.exists():
@@ -265,20 +267,34 @@ def export_vnext_data_audit(
         "truthfulness": "exact U0 symbol-set coverage and source audit only; extra files cannot offset missing symbols",
     }
 
-    freshness_blocking = bool(source_freshness.get("blocking", True))
-    freshness_status = str(source_freshness.get("overall_status", "missing_files"))
+    canonical_status = str(canonical_freshness.get("status", DataStatus.MISSING.value)).upper()
+    canonical_blocking_count = int(canonical_freshness.get("blocking_stock_count", 1) or 0)
+    canonical_universe_ok = canonical_freshness.get("universe_status") == DataStatus.OK.value
+    freshness_ok = canonical_status == DataStatus.OK.value and canonical_blocking_count == 0 and canonical_universe_ok
+    auxiliary_freshness_status = str(source_freshness.get("overall_status", "missing_files"))
     freshness_payload = {
         "schema_version": "1.0",
-        "status": DataStatus.OK.value if freshness_status == "ok" and not freshness_blocking else DataStatus.STALE.value,
+        "status": DataStatus.OK.value if freshness_ok else DataStatus.STALE.value,
         "as_of": as_of,
         "generated_at": now_iso(),
-        "overall_status": freshness_status,
-        "blocking": freshness_blocking,
-        "files": source_freshness.get("files", []),
-        "source_check_time": source_freshness.get("check_time"),
-        "source_report": str(source_freshness_path),
-        "source_report_sha256": _sha256(source_freshness_path),
-        "production_signal_eligible": not freshness_blocking and freshness_status == "ok",
+        "overall_status": canonical_status,
+        "blocking": not freshness_ok,
+        "blocking_stock_count": canonical_blocking_count,
+        "as_of_open_date": canonical_freshness.get("as_of_open_date"),
+        "active_stocks": canonical_freshness.get("total_stocks"),
+        "freshness_distribution": canonical_freshness.get("freshness_distribution", {}),
+        "suspended_stocks": canonical_freshness.get("suspended_stocks", []),
+        "source_report": str(canonical_freshness_path),
+        "source_report_sha256": _sha256(canonical_freshness_path),
+        "auxiliary_file_freshness": {
+            "overall_status": auxiliary_freshness_status,
+            "blocking_in_legacy_report": bool(source_freshness.get("blocking", False)),
+            "files": source_freshness.get("files", []),
+            "source_check_time": source_freshness.get("check_time"),
+            "source_report": str(source_freshness_path),
+            "source_report_sha256": _sha256(source_freshness_path),
+        },
+        "production_signal_eligible": freshness_ok,
     }
 
     recovery = _recovery_runs(root)
@@ -286,7 +302,9 @@ def export_vnext_data_audit(
     snapshot = _load_json(snapshot_path)
     snapshot_ok = snapshot.get("status") == DataStatus.OK.value
     historical_research_ok = not core_partial_datasets and snapshot_ok
-    production_ready = not partial_datasets and freshness_payload["status"] == DataStatus.OK.value and snapshot_ok
+    shadow_ready = not core_partial_datasets and freshness_payload["status"] == DataStatus.OK.value and snapshot_ok
+    order_draft_ready = shadow_ready and not auxiliary_partial_datasets and not structural_gaps
+    production_ready = order_draft_ready
     audit_payload = {
         "schema_version": "1.0",
         "status": DataStatus.OK.value if production_ready else DataStatus.PARTIAL.value,
@@ -300,8 +318,9 @@ def export_vnext_data_audit(
         "historical_research_eligible": historical_research_ok,
         "auxiliary_gate_mode": gap_payload["auxiliary_gate_mode"],
         "formal_ml_status": DataStatus.OK.value if historical_research_ok else DataStatus.BLOCKED.value,
-        "shadow_status": DataStatus.OK.value if production_ready else DataStatus.BLOCKED.value,
-        "order_draft_status": DataStatus.OK.value if production_ready else DataStatus.BLOCKED.value,
+        "shadow_status": DataStatus.OK.value if shadow_ready else DataStatus.BLOCKED.value,
+        "order_draft_status": DataStatus.OK.value if order_draft_ready else DataStatus.BLOCKED.value,
+        "protective_sell_data_status": DataStatus.OK.value if shadow_ready else DataStatus.BLOCKED.value,
         "blocking_reasons": [
             reason
             for condition, reason in (
@@ -311,7 +330,7 @@ def export_vnext_data_audit(
             )
             if condition
         ],
-        "warnings": ["auxiliary_data_gaps_watch_only"] if auxiliary_partial_datasets and not core_partial_datasets else [],
+        "warnings": ["auxiliary_data_gaps_watch_only"] if (auxiliary_partial_datasets or structural_gaps) and not core_partial_datasets else [],
         "no_mock_or_fallback": True,
         "no_live_trade": True,
     }

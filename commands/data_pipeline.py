@@ -747,12 +747,25 @@ def run_data_audit() -> dict:
         from data_audit import run_all_audits
 
         health_reports = run_all_audits()
-        print(f"\n  新鲜度: {fresh.get('status', 'unknown')}")
+        canonical_freshness = {}
+        try:
+            canonical_freshness = json.loads(Path(health_reports["freshness"]).read_text(encoding="utf-8"))
+        except (KeyError, OSError, json.JSONDecodeError):
+            pass
+        core_status = canonical_freshness.get("status", "UNKNOWN")
+        overall_status = (
+            "ok"
+            if core_status == "OK" and not gaps["summary"].get("blocking_codex", False)
+            else "partial"
+        )
+        print(f"\n  核心新鲜度: {core_status}")
+        print(f"  辅助快照:   {fresh.get('overall_status', 'unknown')}")
         print(f"  缺口:   {gaps['summary']['total_gaps']} 总, {gaps['summary']['blocking_gaps']} 阻塞")
 
         return {
-            "status": "ok",
-            "freshness": fresh,
+            "status": overall_status,
+            "canonical_freshness": canonical_freshness,
+            "auxiliary_freshness": fresh,
             "gaps": gaps,
             "health_reports": health_reports,
         }

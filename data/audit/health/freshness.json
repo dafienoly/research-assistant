@@ -1,115 +1,56 @@
 {
   "report_type": "freshness",
-  "generated_at": "2026-07-11T21:36:52+08:00",
-  "today": "20260711",
-  "data_dir": "/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline",
-  "total_stocks": 5740,
-  "stocks_with_data": 5739,
-  "average_lag_days": 37.1,
-  "max_lag_days": 2004,
-  "max_lag_code": "600317.SH",
-  "min_lag_days": -6,
-  "min_lag_code": "999999.SZ",
-  "future_date_count": 1,
-  "future_date_stocks": [
-    {
-      "ts_code": "999999.SZ",
-      "latest_date": "2026-07-17",
-      "days_in_future": 6
-    }
+  "generated_at": "2026-07-12T00:18:01+08:00",
+  "today": "20260710",
+  "as_of_open_date": "2026-07-10",
+  "data_dir": "/home/ly/.hermes/research-assistant/data/normalized/market",
+  "data_roots": [
+    "/home/ly/.hermes/research-assistant/data/normalized/market"
   ],
+  "universe_status": "OK",
+  "total_stocks": 5530,
+  "stocks_with_data": 5530,
+  "active_missing_files": 0,
+  "historical_files_excluded": 210,
+  "status": "OK",
+  "blocking_stock_count": 0,
+  "average_lag_days": 0.0,
+  "max_lag_days": 14,
+  "max_lag_code": "300214.SZ",
+  "min_lag_days": 0,
+  "min_lag_code": "000001.SZ",
+  "future_date_count": 0,
+  "future_date_stocks": [],
   "freshness_distribution": {
-    "fresh (<=7d)": 5528,
-    "stale (8-30d)": 11,
-    "old (31-90d)": 3,
-    "ancient (>90d)": 197
+    "fresh (<=7d)": 5526,
+    "stale (8-30d)": 0,
+    "old (31-90d)": 0,
+    "ancient (>90d)": 0,
+    "suspended (canonical)": 4
   },
-  "stale_stocks": [
-    {
-      "ts_code": "600405.SH",
-      "latest_date": "2026-07-03",
-      "lag_days": 8,
-      "freshness_level": "stale"
-    },
-    {
-      "ts_code": "600193.SH",
-      "latest_date": "2026-06-29",
-      "lag_days": 12,
-      "freshness_level": "stale"
-    },
-    {
-      "ts_code": "600608.SH",
-      "latest_date": "2026-06-29",
-      "lag_days": 12,
-      "freshness_level": "stale"
-    },
-    {
-      "ts_code": "605081.SH",
-      "latest_date": "2026-06-29",
-      "lag_days": 12,
-      "freshness_level": "stale"
-    },
+  "suspended_stocks": [
     {
       "ts_code": "300214.SZ",
       "latest_date": "2026-06-26",
-      "lag_days": 15,
-      "freshness_level": "stale"
+      "suspended_through": "2026-07-10"
+    },
+    {
+      "ts_code": "600405.SH",
+      "latest_date": "2026-07-03",
+      "suspended_through": "2026-07-10"
     },
     {
       "ts_code": "601369.SH",
       "latest_date": "2026-06-26",
-      "lag_days": 15,
-      "freshness_level": "stale"
+      "suspended_through": "2026-07-10"
     },
     {
       "ts_code": "688072.SH",
       "latest_date": "2026-06-26",
-      "lag_days": 15,
-      "freshness_level": "stale"
-    },
-    {
-      "ts_code": "600421.SH",
-      "latest_date": "2026-06-22",
-      "lag_days": 19,
-      "freshness_level": "stale"
-    },
-    {
-      "ts_code": "600599.SH",
-      "latest_date": "2026-06-22",
-      "lag_days": 19,
-      "freshness_level": "stale"
-    },
-    {
-      "ts_code": "600636.SH",
-      "latest_date": "2026-06-22",
-      "lag_days": 19,
-      "freshness_level": "stale"
-    },
-    {
-      "ts_code": "600696.SH",
-      "latest_date": "2026-06-22",
-      "lag_days": 19,
-      "freshness_level": "stale"
+      "suspended_through": "2026-07-10"
     }
   ],
-  "old_stocks": [
-    {
-      "ts_code": "688287.SH",
-      "latest_date": "2026-06-08",
-      "lag_days": 33,
-      "freshness_level": "old"
-    },
-    {
-      "ts_code": "300344.SZ",
-      "latest_date": "2026-04-21",
-      "lag_days": 81,
-      "freshness_level": "old"
-    },
-    {
-      "ts_code": "000638.SZ",
-      "latest_date": "2026-04-13",
-      "lag_days": 89,
-      "freshness_level": "old"
-    }
-  ]
+  "stale_stocks": [],
+  "old_stocks": [],
+  "ancient_stocks": []
 }

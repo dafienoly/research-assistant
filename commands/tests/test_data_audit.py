@@ -18,8 +18,6 @@ import sys
 import os
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from typing import Any
-
 import pytest
 import pandas as pd
 import numpy as np
@@ -126,30 +124,31 @@ def sample_daily_files():
 
 @pytest.fixture
 def mock_u0_universe(monkeypatch):
-    """Mock universes.get_universe to return a controlled U0 pool."""
-    def mock_get_universe(name: str) -> dict[str, Any]:
-        return {
-            "name": name,
-            "stocks": [
+    """Persist a controlled canonical DataHub stock reference."""
+    import data_audit
+
+    stocks = [
                 {"ts_code": "688012.SH", "symbol": "688012", "name": "中微公司",
-                 "is_listed": True, "board": "科创板", "delist_date": ""},
+                 "list_status": "L", "market": "科创板", "delist_date": ""},
                 {"ts_code": "000001.SZ", "symbol": "000001", "name": "平安银行",
-                 "is_listed": True, "board": "主板", "delist_date": ""},
+                 "list_status": "L", "market": "主板", "delist_date": ""},
                 {"ts_code": "600519.SH", "symbol": "600519", "name": "贵州茅台",
-                 "is_listed": True, "board": "主板", "delist_date": ""},
+                 "list_status": "L", "market": "主板", "delist_date": ""},
                 {"ts_code": "300999.SZ", "symbol": "300999", "name": "ST金刚",
-                 "is_listed": True, "board": "创业板", "delist_date": ""},
+                 "list_status": "L", "market": "创业板", "delist_date": ""},
                 {"ts_code": "000555.SZ", "symbol": "000555", "name": "*ST神州",
-                 "is_listed": True, "board": "主板", "delist_date": ""},
+                 "list_status": "L", "market": "主板", "delist_date": ""},
                 {"ts_code": "600666.SH", "symbol": "600666", "name": "退市公司",
-                 "is_listed": False, "board": "主板", "delist_date": "20251031"},
+                 "list_status": "D", "market": "主板", "delist_date": "20251031"},
                 {"ts_code": "999999.SZ", "symbol": "999999", "name": "最新新股",
-                 "is_listed": True, "board": "创业板", "delist_date": ""},
+                 "list_status": "L", "market": "创业板", "delist_date": ""},
                 {"ts_code": "unpulled_stock", "symbol": "999998", "name": "未拉取",
-                 "is_listed": True, "board": "主板", "delist_date": ""},
-            ],
-        }
-    monkeypatch.setattr("universes.get_universe", mock_get_universe)
+                 "list_status": "L", "market": "主板", "delist_date": ""},
+    ]
+    reference = data_audit.NORMALIZED_DIR / "reference" / "stock_basic.csv"
+    reference.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(stocks).to_csv(reference, index=False, encoding="utf-8-sig")
+    yield
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -219,6 +218,28 @@ class TestCoverage:
         # Should still be 5 (valuation files excluded)
         assert report["total_stocks"] == 5
 
+    def test_canonical_active_reference_excludes_test_and_historical_extras(self):
+        _create_daily_csv("000001.SZ", n_rows=2, start_date="2026-07-09")
+        _create_daily_csv("999999.SZ", n_rows=1, start_date="2099-01-01")
+        import data_audit
+
+        reference = data_audit.NORMALIZED_DIR / "reference/stock_basic.csv"
+        reference.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "ts_code": ["000001.SZ", "600666.SH"],
+                "list_status": ["L", "D"],
+            }
+        ).to_csv(reference, index=False, encoding="utf-8-sig")
+
+        report = coverage()
+
+        assert report["universe_status"] == "OK"
+        assert report["total_stocks"] == 1
+        assert report["stocks_with_data"] == 1
+        assert report["latest_date"] == "2026-07-10"
+        assert report["historical_files_outside_active"] == 1
+
 
 # ═════════════════════════════════════════════════════════════════════════
 # freshness 测试
@@ -276,6 +297,32 @@ class TestFreshness:
         assert report["max_lag_days"] > 0
         assert report["average_lag_days"] > 0
 
+    def test_canonical_suspension_explains_stale_market_file(self):
+        _create_daily_csv("600405.SH", n_rows=1, start_date="2026-01-01")
+        import data_audit
+
+        reference = data_audit.NORMALIZED_DIR / "reference/stock_basic.csv"
+        reference.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({"ts_code": ["600405.SH"], "list_status": ["L"]}).to_csv(
+            reference, index=False, encoding="utf-8-sig"
+        )
+        suspension = data_audit.NORMALIZED_DIR / "suspend/records.csv"
+        suspension.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "ts_code": ["600405.SH"],
+                "trade_date": [datetime.now(CST).strftime("%Y%m%d")],
+                "suspend_type": ["S"],
+                "source_provider": ["tushare:suspend_d"],
+            }
+        ).to_csv(suspension, index=False, encoding="utf-8-sig")
+
+        report = freshness()
+
+        assert report["status"] == "OK"
+        assert report["blocking_stock_count"] == 0
+        assert report["freshness_distribution"]["suspended (canonical)"] == 1
+
 
 # ═════════════════════════════════════════════════════════════════════════
 # missing 测试
@@ -287,17 +334,18 @@ class TestMissing:
         report = missing()
 
         assert report["report_type"] == "missing"
-        # U0 has 8 stocks, we have 5 files (including empty_stock)
+        # Canonical reference has 7 active stocks and one delisted stock.
         # Only 688012.SH, 000001.SZ, 600519.SH, 999999.SZ are in U0
         # empty_stock not in U0
-        assert report["u0_total"] == 8
+        assert report["u0_total"] == 7
+        assert report["reference_total_all_statuses"] == 8
         assert "missing_stocks" in report
 
     def test_missing_codes(self, sample_daily_files, mock_u0_universe):
         report = missing()
 
         # unpulled_stock should be in missing
-        assert "unpulled_stock" in report["missing_codes_sample"]
+        assert "UNPULLED_STOCK" in report["missing_codes_sample"]
 
     def test_missing_json_file(self, sample_daily_files, mock_u0_universe):
         report = missing()
@@ -318,17 +366,13 @@ class TestMissing:
             assert "actual_days" in detail
             assert "missing_pct" in detail
 
-    def test_missing_without_u0(self, clean_dirs, sample_daily_files, monkeypatch):
-        """Without U0 universe (get_universe raises), should still produce a report."""
-        def mock_fail(*args):
-            raise RuntimeError("U0 not available")
-        monkeypatch.setattr("universes.get_universe", mock_fail)
-
+    def test_missing_without_u0(self, clean_dirs, sample_daily_files):
+        """Without canonical reference, report status is UNKNOWN rather than complete."""
         report = missing()
 
-        # Falls back to file-only estimation
         assert report["u0_total"] == 0
         assert report["pulled_stocks"] == 5  # All files counted as pulled
+        assert report["universe_status"] == "UNKNOWN"
         assert "summary" in report
 
 

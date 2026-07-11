@@ -1,50 +1,176 @@
 {
   "report_type": "missing",
-  "generated_at": "2026-07-11T21:36:53+08:00",
-  "data_dir": "/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline",
-  "u0_total": 0,
-  "u0_codes_in_universe": 0,
-  "universe_status": "UNKNOWN",
-  "universe_missing_reason": "U0 unavailable or empty; missing coverage cannot be asserted",
-  "pulled_stocks": 5740,
+  "generated_at": "2026-07-12T00:18:08+08:00",
+  "data_dir": "/home/ly/.hermes/research-assistant/data/normalized/market",
+  "data_roots": [
+    "/home/ly/.hermes/research-assistant/data/normalized/market"
+  ],
+  "universe_source": "data/normalized/reference/stock_basic.csv",
+  "reference_total_all_statuses": 5865,
+  "u0_total": 5530,
+  "u0_codes_in_universe": 5530,
+  "universe_status": "OK",
+  "universe_missing_reason": null,
+  "pulled_stocks": 5530,
   "missing_stocks": 0,
-  "extra_stocks_outside_u0": 5740,
+  "extra_stocks_outside_u0": 210,
   "missing_codes_sample": [],
   "extra_codes_sample": [
-    "601198.SH",
-    "300961.SZ",
-    "300908.SZ",
-    "600998.SH",
-    "600781.SH",
-    "002277.SZ",
-    "300550.SZ",
-    "300896.SZ",
-    "688017.SH",
-    "000701.SZ",
-    "600106.SH",
-    "000623.SZ",
-    "688560.SH",
-    "600742.SH",
-    "000628.SZ",
-    "003023.SZ",
-    "688210.SH",
-    "920003.BJ",
-    "300546.SZ",
-    "300977.SZ",
-    "001311.SZ",
-    "002447.SZ",
-    "601126.SH",
-    "600724.SH",
-    "300972.SZ",
-    "603105.SH",
-    "000153.SZ",
-    "688468.SH",
-    "002857.SZ",
-    "688378.SH"
+    "000005.SZ",
+    "000023.SZ",
+    "000038.SZ",
+    "000040.SZ",
+    "000046.SZ",
+    "000150.SZ",
+    "000413.SZ",
+    "000416.SZ",
+    "000502.SZ",
+    "000540.SZ",
+    "000584.SZ",
+    "000585.SZ",
+    "000587.SZ",
+    "000606.SZ",
+    "000611.SZ",
+    "000613.SZ",
+    "000616.SZ",
+    "000622.SZ",
+    "000627.SZ",
+    "000638.SZ",
+    "000662.SZ",
+    "000666.SZ",
+    "000667.SZ",
+    "000671.SZ",
+    "000673.SZ",
+    "000687.SZ",
+    "000732.SZ",
+    "000760.SZ",
+    "000780.SZ",
+    "000806.SZ"
   ],
-  "missing_detail_top20": [],
+  "missing_detail_top20": [
+    {
+      "ts_code": "empty_stock",
+      "expected_days": 1351,
+      "actual_days": 0,
+      "missing_pct": 100.0
+    },
+    {
+      "ts_code": "301583.SZ",
+      "expected_days": 1351,
+      "actual_days": 1,
+      "missing_pct": 99.93
+    },
+    {
+      "ts_code": "920081.BJ",
+      "expected_days": 1351,
+      "actual_days": 1,
+      "missing_pct": 99.93
+    },
+    {
+      "ts_code": "920136.BJ",
+      "expected_days": 1351,
+      "actual_days": 2,
+      "missing_pct": 99.85
+    },
+    {
+      "ts_code": "920189.BJ",
+      "expected_days": 1351,
+      "actual_days": 3,
+      "missing_pct": 99.78
+    },
+    {
+      "ts_code": "999999.SZ",
+      "expected_days": 1351,
+      "actual_days": 5,
+      "missing_pct": 99.63
+    },
+    {
+      "ts_code": "001248.SZ",
+      "expected_days": 1351,
+      "actual_days": 7,
+      "missing_pct": 99.48
+    },
+    {
+      "ts_code": "920193.BJ",
+      "expected_days": 1351,
+      "actual_days": 7,
+      "missing_pct": 99.48
+    },
+    {
+      "ts_code": "600317.SH",
+      "expected_days": 1351,
+      "actual_days": 9,
+      "missing_pct": 99.33
+    },
+    {
+      "ts_code": "920222.BJ",
+      "expected_days": 1351,
+      "actual_days": 9,
+      "missing_pct": 99.33
+    },
+    {
+      "ts_code": "920072.BJ",
+      "expected_days": 1351,
+      "actual_days": 10,
+      "missing_pct": 99.26
+    },
+    {
+      "ts_code": "001399.SZ",
+      "expected_days": 1351,
+      "actual_days": 11,
+      "missing_pct": 99.19
+    },
+    {
+      "ts_code": "688797.SH",
+      "expected_days": 1351,
+      "actual_days": 13,
+      "missing_pct": 99.04
+    },
+    {
+      "ts_code": "920126.BJ",
+      "expected_days": 1351,
+      "actual_days": 19,
+      "missing_pct": 98.59
+    },
+    {
+      "ts_code": "920083.BJ",
+      "expected_days": 1351,
+      "actual_days": 21,
+      "missing_pct": 98.45
+    },
+    {
+      "ts_code": "301669.SZ",
+      "expected_days": 1351,
+      "actual_days": 23,
+      "missing_pct": 98.3
+    },
+    {
+      "ts_code": "920206.BJ",
+      "expected_days": 1351,
+      "actual_days": 24,
+      "missing_pct": 98.22
+    },
+    {
+      "ts_code": "920211.BJ",
+      "expected_days": 1351,
+      "actual_days": 25,
+      "missing_pct": 98.15
+    },
+    {
+      "ts_code": "000760.SZ",
+      "expected_days": 1351,
+      "actual_days": 30,
+      "missing_pct": 97.78
+    },
+    {
+      "ts_code": "002260.SZ",
+      "expected_days": 1351,
+      "actual_days": 30,
+      "missing_pct": 97.78
+    }
+  ],
   "summary": {
-    "coverage_pct": 0,
-    "missing_pct": 0
+    "coverage_pct": 100.0,
+    "missing_pct": 0.0
   }
 }

@@ -205,6 +205,28 @@
       "behavior": "整数 YYYYMMDD 不再误解析为 1970；未来日期显式报告；U0 空响应返回 UNKNOWN；data:audit 同步重建四份 health 报告。"
     },
     {
+      "id": "DATA-AUDIT-02",
+      "title": "Canonical 活跃股票与官方停牌分层新鲜度",
+      "code_locations": [
+        {"file": "commands/data_audit.py", "function": "_reference_stocks", "line": 94},
+        {"file": "commands/data_audit.py", "function": "freshness", "line": 320},
+        {"file": "commands/factor_lab/datahub_ingestion/suspensions.py", "function": "SuspensionIngestion", "line": 15}
+      ],
+      "expected_keywords": ["list_status", "suspended (canonical)", "suspend_d", "blocking_stock_count", "historical_files_excluded"],
+      "behavior": "健康口径只检查 5530 只活跃证券，保留但排除退市和测试哨兵；滞后行情必须由 DataHub 持久化的官方停牌证据解释，行情 CSV 不被改写。"
+    },
+    {
+      "id": "DATA-AUDIT-03",
+      "title": "核心 freshness 与辅助快照门禁分离",
+      "code_locations": [
+        {"file": "commands/data_quality.py", "function": "FreshnessChecker.check_all", "line": 27},
+        {"file": "commands/data_pipeline.py", "function": "run_data_audit", "line": 733},
+        {"file": "commands/factor_lab/vnext/data_audit.py", "function": "export_vnext_data_audit", "line": 215}
+      ],
+      "expected_keywords": ["gate_scope", "canonical_freshness", "auxiliary_file_freshness", "protective_sell_data_status", "order_draft_ready"],
+      "behavior": "Legacy 文件 mtime 仅作辅助告警；canonical 核心完整时 ML、Shadow 和保护性 SELL 数据门禁可用，辅助缺口继续阻断 BUY OrderDraft。"
+    },
+    {
       "id": "P0-P1-RUNTIME-FIXES",
       "title": "QMT 状态 fail-closed 与复盘链路动态基准",
       "code_locations": [
@@ -327,5 +349,5 @@
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-11T23:56:48+08:00"
+  "generated_at": "2026-07-12T00:22:18+08:00"
 }

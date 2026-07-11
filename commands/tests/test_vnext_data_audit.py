@@ -73,7 +73,7 @@ def test_data_audit_export_blocks_production_when_gaps_or_stale_data_remain(tmp_
     assert result["no_mock_or_fallback"] is True
 
 
-def test_auxiliary_gaps_are_watch_only_for_historical_ml_but_block_execution(tmp_path):
+def test_auxiliary_gaps_are_watch_only_for_ml_and_shadow_but_block_buy_drafts(tmp_path):
     data = tmp_path / "data"
     market = data / "normalized/market"
     reference = data / "normalized/reference"
@@ -88,6 +88,12 @@ def test_auxiliary_gaps_are_watch_only_for_historical_ml_but_block_execution(tmp
     (audit / "data_freshness_report.json").write_text(
         '{"overall_status":"stale","blocking":true,"files":[]}', encoding="utf-8"
     )
+    health = audit / "health"
+    health.mkdir()
+    (health / "freshness.json").write_text(
+        '{"status":"OK","universe_status":"OK","blocking_stock_count":0,"total_stocks":1,"as_of_open_date":"2026-07-10"}',
+        encoding="utf-8",
+    )
     output = tmp_path / "artifacts/vnext"
     output.mkdir(parents=True)
     (output / "snapshot_manifest.json").write_text('{"status":"OK"}', encoding="utf-8")
@@ -98,5 +104,10 @@ def test_auxiliary_gaps_are_watch_only_for_historical_ml_but_block_execution(tmp
     assert result["formal_ml_status"] == "OK"
     assert result["auxiliary_gate_mode"] == "watch_only"
     assert result["warnings"] == ["auxiliary_data_gaps_watch_only"]
-    assert result["shadow_status"] == "BLOCKED"
+    assert result["shadow_status"] == "OK"
     assert result["order_draft_status"] == "BLOCKED"
+    assert result["protective_sell_data_status"] == "OK"
+    assert "critical_freshness_check_failed" not in result["blocking_reasons"]
+    freshness = json.loads((output / "data_freshness_report.json").read_text(encoding="utf-8"))
+    assert freshness["status"] == "OK"
+    assert freshness["auxiliary_file_freshness"]["overall_status"] == "stale"

@@ -1,0 +1,49 @@
+{
+  "generated_at": "2026-07-12T00:11:04.714561+08:00",
+  "source": "tushare:suspend_d",
+  "source_health_report": "/home/ly/.hermes/research-assistant/data/audit/health/freshness.json",
+  "as_of_open_date": "2026-07-10",
+  "candidate_count": 4,
+  "explained_suspensions": 4,
+  "unexplained_symbols": [],
+  "results": [
+    {
+      "ts_code": "300214.SZ",
+      "latest_market_date": "2026-06-26",
+      "query_start": "20260627",
+      "query_end": "20260710",
+      "rows": 10,
+      "suspended_through_as_of": true,
+      "error": null
+    },
+    {
+      "ts_code": "600405.SH",
+      "latest_market_date": "2026-07-03",
+      "query_start": "20260704",
+      "query_end": "20260710",
+      "rows": 5,
+      "suspended_through_as_of": true,
+      "error": null
+    },
+    {
+      "ts_code": "601369.SH",
+      "latest_market_date": "2026-06-26",
+      "query_start": "20260627",
+      "query_end": "20260710",
+      "rows": 10,
+      "suspended_through_as_of": true,
+      "error": null
+    },
+    {
+      "ts_code": "688072.SH",
+      "latest_market_date": "2026-06-26",
+      "query_start": "20260627",
+      "query_end": "20260710",
+      "rows": 10,
+      "suspended_through_as_of": true,
+      "error": null
+    }
+  ],
+  "status": "OK",
+  "conflict_policy": "merge by ts_code+trade_date; preserve historical rows and latest observation metadata"
+}

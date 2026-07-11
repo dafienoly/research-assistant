@@ -5,7 +5,7 @@
 ## 阻止模型/策略晋级的真实缺口
 
 - 数据审计仍为 `PARTIAL`：按 U0 代码集合核对，资金流匹配 5,401/5,530、缺 129，财务匹配 5,528/5,530、缺 2；精确补拉对这些代码得到上游空结果。概念 409/380、行业 511/80 已转为 OK；另有 3 个标签文件缺失。
-- legacy DataHub 新鲜度仍为 stale/blocking；正式 ML、Shadow 候选和生产 OrderDraft 保持 BLOCKED。
+- Canonical DataHub 核心新鲜度已为 OK：活跃股票 5,530/5,530，5,526 只最新至 2026-07-10，另 4 只由官方 `suspend_d` 解释；正式 ML 和 Shadow 数据门禁为 OK。生产 BUY OrderDraft 仍因资金流/财务/标签辅助缺口保持 BLOCKED，保护性 SELL 数据门禁为 OK。
 - Event Truth 缺官方 `stk_limit`、`suspend_d`、现金分红事件和复权因子；当前只能 `PARTIAL/BACKTEST_ONLY`。
 - Antifragile Review 缺 realized Regime/Semi/Style 标签、滚动模型衰减历史及连续 Paper/Shadow 权益曲线，因此相关六项指标为 null。
 - vectorbt 第二个 OOS fold 收益为 -6.03%，不得用第一段或样本内结果替代。
