@@ -40,7 +40,7 @@ class EventTruthIngestion:
                     params = {"ts_code": symbol, "fields": fields}
                     if dataset != "dividend":
                         params.update({"start_date": start_date, "end_date": end_date})
-                    frame = client._query(api_name, **params)
+                    frame = client._query(api_name, raise_on_failure=True, **params)
                     datasets[dataset] = frame if isinstance(frame, pd.DataFrame) else pd.DataFrame()
                 except Exception as exc:
                     datasets[dataset] = pd.DataFrame()

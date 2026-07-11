@@ -68,7 +68,7 @@ class CorporateEventIngestion:
                     params = {"ts_code": symbol}
                     if dataset != "dividend":
                         params.update({"start_date": start_date, "end_date": end_date})
-                    frame = client._query(api_name, **params)
+                    frame = client._query(api_name, raise_on_failure=True, **params)
                     frame = frame if isinstance(frame, pd.DataFrame) else pd.DataFrame()
                     coverage[dataset] = len(frame)
                     rows.extend(self._normalize(frame, symbol, dataset, date_candidates, observed_at, start_date, end_date))

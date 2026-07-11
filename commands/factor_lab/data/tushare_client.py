@@ -44,7 +44,6 @@ Tushare Pro 客户端 V1.0 — A 股全量数据接口
 from __future__ import annotations
 
 import os
-import json
 import logging
 import time
 from datetime import datetime, timedelta, timezone
@@ -52,7 +51,6 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +168,14 @@ class TushareClient:
         self._last_request_time = time.time()
         self._request_count += 1
 
-    def _query(self, api_name: str, fields: str = "", **params) -> pd.DataFrame:
+    def _query(
+        self,
+        api_name: str,
+        fields: str = "",
+        *,
+        raise_on_failure: bool = False,
+        **params,
+    ) -> pd.DataFrame:
         """通用查询 (含重试和限流)
         
         Returns:
@@ -187,6 +192,8 @@ class TushareClient:
                 func = getattr(pro, api_name, None)
                 if func is None:
                     logger.error(f"Tushare API '{api_name}' 不存在")
+                    if raise_on_failure:
+                        raise RuntimeError(f"Tushare API '{api_name}' does not exist")
                     return pd.DataFrame()
 
                 # 如果指定了 fields 则传入
@@ -208,6 +215,8 @@ class TushareClient:
                     time.sleep(2 ** attempt)  # 指数退避
                 else:
                     logger.error(f"Tushare {api_name} 请求全部失败: {last_error}")
+                    if raise_on_failure:
+                        raise RuntimeError(f"Tushare {api_name} request failed") from last_error
                     return pd.DataFrame()
 
     # ═══════════════════════════════════════════════════════════

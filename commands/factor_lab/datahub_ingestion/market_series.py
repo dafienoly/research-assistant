@@ -36,7 +36,13 @@ class MarketSeriesIngestion:
             category = "index" if api_name == "index_daily" else "fund"
             for symbol in symbols:
                 try:
-                    frame = client._query(api_name, ts_code=symbol, start_date=start_date, end_date=end_date)
+                    frame = client._query(
+                        api_name,
+                        ts_code=symbol,
+                        start_date=start_date,
+                        end_date=end_date,
+                        raise_on_failure=True,
+                    )
                     if not isinstance(frame, pd.DataFrame) or frame.empty:
                         raise ValueError("empty provider response")
                     destination = self.output_root / category / f"{symbol}.csv"
