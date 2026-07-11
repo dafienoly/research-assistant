@@ -3,13 +3,10 @@
 支持 dry-run 模式，所有推送记录写入 wechat_push_log.jsonl。
 """
 
-import json
 import uuid
-import urllib.request
-import urllib.error
-from pathlib import Path
 
 from config import ENV, PATHS, now_str, append_jsonl
+from factor_lab.notification_transport import post_json
 
 
 class WeChatPushError(Exception):
@@ -63,20 +60,10 @@ class WeChatPusher:
                        [], "", sent=False, summary="webhook URL 未配置")
             return False
 
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(
-            self.webhook_url,
-            data=data,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            resp = urllib.request.urlopen(req, timeout=10)
-            body = resp.read().decode()
-            result = json.loads(body)
-            return result.get("errcode") == 0
-        except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as e:
-            raise WeChatPushError(f"Webhook 调用失败: {e}")
+        result = post_json(self.webhook_url, payload, timeout=10)
+        if not result.get("ok"):
+            raise WeChatPushError(f"Webhook 调用失败: {result.get('error', 'unknown_error')}")
+        return (result.get("response") or {}).get("errcode") == 0
 
     def push_notice(self, level: str, alert_type: str, symbols: list,
                     sector: str, title: str, body_lines: list,
@@ -144,7 +131,7 @@ class WeChatPusher:
 
         try:
             sent = self._call_webhook(payload)
-        except WeChatPushError as e:
+        except WeChatPushError:
             sent = False
             title = f"[FAILED] {title}"
 
@@ -168,16 +155,11 @@ class WeChatPusher:
             }
         }
         try:
-            data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(self.webhook_url, data=data,
-                                          headers={"Content-Type": "application/json"})
-            resp = urllib.request.urlopen(req, timeout=10)
-            body = resp.read().decode()
-            result = json.loads(body)
-            ok = result.get("errcode") == 0
+            result = post_json(self.webhook_url, payload, timeout=10)
+            ok = bool(result.get("ok") and (result.get("response") or {}).get("errcode") == 0)
             print(f"{'✅' if ok else '❌'} 企业微信 webhook 连接{'成功' if ok else '失败'}")
             return ok
-        except Exception as e:
+        except (OSError, ValueError, TimeoutError) as e:
             print(f"❌ 连接失败: {e}")
             return False
 
@@ -189,19 +171,19 @@ def build_position_drop_notice(symbol: str, name: str, price: float,
                                 data_freshness_s: int) -> list:
     """构建持仓下跌通知"""
     return [
-        f"⚠️ [L2 用户通知] 持仓风险初筛",
-        f"━━━━━━━━━━━━━━━━━━",
+        "⚠️ [L2 用户通知] 持仓风险初筛",
+        "━━━━━━━━━━━━━━━━━━",
         f"股票：{symbol}·{name}",
         f"当前价：{price:.2f} 元",
         f"跌幅：{change_pct:.1f}%",
         f"触发规则：持仓股跌幅 > {threshold}%（R01）",
         f"数据新鲜度：{data_freshness_s}s 前 | {'✅ 正常' if data_freshness_s < 60 else '⚠️ 延迟'}",
-        f"━━━━━━━━━━━━━━━━━━",
-        f"风险等级：中等 | 建议观察",
-        f"下一步：关注午后能否收回",
-        f"是否需要 Codex 复核：否",
-        f"是否需要人工确认：否",
-        f"━━━━━━━━━━━━━━━━━━",
+        "━━━━━━━━━━━━━━━━━━",
+        "风险等级：中等 | 建议观察",
+        "下一步：关注午后能否收回",
+        "是否需要 Codex 复核：否",
+        "是否需要人工确认：否",
+        "━━━━━━━━━━━━━━━━━━",
         f"Hermes A股监测 @ {now_str()}",
     ]
 
