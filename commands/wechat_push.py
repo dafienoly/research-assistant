@@ -6,6 +6,7 @@
 import uuid
 
 from config import ENV, PATHS, now_str, append_jsonl
+from factor_lab.notify import _send_wecom_markdown
 from factor_lab.notification_transport import post_json
 
 
@@ -33,6 +34,7 @@ class WeChatPusher:
 
     def _log(self, level: str, channel: str, alert_type: str,
              symbols: list, sector: str = "", sent: bool = False,
+             queued: bool = False,
              deduped: bool = False, codex_escalated: bool = False,
              summary: str = ""):
         record = {
@@ -44,6 +46,7 @@ class WeChatPusher:
             "symbols": symbols,
             "sector": sector,
             "sent": sent,
+            "queued": queued,
             "deduped": deduped,
             "codex_escalated": codex_escalated,
             "message_summary": summary,
@@ -54,16 +57,15 @@ class WeChatPusher:
         return record
 
     def _call_webhook(self, payload: dict) -> bool:
-        """调用企业微信 webhook"""
-        if not self.webhook_url:
-            self._log("L0", "wechat_silent", "webhook_not_configured",
-                       [], "", sent=False, summary="webhook URL 未配置")
-            return False
-
-        result = post_json(self.webhook_url, payload, timeout=10)
-        if not result.get("ok"):
-            raise WeChatPushError(f"Webhook 调用失败: {result.get('error', 'unknown_error')}")
-        return (result.get("response") or {}).get("errcode") == 0
+        """Persist a text/markdown intent for the dual-channel worker."""
+        message_type = payload.get("msgtype")
+        if message_type == "markdown":
+            content = str((payload.get("markdown") or {}).get("content", ""))
+        else:
+            content = str((payload.get("text") or {}).get("content", ""))
+        if not content or not _send_wecom_markdown("Hermes 风险通知", content):
+            raise WeChatPushError("通知 intent 持久化失败")
+        return True
 
     def push_notice(self, level: str, alert_type: str, symbols: list,
                     sector: str, title: str, body_lines: list,
@@ -94,13 +96,13 @@ class WeChatPusher:
         }
 
         try:
-            sent = self._call_webhook(payload)
+            queued = self._call_webhook(payload)
         except WeChatPushError as e:
-            sent = False
+            queued = False
             summary = f"[FAILED] {e}"
 
         record = self._log(level, channel, alert_type, symbols, sector,
-                          sent=sent, codex_escalated=codex_escalated,
+                          sent=False, queued=queued, codex_escalated=codex_escalated,
                           summary=summary)
         return record
 
@@ -130,13 +132,13 @@ class WeChatPusher:
         }
 
         try:
-            sent = self._call_webhook(payload)
+            queued = self._call_webhook(payload)
         except WeChatPushError:
-            sent = False
+            queued = False
             title = f"[FAILED] {title}"
 
         record = self._log(level, channel, alert_type, symbols, sector,
-                          sent=sent, codex_escalated=codex_escalated,
+                          sent=False, queued=queued, codex_escalated=codex_escalated,
                           summary=title)
         return record
 

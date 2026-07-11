@@ -112,6 +112,8 @@ raw → staging → normalized → manifest/conflict/freshness
 
 遗留 `factor_lab.notify` 第一轮 blast radius 为 CRITICAL（27 个符号）；本轮对实际网络汇聚点 `_send_wecom_markdown` 复核为 HIGH（4 个直接调用方，kill switch/risk sentinel/盘中监控三条流程）。现保持函数签名、布尔返回、冷却和 Markdown 截断不变，但业务调用只向 Telegram＋企业微信 durable outbox 写入带内容哈希的幂等 intent；每分钟 worker 负责网络、重试和 dead-letter，盘中风险调用不再同步等待 webhook。布尔 `True` 的语义明确为“持久化成功”，不是“已送达”。
 
+旧 `WeChatPusher` 的 L2/L3/L4 文本与 Markdown 入口也已迁入相同双通道 outbox；日志新增 `queued` 并保持 `sent=false`，不再把排队成功冒充网络送达。显式 `wechat:test` 仍作为人工连通性诊断调用中央 transport，不属于业务事件发送。
+
 ## 因子与研究审计
 
 - 因子计算存在硬编码 DataHub 路径，缺少统一 snapshot/version 参数。

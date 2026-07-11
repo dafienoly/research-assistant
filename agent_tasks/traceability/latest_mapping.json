@@ -897,6 +897,17 @@
       "behavior": "相同 change-set 只复用通过的审计；失败或环境异常必须生成新 run 并重新执行门禁，避免临时盘等瞬态故障永久阻断。"
     },
     {
+      "id": "P1-WECHAT-PUSH-OUTBOX-01",
+      "title": "旧 WeChatPusher 业务事件迁入双通道 outbox",
+      "code_locations": [
+        {"file": "commands/wechat_push.py", "function": "_call_webhook", "line": 59},
+        {"file": "commands/wechat_push.py", "function": "push_notice", "line": 72},
+        {"file": "commands/tests/test_wechat_push_transport.py", "line": 1}
+      ],
+      "expected_keywords": ["_send_wecom_markdown", "queued", "sent=False", "telegram", "enterprise_wechat"],
+      "behavior": "L2/L3/L4 文本与 Markdown 业务事件不等待企业微信网络；写入 Telegram+企业微信 durable outbox，日志区分 queued 与 sent，只有显式人工连接测试允许同步 transport。"
+    },
+    {
       "id": "P1-REGULATORY-COVERAGE-01",
       "title": "监管公告 ingestion 与逐标的覆盖感知门禁",
       "code_locations": [
