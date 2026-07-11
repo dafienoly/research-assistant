@@ -64,7 +64,7 @@
       "job_id": "event_truth",
       "command": ["{python}", "{root}/commands/scripts/vnext_event_truth_fetch.py"],
       "depends_on": ["datahub_daily"],
-      "owned_datasets": ["normalized/events/event_truth"],
+      "owned_datasets": ["normalized/events/event_truth", "normalized/events/corporate_events"],
       "writer_id": "datahub_event_truth_ingestion",
       "timeout_seconds": 1800,
       "retry_attempts": 2,

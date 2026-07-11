@@ -132,6 +132,7 @@ def test_production_data_dependencies_and_runtime_are_explicit() -> None:
     assert registry.jobs["benchmark_projection"].depends_on == ("datahub_daily",)
     assert registry.jobs["postmarket_review"].depends_on == ("benchmark_projection",)
     assert registry.jobs["data_backup"].depends_on == ("datahub_daily",)
+    assert "normalized/events/corporate_events" in registry.jobs["event_truth"].owned_datasets
     crontab = (root / "commands/scripts/crontab/hermes-crontab").read_text(encoding="utf-8")
     assert "/usr/bin/python3" not in crontab
     assert "decision_notification_worker.py" in crontab

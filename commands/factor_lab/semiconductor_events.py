@@ -3,7 +3,7 @@
 V4.10 事件与研报语义增强 — 半导体事件因子引擎
 
 SemiconductorEventEngine:
-  从多源 (Tushare + 本地CSV) 获取半导体产业链事件数据，
+  从 DataHub canonical corporate events + 本地CSV 获取半导体产业链事件数据，
   构建标准化 Event 记录，统计事件频率，生成事件驱动因子。
 
 事件类型:
@@ -22,9 +22,9 @@ SemiconductorEventEngine:
 数据源:
   - data/events/policy_events.csv (政策事件)
   - data/events/preopen_events.csv (盘前事件)
-  - Tushare: forecast (业绩预告), stk_holdertrade (增减持),
-    repurchase (回购), share_float (解禁), dividend (分红)
-  - Tushare: trade_cal (交易日历)
+  - DataHub corporate_events: forecast, stk_holdertrade, repurchase,
+    share_float, dividend
+  - DataHub canonical trade calendar
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from factor_lab.data.tushare_client import get_ts_client
+from factor_lab.datahub_access import read_trade_calendar
 
 logger = logging.getLogger(__name__)
 
@@ -93,40 +93,22 @@ EVENT_CATEGORY_MAP: dict[str, str] = {
     "分红": "公司行为",
 }
 
-# Tushare code → event type mapping
-TUSHARE_EVENT_SOURCE = "tushare"
 
-# ─── 股票代码映射缓存 ─────────────────────────────────────────────────
-_symbol_to_ts_code: dict[str, str] = {}
-_ts_code_to_symbol: dict[str, str] = {}
+def _load_symbol_map() -> None:
+    """Deprecated compatibility hook; exchange mapping is deterministic and offline."""
+    return None
 
 
-def _load_symbol_map():
-    """从 Tushare stock_basic 加载 symbol ↔ ts_code 映射"""
-    if _symbol_to_ts_code:
-        return
-    try:
-        tc = get_ts_client()
-        df = tc.stock_basic()
-        if not df.empty:
-            for _, row in df.iterrows():
-                ts = str(row.get("ts_code", "")).strip()
-                if ts:
-                    sym = ts.split(".")[0]  # "688012.SH" → "688012"
-                    _symbol_to_ts_code[sym] = ts
-                    _ts_code_to_symbol[ts] = sym
-    except Exception as e:
-        logger.warning(f"加载股票代码映射失败: {e}")
+TUSHARE_EVENT_SOURCE = "retired_direct_provider_path"
 
+
+def get_ts_client():
+    """Fail closed if unreachable legacy fetch methods are invoked directly."""
+    raise RuntimeError("direct provider access retired; run CorporateEventIngestion")
 
 def symbol_to_ts_code(symbol: str) -> str:
-    """6位数字代码 → Tushare ts_code (如 688012 → 688012.SH)"""
-    if not _symbol_to_ts_code:
-        _load_symbol_map()
+    """6位数字代码 → exchange-qualified canonical code。"""
     symbol = symbol.strip().split(".")[0]
-    if symbol in _symbol_to_ts_code:
-        return _symbol_to_ts_code[symbol]
-    # 猜测: 688/689 → SH, 000/001/002/300/301 → SZ, 8 → BJ
     if symbol.startswith("6"):
         return f"{symbol}.SH"
     elif symbol.startswith("8") or symbol.startswith("4"):
@@ -181,8 +163,6 @@ class SemiconductorEventEngine:
         """
         self._universe_codes = universe_codes
         self._trade_cal: Optional[pd.DataFrame] = None
-        # 确保代码映射已加载
-        _load_symbol_map()
 
     # ─── 半导体池 ─────────────────────────────────────────────────
 
@@ -209,7 +189,7 @@ class SemiconductorEventEngine:
     # ─── 交易日历 ─────────────────────────────────────────────────
 
     def _load_trade_cal(self) -> pd.DataFrame:
-        """加载交易日历
+        """加载 DataHub canonical 交易日历。
 
         Returns:
             DataFrame: date (datetime), is_open (bool)
@@ -217,26 +197,9 @@ class SemiconductorEventEngine:
         if self._trade_cal is not None:
             return self._trade_cal
 
-        try:
-            tc = get_ts_client()
-            df = tc.trade_cal(start_date="20200101", end_date="20261231")
-            if not df.empty:
-                df["date"] = pd.to_datetime(df["cal_date"], format="%Y%m%d", errors="coerce")
-                self._trade_cal = df[["date", "is_open"]].sort_values("date").reset_index(drop=True)
-                return self._trade_cal
-        except Exception as e:
-            logger.warning(f"加载交易日历失败: {e}")
-
-        # 回退: 本地缓存
-        cal_path = DATA_DIR / "cache" / "tushare" / "trade_cal.parquet"
-        if cal_path.exists():
-            self._trade_cal = pd.read_parquet(cal_path)
-            return self._trade_cal
-
-        # 兜底: 识别所有K线文件中的日期作为交易日
-        logger.warning("无交易日历, 使用全部自然日")
-        dates = pd.date_range("2020-01-01", "2026-12-31", freq="D")
-        self._trade_cal = pd.DataFrame({"date": dates, "is_open": 1})
+        frame = read_trade_calendar()
+        frame["date"] = pd.to_datetime(frame["cal_date"], format="%Y%m%d", errors="coerce")
+        self._trade_cal = frame[["date", "is_open"]].dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
         return self._trade_cal
 
     def _get_trading_days(self) -> pd.Series:
@@ -276,6 +239,7 @@ class SemiconductorEventEngine:
     def _fetch_forecast_events(self, start_date: str = "20250101",
                                end_date: str = "") -> list[EventRecord]:
         """从 Tushare forecast 获取业绩预告/业绩快报事件"""
+        raise RuntimeError("direct provider access retired; run CorporateEventIngestion")
         records: list[EventRecord] = []
         try:
             tc = get_ts_client()
@@ -343,6 +307,7 @@ class SemiconductorEventEngine:
     def _fetch_holdertrade_events(self, start_date: str = "20250101",
                                   end_date: str = "") -> list[EventRecord]:
         """从 Tushare stk_holdertrade 获取增减持事件"""
+        raise RuntimeError("direct provider access retired; run CorporateEventIngestion")
         records: list[EventRecord] = []
         try:
             from commands.data_providers.tushare import TushareEventProvider
@@ -402,6 +367,7 @@ class SemiconductorEventEngine:
 
     def _fetch_repurchase_events(self, start_date: str = "20250101") -> list[EventRecord]:
         """从 Tushare repurchase 获取回购事件"""
+        raise RuntimeError("direct provider access retired; run CorporateEventIngestion")
         records: list[EventRecord] = []
         try:
             from commands.data_providers.tushare import TushareEventProvider
@@ -451,6 +417,7 @@ class SemiconductorEventEngine:
     def _fetch_share_float_events(self, start_date: str = "20250101",
                                   end_date: str = "") -> list[EventRecord]:
         """从 Tushare share_float 获取限售解禁事件"""
+        raise RuntimeError("direct provider access retired; run CorporateEventIngestion")
         records: list[EventRecord] = []
         try:
             from commands.data_providers.tushare import TushareEventProvider
@@ -504,6 +471,7 @@ class SemiconductorEventEngine:
     def _fetch_dividend_events(self, start_date: str = "20250101",
                                end_date: str = "") -> list[EventRecord]:
         """从 Tushare dividend 获取分红事件"""
+        raise RuntimeError("direct provider access retired; run CorporateEventIngestion")
         records: list[EventRecord] = []
         try:
             from commands.data_providers.tushare import TushareEventProvider
@@ -553,6 +521,89 @@ class SemiconductorEventEngine:
         except Exception as e:
             logger.warning(f"dividend 批量拉取失败: {e}")
         return records
+
+    def _load_datahub_events(self, start_date: str, end_date: str) -> list[EventRecord]:
+        """Load normalized corporate events without provider access."""
+        records: list[EventRecord] = []
+        effective_end = end_date or datetime.now(CST).strftime("%Y%m%d")
+        root = DATA_DIR / "normalized/events/corporate_events"
+        for code in self._get_universe_codes():
+            ts_code = symbol_to_ts_code(code)
+            path = root / f"{ts_code}.csv"
+            if not path.exists():
+                continue
+            try:
+                frame = pd.read_csv(path, encoding="utf-8-sig", dtype="string")
+            except (OSError, UnicodeError, pd.errors.ParserError):
+                logger.warning("corporate event snapshot unreadable: %s", path)
+                continue
+            required = {"event_dataset", "event_date", "payload", "source_provider"}
+            if frame.empty or not required.issubset(frame.columns):
+                continue
+            frame = frame[(frame["event_date"] >= start_date) & (frame["event_date"] <= effective_end)]
+            for row in frame.to_dict(orient="records"):
+                try:
+                    payload = json.loads(str(row["payload"]))
+                except (TypeError, json.JSONDecodeError):
+                    continue
+                event = self._datahub_event_record(ts_code, str(row["event_dataset"]), str(row["event_date"]), payload, path)
+                if event is not None:
+                    records.append(event)
+        logger.info("从 DataHub corporate_events 加载 %s 条事件", len(records))
+        return records
+
+    def _datahub_event_record(
+        self,
+        ts_code: str,
+        dataset: str,
+        raw_date: str,
+        payload: dict,
+        path: Path,
+    ) -> EventRecord | None:
+        event_date = self._find_next_trading_day(raw_date)
+        if event_date is None:
+            return None
+        event_type = "订单"
+        direction = "neutral"
+        strength = 2
+        title = dataset
+        if dataset == "forecast":
+            forecast_type = str(payload.get("type", ""))
+            direction = "positive" if forecast_type in {"1", "3", "5", "8"} else (
+                "negative" if forecast_type in {"2", "4", "6", "7"} else "neutral"
+            )
+            event_type, strength, title = "业绩预告", 3, f"业绩{forecast_type}"
+        elif dataset == "holdertrade":
+            is_reduce = str(payload.get("trade_type", "0")) == "0"
+            volume = abs(float(payload.get("vol", 0) or 0))
+            event_type = "减持" if is_reduce else "回购"
+            direction = "negative" if is_reduce else "positive"
+            strength = 4 if volume > 1_000_000 else 2
+            title = f"{'减持' if is_reduce else '增持'} {volume:.0f}股"
+        elif dataset == "repurchase":
+            amount = float(payload.get("amount", 0) or 0)
+            event_type, direction = "回购", "positive"
+            strength, title = (3 if amount > 50_000_000 else 2), f"回购 {amount:.0f}元"
+        elif dataset == "share_float":
+            ratio = float(payload.get("ratio", 0) or 0)
+            event_type, direction = "限售解禁", "negative"
+            strength, title = (4 if ratio > 10 else (3 if ratio > 5 else 2)), f"解禁 {ratio:.1f}%"
+        elif dataset == "dividend":
+            cash_div = float(payload.get("cash_div", payload.get("div_cash", 0)) or 0)
+            event_type = "分红"
+            direction = "positive" if cash_div > 0 else "neutral"
+            strength, title = (3 if cash_div > 1 else 2), f"分红 {cash_div:.2f}元/股"
+        return EventRecord(
+            event_date=event_date,
+            ts_code=ts_code,
+            event_type=event_type,
+            event_direction=direction,
+            event_strength=strength,
+            event_source="datahub_corporate_events",
+            title=title,
+            detail=json.dumps(payload, ensure_ascii=False, default=str),
+            source_ref=f"{path.name}:{dataset}:{raw_date}",
+        )
 
     # ─── 从本地 CSV 加载事件 ──────────────────────────────────────
 
@@ -680,7 +731,7 @@ class SemiconductorEventEngine:
         Args:
             start_date: 起始日期 YYYYMMDD
             end_date: 截止日期 YYYYMMDD
-            include_tushare: 是否从 Tushare 拉取
+            include_tushare: 兼容参数；True 表示加载 DataHub corporate events
             include_csv: 是否从本地 CSV 加载
 
         Returns:
@@ -689,11 +740,7 @@ class SemiconductorEventEngine:
         all_records: list[EventRecord] = []
 
         if include_tushare:
-            all_records.extend(self._fetch_forecast_events(start_date, end_date))
-            all_records.extend(self._fetch_holdertrade_events(start_date, end_date))
-            all_records.extend(self._fetch_repurchase_events(start_date))
-            all_records.extend(self._fetch_share_float_events(start_date, end_date))
-            all_records.extend(self._fetch_dividend_events(start_date, end_date))
+            all_records.extend(self._load_datahub_events(start_date, end_date))
 
         if include_csv:
             all_records.extend(self._load_csv_events())

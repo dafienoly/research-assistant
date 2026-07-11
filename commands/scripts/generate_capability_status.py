@@ -37,6 +37,7 @@ def main() -> int:
     live_snapshot = read(LIVE_SNAPSHOT_PATH.with_suffix(".manifest.json"))
     etf_holdings = read(ETF_HOLDINGS_PATH.with_suffix(".manifest.json"))
     regulatory_truth = read(ROOT / "data/normalized/events/regulatory_watchlist.json")
+    corporate_events = read(ROOT / "data/normalized/events/corporate_events/manifest.json")
     certification = service.store.read_json("certification/latest.json", default={"status": "NOT_RUN"})
     qmt_response = QMTClient().health()
     qmt = qmt_response.get("data") if qmt_response.get("status") == "ok" else {}
@@ -55,6 +56,7 @@ def main() -> int:
         f"| 盘中 canonical 快照 | {live_snapshot.get('status', 'MISSING')} | rows={live_snapshot.get('rows', 0)}，observed_at={live_snapshot.get('observed_at', 'unknown')} |",
         f"| ETF 权重真值 | {etf_holdings.get('status', 'MISSING')} | rows={etf_holdings.get('rows', 0)}，etf_count={etf_holdings.get('etf_count', 0)} |",
         f"| 监管公告真值 | {regulatory_truth.get('status', 'MISSING')} | 缺失时 PreTrade BUY fail-closed |",
+        f"| 公司事件真值 | {corporate_events.get('status', 'MISSING')} | forecast/holdertrade/repurchase/share_float/dividend |",
         f"| 真实确认持仓 | {'READY' if status.get('current_position_snapshot') else 'BLOCKED'} | {status.get('current_position_snapshot', {}).get('snapshot_id', 'confirmed snapshot missing') if status.get('current_position_snapshot') else 'confirmed snapshot missing'} |",
         f"| 日级授权 | {(status.get('daily_authorization') or {}).get('status', 'inactive')} | 收盘自动失效，参数/数据/审计/风险变化自动撤销 |",
         f"| 分钟决策周期 | {service.store.read_json('cycles/latest.json', default={'status': 'NOT_RUN'}).get('status')} | 统一 DecisionCycleResult + 周期锁 |",

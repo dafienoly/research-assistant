@@ -154,3 +154,23 @@ def test_dive_live_predictor_is_read_only_datahub_consumer():
     assert "urllib.request" not in source
     assert "qt.gtimg.cn" not in source
     assert "os.environ.pop" not in source
+
+
+def test_semiconductor_event_runtime_path_only_reads_datahub():
+    path = ROOT / "commands/factor_lab/semiconductor_events.py"
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    loader = next(
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "load_all_events"
+    )
+    loader_source = ast.get_source_segment(source, loader) or ""
+    assert "_load_datahub_events" in loader_source
+    assert "_fetch_forecast_events" not in loader_source
+    assert "_fetch_holdertrade_events" not in loader_source
+    assert "get_ts_client" not in loader_source
+
+    ingestion = ROOT / "commands/factor_lab/datahub_ingestion/corporate_events.py"
+    ingestion_source = ingestion.read_text(encoding="utf-8")
+    assert "client._query" in ingestion_source
+    assert "atomic_write_frame" in ingestion_source
