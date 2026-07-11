@@ -983,6 +983,17 @@
       "behavior": "通用 PositionLoader 不调用旧 xtdata/miniqmt 缓存路径；统一经 QMT Bridge 读取并标准化账户持仓，Bridge 失败或空响应显式 error+partial，不产生静默空持仓。"
     },
     {
+      "id": "P0-LEGACY-MINIQMT-FACADE-01",
+      "title": "旧 miniqmt 模块降为 QMT Bridge/DataHub facade",
+      "code_locations": [
+        {"file": "commands/factor_lab/miniqmt/__init__.py", "function": "query_positions", "line": 31},
+        {"file": "commands/factor_lab/miniqmt/__init__.py", "function": "get_kline", "line": 55},
+        {"file": "commands/tests/test_legacy_miniqmt_facade.py", "line": 1}
+      ],
+      "expected_keywords": ["MiniQMTPositionAdapter", "read_live_snapshot", "daily_kline_path", "QMT Bridge is not connected", "canonical minute K-line dataset unavailable"],
+      "behavior": "遗留账户/持仓入口只经 QMT Bridge；行情只读 DataHub；无 canonical 分钟数据时 fail-closed；xtdata 直连、异常吞噬和缓存空仓 fallback 已物理删除。"
+    },
+    {
       "id": "P1-REGULATORY-COVERAGE-01",
       "title": "监管公告 ingestion 与逐标的覆盖感知门禁",
       "code_locations": [
