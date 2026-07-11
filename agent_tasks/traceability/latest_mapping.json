@@ -499,11 +499,12 @@
         {"file": "commands/factor_lab/datahub_ingestion/regulatory_events.py", "function": "RegulatoryEventIngestion", "line": 15},
         {"file": "commands/factor_lab/risk/regulatory_watchlist.py", "function": "covers", "line": 90},
         {"file": "commands/factor_lab/risk/pretrade_risk_check.py", "function": "run_pretrade_risk_check", "line": 169},
+        {"file": "commands/announcement_parser.py", "function": "AnnouncementParser", "line": 50},
         {"file": "commands/scripts/datahub_regulatory_events.py", "line": 1},
         {"file": "commands/tests/test_regulatory_event_ingestion.py", "line": 1}
       ],
-      "expected_keywords": ["covered_symbols", "failed_symbols", "coverage_policy", "no verifiable response", "regulatory truth does not cover", "datahub-global.lock"],
-      "behavior": "公告只在 ingestion 层抓取并分类；快照记录成功/失败覆盖，所有来源吞错后返回空列表时仍判定失败，PreTrade 对未覆盖标的 fail-closed，空事件不等于全市场安全。"
+      "expected_keywords": ["covered_symbols", "failed_symbols", "announcements", "coverage_policy", "no verifiable response", "regulatory truth does not cover", "datahub-global.lock"],
+      "behavior": "公告只在 ingestion 层抓取并同时发布完整公告和风险事件视图；解析器只读 canonical snapshot；快照记录成功/失败覆盖，所有来源吞错后返回空列表时仍判定失败，PreTrade 对未覆盖标的 fail-closed。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

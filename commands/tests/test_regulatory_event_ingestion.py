@@ -6,6 +6,7 @@ from factor_lab.datahub_ingestion.regulatory_events import RegulatoryEventIngest
 from factor_lab.risk.pretrade_risk_check import run_pretrade_risk_check
 from factor_lab.risk.regulatory_watchlist import RegulatoryWatchlist
 from factor_lab.risk.st_watchlist import STWatchlist
+from announcement_parser import AnnouncementParser
 
 
 def test_regulatory_ingestion_classifies_and_records_coverage(tmp_path):
@@ -23,6 +24,7 @@ def test_regulatory_ingestion_classifies_and_records_coverage(tmp_path):
     assert watchlist.covers("688012.SH")
     assert not watchlist.covers("688072.SH")
     assert watchlist.is_blacklisted("688012.SH")
+    assert payload["announcements"][0]["title"] == "收到中国证监会立案调查通知"
 
 
 def test_pretrade_blocks_symbol_absent_from_regulatory_coverage(tmp_path):
@@ -56,3 +58,19 @@ def test_regulatory_ingestion_does_not_treat_provider_failure_as_empty_coverage(
     assert payload["status"] == "PARTIAL"
     assert payload["covered_symbols"] == []
     assert payload["failed_symbols"] == [{"symbol": "688012", "error": "RuntimeError"}]
+
+
+def test_announcement_parser_reads_only_canonical_snapshot(tmp_path):
+    snapshot = tmp_path / "regulatory_watchlist.json"
+    snapshot.write_text(json.dumps({
+        "covered_symbols": ["688012"],
+        "announcements": [{
+            "symbol": "688012", "date": "2026-07-10", "title": "重大合同公告",
+            "source": "sse", "source_ref": "ann-2",
+        }],
+    }), encoding="utf-8")
+
+    parsed = AnnouncementParser(snapshot).parse_for_stock("688012.SH")
+
+    assert parsed[0]["announce_type"] == "重大合同"
+    assert parsed[0]["announce_id"] == "ann-2"

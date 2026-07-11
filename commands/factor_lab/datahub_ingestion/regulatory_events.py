@@ -30,6 +30,7 @@ class RegulatoryEventIngestion:
         covered = []
         failed = []
         events = []
+        all_announcements = []
         for symbol in requested:
             try:
                 announcements = self.fetcher(symbol) or []
@@ -40,18 +41,22 @@ class RegulatoryEventIngestion:
             for announcement in announcements:
                 title = str(announcement.get("title", "")).strip()
                 severity = self._severity(title)
-                if severity == "notice":
-                    continue
                 event_date = self._date(announcement.get("date"))
-                if event_date is None:
-                    continue
-                events.append({
+                normalized = {
                     "symbol": symbol,
                     "date": event_date,
-                    "severity": severity,
                     "title": title,
                     "source": announcement.get("source", "announcement_provider"),
                     "source_ref": announcement.get("id") or announcement.get("url") or announcement.get("adjunct_url"),
+                }
+                all_announcements.append(normalized)
+                if severity == "notice":
+                    continue
+                if event_date is None:
+                    continue
+                events.append({
+                    **normalized,
+                    "severity": severity,
                 })
         status = "EMPTY" if not requested else ("OK" if not failed else "PARTIAL")
         payload = {
@@ -60,6 +65,9 @@ class RegulatoryEventIngestion:
             "requested_symbols": requested,
             "covered_symbols": covered,
             "failed_symbols": failed,
+            "announcements": sorted(
+                all_announcements, key=lambda row: (row["date"] or "", row["symbol"], row["title"])
+            ),
             "events": sorted(events, key=lambda row: (row["date"], row["symbol"], row["title"])),
             "source": "cninfo+sse+szse_via_datahub_ingestion",
             "coverage_policy": "symbols absent from covered_symbols remain fail-closed",

@@ -68,6 +68,13 @@ def test_vnext_event_truth_is_read_only_datahub_consumer():
     assert provider_imports(path) == []
     source = path.read_text(encoding="utf-8")
     assert "data/normalized/events/event_truth" in source
+
+
+def test_announcement_parser_is_read_only_datahub_consumer():
+    source = (ROOT / "commands/announcement_parser.py").read_text(encoding="utf-8")
+    assert "regulatory_watchlist.json" in source
+    assert "AnnouncementProvider" not in source
+    assert "provider_matrix" not in source
     assert "._query(" not in source
 
 

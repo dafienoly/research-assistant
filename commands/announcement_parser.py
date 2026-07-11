@@ -5,12 +5,10 @@ Phase 2 实现: 从三大交易所公告源拉取并解析公告，
 """
 
 import csv
-import re
-import time
+import json
 from pathlib import Path
 
-from config import PATHS, now_str, now_cst, date_id, ensure_dirs, read_csv_safe, append_jsonl
-from provider_matrix import AnnouncementProvider
+from config import PATHS, now_str, read_csv_safe, append_jsonl
 
 
 # ========== 公告分类 ==========
@@ -31,7 +29,6 @@ EVENT_KEYWORDS = {
 
 def classify_announcement(title: str) -> str:
     """根据标题分类公告"""
-    title_lower = title.lower()
     for ann_type, keywords in EVENT_KEYWORDS.items():
         for kw in keywords:
             if kw in title:
@@ -45,7 +42,6 @@ def extract_symbols_from_cninfo(items: list[dict], target_symbol: str) -> list[d
     for item in items:
         # CNINFO 返回的 orgId/secCode 可能不在标准字段中
         # 直接在标题/内容中搜索股票代码做二次校验
-        title = item.get("title", "")
         # 有些公告是跨公司的，先返回全部，由调用方按需筛选
         filtered.append(item)
     return filtered
@@ -54,24 +50,41 @@ def extract_symbols_from_cninfo(items: list[dict], target_symbol: str) -> list[d
 class AnnouncementParser:
     """公告解析器"""
 
-    def __init__(self):
-        self.provider = AnnouncementProvider()
+    def __init__(self, snapshot_path: Path | None = None):
+        self.snapshot_path = snapshot_path or (
+            Path(__file__).resolve().parents[1] / "data/normalized/events/regulatory_watchlist.json"
+        )
+
+    def _snapshot(self) -> dict:
+        if not self.snapshot_path.exists():
+            raise FileNotFoundError(f"canonical DataHub announcement snapshot missing: {self.snapshot_path}")
+        payload = json.loads(self.snapshot_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("canonical DataHub announcement snapshot is invalid")
+        return payload
 
     def parse_for_stock(self, symbol: str) -> list[dict]:
         """获取并解析单个股票的近期公告"""
-        all_items = self.provider.get_all(symbol)
+        normalized = "".join(character for character in str(symbol) if character.isdigit())[:6]
+        snapshot = self._snapshot()
+        if normalized not in set(snapshot.get("covered_symbols", [])):
+            raise ValueError(f"canonical DataHub announcement snapshot does not cover {normalized}")
+        all_items = [
+            item for item in snapshot.get("announcements", [])
+            if str(item.get("symbol", "")) == normalized
+        ]
 
         parsed = []
         for item in all_items:
             title = item.get("title", "")
             ann_type = classify_announcement(title)
             parsed.append({
-                "code": symbol,
+                "code": normalized,
                 "source": item.get("source", ""),
                 "announce_type": ann_type,
                 "title": title,
                 "date": item.get("date", ""),
-                "announce_id": item.get("id", item.get("announce_id", "")),
+                "announce_id": item.get("source_ref", item.get("announce_id", "")),
                 "parsed_at": now_str(),
             })
 
@@ -84,7 +97,6 @@ class AnnouncementParser:
             try:
                 items = self.parse_for_stock(symbol)
                 all_parsed.extend(items)
-                time.sleep(0.5)  # 避免频率限制
             except Exception as e:
                 print(f"⚠️ {symbol} 公告解析失败: {e}")
 
