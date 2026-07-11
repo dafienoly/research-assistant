@@ -459,6 +459,17 @@
       "behavior": "实时 ETF 价格和市场跌幅广度使用同一新鲜 DataHub 快照；不构造 synthetic high/low，不清除进程代理变量，不直连腾讯。"
     },
     {
+      "id": "INFRA-DIVE-HISTORY-DATAHUB-01",
+      "title": "跳水训练历史数据只读 canonical DataHub",
+      "code_locations": [
+        {"file": "commands/dive_prediction/data_collector.py", "function": "_read_canonical_history", "line": 25},
+        {"file": "commands/dive_prediction/data_collector.py", "function": "fetch_etf_intraday", "line": 70},
+        {"file": "commands/tests/test_dive_data_collector_datahub.py", "line": 1}
+      ],
+      "expected_keywords": ["daily_kline_path", "read_live_snapshot", "canonical DataHub", "DataHub 缺失"],
+      "behavior": "训练和回测读取 DataHub 日线，盘中读取 DataHub snapshot；不调用 AkShare，不写 _hist.csv，canonical 缺失时明确失败。"
+    },
+    {
       "id": "P0-EVENT-TRUTH-PRESERVE-01",
       "title": "Event Truth 上游失败时保留旧快照并发布运行断点",
       "code_locations": [

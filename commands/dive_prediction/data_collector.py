@@ -1,20 +1,14 @@
 """ETF 跳水预测系统 — 数据采集模块
 
-从 akshare 拉取 ETF 和龙头个股的历史/实时数据。
-数据统一存到 config.PATHS["daily_kline"]，不自己维护副本。
+只读 DataHub canonical ETF 和龙头个股历史/实时数据，不维护副本。
 """
-import os, json, csv, sys
+import sys
 from pathlib import Path
-from datetime import datetime, timedelta, timezone
 
 import pandas as pd
-import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from config import PATHS, VENV_PYTHON
-from dive_prediction.proxy_bypass import call_no_proxy, no_proxy_for
-
-CST = timezone(timedelta(hours=8))
+from factor_lab.datahub_access import daily_kline_path, read_live_snapshot
 
 # ── 监测标的 ──
 ETF_CODE = "159516"
@@ -29,12 +23,19 @@ LEADER_STOCKS = [
     ("688120", "华海清科"),
 ]
 
-# 数据统一存储路径（与 DataHub 共享）
-KLINE_DIR = PATHS["daily_kline"]
-
-
-def ensure_dir():
-    KLINE_DIR.mkdir(parents=True, exist_ok=True)
+def _read_canonical_history(code: str, days: int) -> pd.DataFrame:
+    path = daily_kline_path(code)
+    frame = pd.read_csv(path, encoding="utf-8-sig")
+    frame = frame.rename(columns={"vol": "volume", "pct_chg": "change_pct", "change": "change_amount"})
+    date_column = next((name for name in ("date", "trade_date", "日期", "timeString") if name in frame), None)
+    if date_column is None:
+        raise ValueError(f"canonical DataHub daily kline has no date column: {path}")
+    frame = frame.rename(columns={date_column: "日期"})
+    frame["日期"] = pd.to_datetime(frame["日期"], errors="coerce")
+    frame = frame.dropna(subset=["日期"]).sort_values("日期", kind="stable")
+    if frame.empty:
+        raise ValueError(f"canonical DataHub daily kline is empty: {path}")
+    return frame.tail(days).reset_index(drop=True)
 
 
 # ═══════════════════════════════════════════════════
@@ -42,61 +43,35 @@ def ensure_dir():
 # ═══════════════════════════════════════════════════
 
 def fetch_etf_hist(days: int = 250) -> pd.DataFrame:
-    """拉取 ETF 历史日K线"""
-    import akshare as ak
-    end = datetime.now(CST)
-    start = end - timedelta(days=days + 20)
-    df = call_no_proxy(
-        ak.fund_etf_hist_em,
-        symbol=ETF_CODE, period="daily",
-        start_date=start.strftime("%Y%m%d"),
-        end_date=end.strftime("%Y%m%d"),
-        adjust="qfq",
-    )
-    df = df.sort_values("日期")
-    df.to_csv(KLINE_DIR / f"{ETF_CODE}_hist.csv", index=False)
+    """读取 DataHub canonical ETF 历史日 K 线。"""
+    df = _read_canonical_history(ETF_CODE, days)
     print(f"  ETF历史: {len(df)} 条 ({df['日期'].iloc[0]} ~ {df['日期'].iloc[-1]})")
     return df
 
 
 def fetch_leader_hist(days: int = 250) -> dict:
-    """拉取龙头个股历史日K线（如果 proxy 阻塞则静默跳过）"""
-    import akshare as ak
-    end = datetime.now(CST)
-    start = end - timedelta(days=days + 20)
+    """读取 DataHub canonical 龙头个股历史日 K 线。"""
     results = {}
     for code, name in LEADER_STOCKS:
         try:
-            df = ak.stock_zh_a_hist(
-                symbol=code,
-                period="daily",
-                start_date=start.strftime("%Y%m%d"),
-                end_date=end.strftime("%Y%m%d"),
-                adjust="qfq",
-            )
-            df = df.sort_values("日期")
-            df.to_csv(KLINE_DIR / f"{code}_hist.csv", index=False)
+            df = _read_canonical_history(code, days)
             results[code] = df
             print(f"  {name}({code}): {len(df)} 条")
         except Exception as e:
-            # stock_zh_a_hist 可能被 proxy 阻塞，不影响主流程
-            print(f"  ⚠️ {name}({code}): 跳过 ({type(e).__name__})")
+            print(f"  ⚠️ {name}({code}): DataHub 缺失 ({type(e).__name__})")
     return results
 
 
 def fetch_etf_intraday() -> pd.DataFrame | None:
-    """拉取 ETF 当日分时"""
-    import akshare as ak
+    """读取 DataHub canonical ETF 最新盘中快照。"""
     try:
-        df = ak.fund_etf_hist_em(
-            symbol=ETF_CODE,
-            period="daily",
-            start_date=datetime.now(CST).strftime("%Y%m%d"),
-            end_date=datetime.now(CST).strftime("%Y%m%d"),
-            adjust="qfq",
-        )
-        return df
-    except Exception:
+        row = read_live_snapshot([ETF_CODE])[ETF_CODE]
+        return pd.DataFrame([{
+            "日期": row["observed_at"], "开盘": row["open"], "收盘": row["price"],
+            "最高": row["high"], "最低": row["low"], "成交量": row["volume"],
+            "成交额": row["amount"], "涨跌幅": row["change_pct"],
+        }])
+    except (FileNotFoundError, KeyError, ValueError):
         return None
 
 
@@ -110,7 +85,7 @@ def compute_features(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
     df = df.copy()
-    # 列名映射 (akshare ETF 用中文列名)
+    # 兼容旧中文列名；canonical DataHub 使用英文列名。
     col_map = {
         "开盘": "open", "收盘": "close", "最高": "high", "最低": "low",
         "成交量": "volume", "成交额": "amount", "振幅": "amplitude",
@@ -209,7 +184,6 @@ def backtest_signals(df: pd.DataFrame) -> dict:
         "ret1<-2": df["ret1"] < -2,
     }
 
-    total = len(df)
     for name, mask in signals.items():
         triggered = mask.sum()
         if triggered == 0:
@@ -241,25 +215,19 @@ def main():
     p.add_argument("--backtest-only", action="store_true", help="只用已有数据做回测")
     args = p.parse_args()
 
-    ensure_dir()
     print(f"\n{'═'*50}")
-    print(f"  ETF跳水预测 — 数据采集&回测")
+    print("  ETF跳水预测 — 数据采集&回测")
     print(f"  标的: {ETF_CODE}({ETF_NAME}) + {len(LEADER_STOCKS)}只龙头")
     print(f"{'═'*50}")
 
     if not args.backtest_only:
-        print("\n--- 拉取 ETF 历史 ---")
+        print("\n--- 读取 DataHub ETF 历史 ---")
         df_etf = fetch_etf_hist(days=args.days)
         print("\n--- 拉取龙头历史 ---")
         fetch_leader_hist(days=args.days)
     else:
-        csv_path = KLINE_DIR / f"{ETF_CODE}_hist.csv"
-        if csv_path.exists():
-            df_etf = pd.read_csv(csv_path)
-            print(f"\n--- 读取本地数据: {len(df_etf)} 条 ---")
-        else:
-            print("⚠️ 本地无数据，请先运行 --fetch-only")
-            return
+        df_etf = fetch_etf_hist(days=args.days)
+        print(f"\n--- 读取 DataHub 数据: {len(df_etf)} 条 ---")
 
     if not args.fetch_only:
         print("\n--- 特征工程+回测 ---")
@@ -274,7 +242,7 @@ def main():
                       f"{r['次日精确率%']:>7.1f}% {r['跳水概率%']:>8.1f}%")
 
             # 综合跳水概率
-            print(f"\n  综合跳水概率 (任意信号触发):")
+            print("\n  综合跳水概率 (任意信号触发):")
             any_signal = pd.DataFrame({k: v for k, v in [
                 (k, v) for k, v in [
                     ("prev_ret5>5", df["prev_ret5"] > 5),
