@@ -1,8 +1,8 @@
 """持仓加载与校验"""
-import csv, json, os
-from pathlib import Path
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+import csv
+import json
+import os
+from datetime import timezone, timedelta
 
 CST = timezone(timedelta(hours=8))
 
@@ -41,34 +41,26 @@ class PositionLoader:
         return self._validate(data, "json")
 
     def from_qmt(self, connect_if_needed: bool = True) -> list:
-        """从 QMT 客户端拉取实时持仓（只读）
+        """通过统一 QMT Bridge 拉取实时持仓（只读）。
 
         需要:
             - QMT 客户端在本地运行
             - pip install xtquant -i https://pypi.org/simple
 
-        无 QMT 时返回空列表，不报错。
+        QMT 不可用时记录显式错误，禁止静默空持仓。
         """
         try:
-            from factor_lab.miniqmt import connect, query_positions, query_account
+            from factor_lab.broker.miniqmt_position_adapter import MiniQMTPositionAdapter
 
-            if connect_if_needed:
-                connect()
-
-            positions = query_positions()
-            account = query_account()
-
-            if positions:
-                self.cash = account.get("cash", 0)
-                return self._validate(positions, "qmt")
-
-            self.warnings.append("QMT 未返回持仓数据（客户端未运行或未登录）")
-            return []
-        except ImportError:
-            self.warnings.append("xtquant 未安装，无法连接 QMT")
-            return []
-        except Exception as e:
-            self.errors.append(f"QMT 连接异常: {e}")
+            del connect_if_needed  # QMT Bridge owns connection lifecycle and health checks
+            adapter = MiniQMTPositionAdapter()
+            positions = adapter.normalize_positions(adapter.load_positions())
+            if not positions:
+                raise RuntimeError("QMT Bridge returned an empty position response")
+            return self._validate(positions, "qmt_bridge")
+        except (ImportError, RuntimeError, OSError, ValueError, TypeError) as exc:
+            self.errors.append(f"QMT Bridge 持仓读取失败: {exc}")
+            self.partial = True
             return []
 
     def _validate(self, rows: list, source: str) -> list:
@@ -114,7 +106,7 @@ class PositionLoader:
                     expected = shares * float(row.get("current_price", 0))
                     if abs(mv - expected) > expected * 0.01:
                         self.warnings.append(f"{sym}: market_value {mv} ≠ shares*price {expected:.0f}")
-                except:
+                except (ValueError, TypeError):
                     pass
 
             validated.append(row)
@@ -124,7 +116,7 @@ class PositionLoader:
             if row.get("symbol", "").upper() == "CASH":
                 try:
                     self.cash = float(row.get("market_value", row.get("shares", 0)))
-                except:
+                except (ValueError, TypeError):
                     pass
 
         if self.warnings:

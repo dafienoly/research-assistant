@@ -973,6 +973,16 @@
       "behavior": "VNext 审批生产默认不再同步单发 Telegram；approval_id 作为共享事件 ID 原子写入双通道 outbox，接口明确区分 QUEUED 与 SENT，执行不等待网络。"
     },
     {
+      "id": "P0-POSITION-LOADER-QMT-BRIDGE-01",
+      "title": "通用持仓加载统一使用 QMT Bridge",
+      "code_locations": [
+        {"file": "commands/factor_lab/portfolio/position_loader.py", "function": "from_qmt", "line": 42},
+        {"file": "commands/tests/test_position_loader_qmt_bridge.py", "line": 1}
+      ],
+      "expected_keywords": ["MiniQMTPositionAdapter", "QMT Bridge 持仓读取失败", "partial = True", "has_no_legacy_miniqmt_account_path"],
+      "behavior": "通用 PositionLoader 不调用旧 xtdata/miniqmt 缓存路径；统一经 QMT Bridge 读取并标准化账户持仓，Bridge 失败或空响应显式 error+partial，不产生静默空持仓。"
+    },
+    {
       "id": "P1-REGULATORY-COVERAGE-01",
       "title": "监管公告 ingestion 与逐标的覆盖感知门禁",
       "code_locations": [
