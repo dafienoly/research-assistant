@@ -584,6 +584,29 @@
       "behavior": "五类公司事件只在 ingestion 层拉取并原子发布；累计三次异常触发熔断；合法空结果标记 EMPTY 而非 MISSING；每个标的后原子更新运行中 manifest。"
     },
     {
+      "id": "INFRA-LEGACY-KLINE-OWNER-01",
+      "title": "旧每日 K 线入口只委托 DataHub ingestion owner",
+      "code_locations": [
+        {
+          "file": "commands/update_kline_daily.py",
+          "function": "run",
+          "line": 14
+        },
+        {
+          "file": "commands/tests/test_legacy_kline_entrypoint.py",
+          "function": "test_legacy_kline_entrypoint_delegates_to_datahub",
+          "line": 8
+        }
+      ],
+      "expected_keywords": [
+        "cmd_update_daily",
+        "canonical DataHub",
+        "delegates_to_datahub",
+        "has_no_provider_or_csv_writer"
+      ],
+      "behavior": "旧 update_kline_daily 可执行入口不再调用 Baostock/RSScast 或逐文件重写 CSV，只委托 canonical DataHub 日增量管线。"
+    },
+    {
       "id": "INFRA-STOCK-CONTEXT-DATAHUB-01",
       "title": "股票研究上下文只读 canonical DataHub",
       "code_locations": [
