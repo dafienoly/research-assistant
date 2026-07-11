@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 
 import pandas as pd
-import pytest
 
 from factor_lab.datahub_ingestion.corporate_events import CorporateEventIngestion
 from factor_lab.semiconductor_events import SemiconductorEventEngine
@@ -76,9 +75,10 @@ def test_semiconductor_engine_reads_canonical_corporate_events(tmp_path, monkeyp
     assert events[0].event_source == "datahub_corporate_events"
 
 
-def test_legacy_provider_methods_fail_closed():
+def test_legacy_provider_methods_are_physically_removed():
     engine = SemiconductorEventEngine(["688012"])
-    with pytest.raises(RuntimeError, match="CorporateEventIngestion"):
-        engine._fetch_forecast_events()
-    with pytest.raises(RuntimeError, match="CorporateEventIngestion"):
-        engine._fetch_holdertrade_events()
+    assert not hasattr(engine, "_fetch_forecast_events")
+    assert not hasattr(engine, "_fetch_holdertrade_events")
+    assert not hasattr(engine, "_fetch_repurchase_events")
+    assert not hasattr(engine, "_fetch_share_float_events")
+    assert not hasattr(engine, "_fetch_dividend_events")

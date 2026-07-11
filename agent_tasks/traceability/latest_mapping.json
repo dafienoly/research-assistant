@@ -479,7 +479,7 @@
         {"file": "commands/tests/test_corporate_event_ingestion.py", "line": 1}
       ],
       "expected_keywords": ["client._query", "normalized/events/corporate_events", "atomic_write_frame", "CircuitOpen", "IN_PROGRESS", "_load_datahub_events", "corporate_event_truth"],
-      "behavior": "forecast、holder trade、repurchase、share float、dividend 只在 ingestion 层拉取并长表原子发布；逐数据集连续失败触发熔断，每个标的后原子更新运行中 manifest，研究加载器只读 canonical 数据和交易日历。"
+      "behavior": "forecast、holder trade、repurchase、share float、dividend 只在 ingestion 层拉取并长表原子发布；逐数据集连续失败触发熔断，每个标的后原子更新运行中 manifest；研究加载器只读 canonical 数据和交易日历，旧 provider 方法已物理删除。"
     },
     {
       "id": "P1-REGULATORY-COVERAGE-01",
