@@ -584,6 +584,35 @@
       "behavior": "五类公司事件只在 ingestion 层拉取并原子发布；累计三次异常触发熔断；合法空结果标记 EMPTY 而非 MISSING；每个标的后原子更新运行中 manifest。"
     },
     {
+      "id": "INFRA-FACTOR-INPUT-OWNER-01",
+      "title": "因子辅助输入统一由 DataHub projection owner 物化",
+      "code_locations": [
+        {
+          "file": "commands/factor_lab/datahub_ingestion/factor_inputs.py",
+          "function": "FactorInputProjection",
+          "line": 32
+        },
+        {
+          "file": "commands/data_hub_rebuilder.py",
+          "function": "_build",
+          "line": 14
+        },
+        {
+          "file": "commands/tests/test_factor_input_projection.py",
+          "line": 1
+        }
+      ],
+      "expected_keywords": [
+        "canonical_datahub_projection",
+        "normalized/fundamentals",
+        "normalized/fund_flow",
+        "regulatory_watchlist.json",
+        "atomic_write_frame",
+        "FactorInputProjection"
+      ],
+      "behavior": "基本面、资金流和公告情绪宽表只由 DataHub projection owner 从 canonical normalized 快照原子物化并记录 SHA/coverage manifest；旧 data_hub_rebuilder CLI 不再拥有 MX/Baostock/provider 或 CSV 写入逻辑。"
+    },
+    {
       "id": "INFRA-LEGACY-KLINE-OWNER-01",
       "title": "旧每日 K 线入口只委托 DataHub ingestion owner",
       "code_locations": [
