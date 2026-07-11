@@ -19,7 +19,7 @@ from factor_lab.vnext.providers import (
     TencentQuoteFetcher,
     build_snapshot_manifest,
 )
-from factor_lab.vnext.snapshot import HubSnapshotBuilder
+from factor_lab.vnext.snapshot import ASSET_PROXIES, HubSnapshotBuilder
 
 
 def test_local_csv_fetcher_persists_idempotent_immutable_point_in_time_snapshot(tmp_path):
@@ -182,20 +182,26 @@ def test_hub_snapshot_uses_provider_router_and_emits_manifest_bound_snapshot_id(
 
     dates = pd.date_range("2026-01-01", "2026-07-10", freq="B")
 
-    def tushare_reader(_: dict) -> pd.DataFrame:
-        return pd.DataFrame(
-            {
-                "trade_date": dates.strftime("%Y%m%d"),
-                "open": range(1, len(dates) + 1),
-                "high": [value + 1 for value in range(1, len(dates) + 1)],
-                "low": [max(0.5, value - 1) for value in range(1, len(dates) + 1)],
-                "close": [value + 0.5 for value in range(1, len(dates) + 1)],
-                "vol": [1000 + value for value in range(len(dates))],
-            }
-        )
+    market = pd.DataFrame(
+        {
+            "trade_date": dates.strftime("%Y%m%d"),
+            "open": range(1, len(dates) + 1),
+            "high": [value + 1 for value in range(1, len(dates) + 1)],
+            "low": [max(0.5, value - 1) for value in range(1, len(dates) + 1)],
+            "close": [value + 0.5 for value in range(1, len(dates) + 1)],
+            "vol": [1000 + value for value in range(len(dates))],
+        }
+    )
+    for category, symbols in (
+        ("index", ["000001.SH"]),
+        ("fund", [symbol for symbol, _ in ASSET_PROXIES.values()]),
+    ):
+        directory = data_root / "normalized/market_series" / category
+        directory.mkdir(parents=True, exist_ok=True)
+        for symbol in symbols:
+            market.to_csv(directory / f"{symbol}.csv", index=False)
 
     registry = ProviderRegistry()
-    registry.register(CallableFrameFetcher("tushare", tushare_reader))
     registry.register(LocalCsvFetcher([data_root, daily_root]))
     store = ImmutableSnapshotStore(tmp_path / "immutable")
     builder = HubSnapshotBuilder(

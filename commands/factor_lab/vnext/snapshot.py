@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +16,6 @@ from .providers import (
     ProviderRegistry,
     ProviderRouteResult,
     ProviderRouter,
-    TushareFetcher,
 )
 
 
@@ -72,6 +69,7 @@ class HubSnapshotBuilder:
         self.project_root = Path(project_root)
         self.data_root = self.project_root / "data"
         self.daily_root = self.data_root / "normalized" / "market"
+        self.market_series_root = self.data_root / "normalized" / "market_series"
         self.live_snapshot = Path(live_snapshot) if live_snapshot else Path(
             "/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/live_snapshot.csv"
         )
@@ -79,7 +77,6 @@ class HubSnapshotBuilder:
         self.provider_route_summaries: list[dict[str, Any]] = []
         if provider_router is None:
             registry = ProviderRegistry()
-            registry.register(TushareFetcher(self._client()))
             registry.register(LocalCsvFetcher([self.data_root, self.live_snapshot.parent]))
             provider_router = ProviderRouter(
                 registry,
@@ -218,38 +215,35 @@ class HubSnapshotBuilder:
             "candidates": candidates,
         }
 
-    def _client(self) -> Any:
-        from factor_lab.data.tushare_client import get_ts_client
-
-        return get_ts_client()
-
     def _fetch_index(self, symbol: str, start: str, end: str) -> pd.DataFrame:
-        source = f"tushare:index_daily:{symbol}"
+        path = self.market_series_root / "index" / f"{symbol}.csv"
+        source = f"datahub:index_daily:{symbol}"
         route = self.provider_router.route(
             ProviderQuery(
                 dataset="index_daily",
                 instrument_id=symbol,
                 as_of=pd.Timestamp(end).strftime("%Y-%m-%d"),
-                params={"api_name": "index_daily", "ts_code": symbol, "start_date": start, "end_date": end},
+                params={"path": str(path), "as_of_field": "trade_date"},
                 required_fields=["trade_date", "close"],
             ),
-            primary_provider="tushare",
+            primary_provider="local_csv",
         )
         frame = self._frame_from_route(route)
         self._record_route(source, route, len(frame))
         return self._normalise_date(frame)
 
     def _fetch_fund(self, symbol: str, start: str, end: str) -> pd.DataFrame:
-        source = f"tushare:fund_daily:{symbol}"
+        path = self.market_series_root / "fund" / f"{symbol}.csv"
+        source = f"datahub:fund_daily:{symbol}"
         route = self.provider_router.route(
             ProviderQuery(
                 dataset="fund_daily",
                 instrument_id=symbol,
                 as_of=pd.Timestamp(end).strftime("%Y-%m-%d"),
-                params={"api_name": "fund_daily", "ts_code": symbol, "start_date": start, "end_date": end},
+                params={"path": str(path), "as_of_field": "trade_date"},
                 required_fields=["trade_date", "close"],
             ),
-            primary_provider="tushare",
+            primary_provider="local_csv",
         )
         frame = self._frame_from_route(route)
         self._record_route(source, route, len(frame))
@@ -335,7 +329,12 @@ class HubSnapshotBuilder:
         result = frame.copy()
         for column in ("trade_date", "date", "timeString"):
             if column in result.columns:
-                result["trade_date"] = pd.to_datetime(result[column].astype(str), errors="coerce")
+                raw = result[column].astype("string").str.replace(r"\.0$", "", regex=True)
+                compact = raw.str.fullmatch(r"\d{8}", na=False)
+                parsed = pd.Series(pd.NaT, index=result.index, dtype="datetime64[ns]")
+                parsed.loc[compact] = pd.to_datetime(raw.loc[compact], format="%Y%m%d", errors="coerce")
+                parsed.loc[~compact] = pd.to_datetime(raw.loc[~compact], errors="coerce")
+                result["trade_date"] = parsed
                 break
         return result.sort_values("trade_date") if "trade_date" in result.columns else result
 

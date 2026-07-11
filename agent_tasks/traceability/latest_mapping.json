@@ -269,8 +269,19 @@
       ],
       "expected_keywords": ["data/normalized/market_series", "datahub:index_daily", "MarketSeriesIngestion"],
       "behavior": "DataHub ingestion 拉取并原子合并指数/ETF 日线；Policy Dataset 只读 canonical 文件，重复交易日去重并记录数据质量冲突。"
+    },
+    {
+      "id": "INFRA-SNAPSHOT-01",
+      "title": "VNext Snapshot 只读 DataHub",
+      "code_locations": [
+        {"file": "commands/factor_lab/vnext/snapshot.py", "function": "HubSnapshotBuilder", "line": 67},
+        {"file": "commands/factor_lab/vnext/snapshot.py", "function": "_fetch_index", "line": 220},
+        {"file": "commands/tests/test_datahub_architecture.py", "function": "test_vnext_snapshot_is_read_only_datahub_consumer", "line": 83}
+      ],
+      "expected_keywords": ["market_series_root", "datahub:index_daily", "primary_provider=\"local_csv\""],
+      "behavior": "Snapshot 默认不注册外部 provider；指数、ETF、日线与实时快照均从 DataHub canonical 文件路由并生成不可变来源清单。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-11T23:15:00+08:00"
+  "generated_at": "2026-07-11T23:30:00+08:00"
 }

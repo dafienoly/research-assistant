@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT / "commands"))
 
 from factor_lab.datahub_ingestion.market_series import MarketSeriesIngestion  # noqa: E402
 from factor_lab.vnext.datasets import PolicyBacktestDatasetBuilder  # noqa: E402
+from factor_lab.vnext.snapshot import ASSET_PROXIES  # noqa: E402
 
 
 if __name__ == "__main__":
@@ -18,6 +19,9 @@ if __name__ == "__main__":
     start = sys.argv[2] if len(sys.argv) > 2 else "20200101"
     datasets = {
         "index_daily": list(PolicyBacktestDatasetBuilder.INDEX_CODES.values()),
-        "fund_daily": list(PolicyBacktestDatasetBuilder.FUND_CODES.values()),
+        "fund_daily": sorted(
+            set(PolicyBacktestDatasetBuilder.FUND_CODES.values())
+            | {symbol for symbol, _ in ASSET_PROXIES.values()}
+        ),
     }
     print(json.dumps(MarketSeriesIngestion(ROOT).fetch(datasets, start, end), ensure_ascii=False, indent=2))
