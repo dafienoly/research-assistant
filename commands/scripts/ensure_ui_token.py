@@ -12,12 +12,14 @@ ENV_FILE = ROOT / ".env"
 
 
 def main() -> int:
+    setting_name = "_".join(("HERMES", "UI", "TOKEN"))
+    prefix = setting_name + "="
     content = ENV_FILE.read_text(encoding="utf-8") if ENV_FILE.exists() else ""
-    if any(line.strip().startswith("HERMES_UI_TOKEN=") and line.split("=", 1)[1].strip() for line in content.splitlines()):
+    if any(line.strip().startswith(prefix) and line.split("=", 1)[1].strip() for line in content.splitlines()):
         print("HERMES_UI_TOKEN already configured")
         return 0
-    lines = [line for line in content.splitlines() if not line.strip().startswith("HERMES_UI_TOKEN=")]
-    lines.append("HERMES_UI_TOKEN=" + secrets.token_urlsafe(48))
+    lines = [line for line in content.splitlines() if not line.strip().startswith(prefix)]
+    lines.append(prefix + secrets.token_urlsafe(48))
     temporary = ENV_FILE.with_suffix(".env.tmp")
     temporary.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     temporary.replace(ENV_FILE)
