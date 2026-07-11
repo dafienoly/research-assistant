@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol
 
-from factor_lab.notification_transport import telegram_sender
+from factor_lab.notify import queue_dual_channel_intent
 
 from .contracts import (
     ApprovedOrderEnvelope,
@@ -435,7 +435,15 @@ class TelegramApprovalGate:
         if approval_ttl_seconds < 1:
             raise ValueError("approval_ttl_seconds must be positive")
         self.approval_ttl_seconds = approval_ttl_seconds
-        self.sender = sender or telegram_sender
+        self.sender = sender or (
+            lambda payload: queue_dual_channel_intent(
+                str(payload["event_id"]),
+                str(payload["text"]),
+                title="Hermes 交易审批",
+                message_format="text",
+                source="vnext_approval",
+            )
+        )
 
     def create(self, order: OrderDraft, *, kill_switch: bool, miniqmt_mode: str) -> dict[str, Any]:
         record = {
@@ -510,11 +518,13 @@ class TelegramApprovalGate:
             return result
         try:
             transport = self.sender({"event_id": approval_id, "text": message})
-            sent = bool(transport.get("ok"))
+            accepted = bool(transport.get("ok"))
+            queued = bool(transport.get("queued"))
             reason = transport.get("error")
             result = {
-                "status": "SENT" if sent else (DataStatus.MISSING.value if reason == "not_configured" else "FAILED"),
-                "sent": sent,
+                "status": "QUEUED" if accepted and queued else "SENT" if accepted else (DataStatus.MISSING.value if reason == "not_configured" else "FAILED"),
+                "sent": accepted and not queued,
+                "queued": queued,
                 "approval_id": approval_id,
                 "reason": reason,
             }

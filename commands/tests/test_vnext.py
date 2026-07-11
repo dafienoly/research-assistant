@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import time
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -461,7 +459,9 @@ def test_vnext_api_surface_and_approval_action_never_executes(tmp_path, monkeypa
 
     from factor_lab.api_server.main import app
 
-    with TestClient(app) as client:
+    token = os.environ.get("HERMES_UI_TOKEN", "").strip()
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    with TestClient(app, headers=headers) as client:
         status_response = client.get("/api/vnext/status?date=2026-07-10")
         assert status_response.status_code == 200
         assert status_response.json()["data"]["no_live_trade"] is True

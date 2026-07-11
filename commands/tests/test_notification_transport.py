@@ -4,6 +4,7 @@ import hashlib
 
 import factor_lab.notification_transport as transport
 from factor_lab.notification_transport import post_json
+from factor_lab.decision_loop.storage import DecisionLoopStore
 from factor_lab.vnext.execution import TelegramApprovalGate
 from commands.tests.test_vnext import order
 
@@ -42,6 +43,20 @@ def test_vnext_approval_maps_missing_credentials_fail_closed(tmp_path):
     result = gate.send(record["approval_id"], dry_run=False)
     assert result["status"] == "MISSING"
     assert result["sent"] is False
+
+
+def test_vnext_approval_default_queues_shared_dual_channel_event(monkeypatch, tmp_path):
+    state = tmp_path / "state"
+    monkeypatch.setenv("HERMES_DECISION_LOOP_STATE_DIR", str(state))
+    gate = TelegramApprovalGate(tmp_path / "approvals")
+    record = gate.create(order(), kill_switch=False, miniqmt_mode="PAPER")
+    result = gate.send(record["approval_id"], dry_run=False)
+    assert result["status"] == "QUEUED"
+    assert result["sent"] is False
+    assert result["queued"] is True
+    outbox = DecisionLoopStore(state).read_jsonl("notifications/outbox.jsonl")
+    assert {row["channel"] for row in outbox} == {"telegram", "enterprise_wechat"}
+    assert {row["event_id"] for row in outbox} == {record["approval_id"]}
 
 
 def test_attachment_senders_verify_state_root_and_sha(monkeypatch, tmp_path):

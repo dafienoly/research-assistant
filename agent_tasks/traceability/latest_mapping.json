@@ -920,6 +920,17 @@
       "behavior": "PNG 原子保存为状态根内的不可变内容寻址附件；outbox 只携带相对路径和 SHA；worker 校验根路径、MIME、大小与哈希后分别通过企业微信 image 和 Telegram multipart 发送。"
     },
     {
+      "id": "P1-VNEXT-APPROVAL-OUTBOX-01",
+      "title": "VNext 审批通知默认使用共享双通道 outbox",
+      "code_locations": [
+        {"file": "commands/factor_lab/notify.py", "function": "queue_dual_channel_intent", "line": 35},
+        {"file": "commands/factor_lab/vnext/execution.py", "function": "send", "line": 510},
+        {"file": "commands/tests/test_notification_transport.py", "function": "test_vnext_approval_default_queues_shared_dual_channel_event", "line": 44}
+      ],
+      "expected_keywords": ["queue_dual_channel_intent", "vnext_approval", "QUEUED", "queued", "approval_id", "enterprise_wechat"],
+      "behavior": "VNext 审批生产默认不再同步单发 Telegram；approval_id 作为共享事件 ID 原子写入双通道 outbox，接口明确区分 QUEUED 与 SENT，执行不等待网络。"
+    },
+    {
       "id": "P1-REGULATORY-COVERAGE-01",
       "title": "监管公告 ingestion 与逐标的覆盖感知门禁",
       "code_locations": [

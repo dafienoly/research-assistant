@@ -36,6 +36,52 @@ _last_sent: dict = {}  # 冷却缓存 {event_key: timestamp}
 MAX_NOTIFICATION_ATTACHMENT_BYTES = 2 * 1024 * 1024
 
 
+def queue_dual_channel_intent(
+    event_id: str,
+    text: str,
+    *,
+    title: str = "Hermes 通知",
+    message_format: str = "markdown",
+    source: str = "business_notification",
+) -> dict:
+    """Queue one idempotent text intent for Telegram and Enterprise WeChat."""
+    if not event_id or not text:
+        return {"ok": False, "error": "invalid_notification"}
+    queued_at = datetime.now(CST).isoformat()
+    store = DecisionLoopStore()
+    try:
+        store.append_unique_jsonl(
+            "notifications/events.jsonl",
+            {
+                "event_id": event_id,
+                "source": source,
+                "title": title,
+                "text": text,
+                "generated_at": queued_at,
+            },
+            f"event:{event_id}",
+        )
+        _, created = store.append_unique_jsonl_batch(
+            "notifications/outbox.jsonl",
+            [
+                (
+                    {
+                        "event_id": event_id,
+                        "channel": channel,
+                        "payload": {"event_id": event_id, "text": text, "format": message_format},
+                        "queued_at": queued_at,
+                        "max_attempts": 5,
+                    },
+                    f"{event_id}:{channel}",
+                )
+                for channel in ("telegram", "enterprise_wechat")
+            ],
+        )
+        return {"ok": True, "event_id": event_id, "queued": True, "created": created}
+    except (OSError, TimeoutError, ValueError):
+        return {"ok": False, "event_id": event_id, "error": "persistence_failed"}
+
+
 def queue_image_notification(title: str, image_bytes: bytes, caption: str = "") -> bool:
     """Persist one immutable PNG and queue it for both notification channels."""
     if not image_bytes or len(image_bytes) > MAX_NOTIFICATION_ATTACHMENT_BYTES:
@@ -114,36 +160,16 @@ def _send_wecom_markdown(title: str, content: str) -> bool:
 
     digest = hashlib.sha256(f"{title}\0{content}".encode("utf-8")).hexdigest()
     event_id = f"legacy_{digest[:24]}"
-    queued_at = datetime.now(CST).isoformat()
-    store = DecisionLoopStore()
     try:
-        store.append_unique_jsonl(
-            "notifications/events.jsonl",
-            {
-                "event_id": event_id,
-                "source": "legacy_notify",
-                "title": title,
-                "text": content,
-                "generated_at": queued_at,
-            },
-            f"event:{event_id}",
+        result = queue_dual_channel_intent(
+            event_id,
+            content,
+            title=title,
+            message_format="markdown",
+            source="legacy_notify",
         )
-        store.append_unique_jsonl_batch(
-            "notifications/outbox.jsonl",
-            [
-                (
-                    {
-                    "event_id": event_id,
-                    "channel": channel,
-                    "payload": {"event_id": event_id, "text": content, "format": "markdown"},
-                    "queued_at": queued_at,
-                    "max_attempts": 5,
-                    },
-                    f"{event_id}:{channel}",
-                )
-                for channel in ("telegram", "enterprise_wechat")
-            ],
-        )
+        if not result.get("ok"):
+            return False
         print(f"✅ 双通道通知已入队: {title} ({event_id})")
         return True
     except (OSError, TimeoutError, ValueError) as exc:
