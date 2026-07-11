@@ -45,7 +45,11 @@ def enterprise_wechat_sender(payload: dict) -> dict:
     webhook = os.environ.get("WECHAT_WEBHOOK_URL") or os.environ.get("WECOM_WEBHOOK_URL")
     if not webhook:
         return {"ok": False, "error": "not_configured"}
-    return post_json(webhook, {"msgtype": "text", "text": {"content": payload["text"]}})
+    if payload.get("format") == "markdown":
+        body = {"msgtype": "markdown", "markdown": {"content": payload["text"]}}
+    else:
+        body = {"msgtype": "text", "text": {"content": payload["text"]}}
+    return post_json(webhook, body)
 
 
 def telegram_sender(payload: dict) -> dict:

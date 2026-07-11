@@ -14,24 +14,15 @@
 环境变量:
     WECHAT_WEBHOOK_URL — 企业微信机器人 webhook (已在 .bashrc 中)
 """
-import json
-import logging
-import os
-import subprocess
-import urllib.request
 from datetime import datetime, timezone, timedelta
+
+from factor_lab.notification_transport import enterprise_wechat_sender
 
 CST = timezone(timedelta(hours=8))
 
 # ---------------------------------------------------------------------------
 # 风控通知配置
 # ---------------------------------------------------------------------------
-_COLORS = {
-    "info": "info",
-    "warning": "warning",
-    "critical": "warning",
-    "blocker": "warning",
-}
 _SEVERITY_LABELS = {
     "info": "ℹ️ 信息",
     "warning": "⚠️ 警告",
@@ -39,25 +30,6 @@ _SEVERITY_LABELS = {
     "blocker": "🛑 阻断",
 }
 _last_sent: dict = {}  # 冷却缓存 {event_key: timestamp}
-
-
-def _get_webhook() -> str:
-    """获取企业微信 webhook URL。
-
-    优先从环境变量读取，失败时尝试从 .bashrc 加载。
-    """
-    webhook = os.environ.get("WECHAT_WEBHOOK_URL", "")
-    if webhook:
-        return webhook
-    try:
-        r = subprocess.run(
-            ["bash", "-c", "source ~/.bashrc && echo $WECHAT_WEBHOOK_URL"],
-            capture_output=True, text=True, timeout=5,
-        )
-        webhook = r.stdout.strip()
-    except Exception:
-        logging.warning("notify: failed to read WECHAT_WEBHOOK_URL from .bashrc")
-    return webhook
 
 
 def _send_wecom_markdown(title: str, content: str) -> bool:
@@ -70,36 +42,18 @@ def _send_wecom_markdown(title: str, content: str) -> bool:
     Returns:
         True 发送成功，False 发送失败或无 webhook 配置。
     """
-    webhook = _get_webhook()
-    if not webhook:
-        print("⚠️ WECHAT_WEBHOOK_URL 未配置, 跳过企业微信通知")
-        return False
-
     # 企业微信 Markdown 消息最大 4096 字节，超长截断
     content_bytes = content.encode("utf-8")
     if len(content_bytes) > 4096:
         # 截断到 4000 字节再补截断标记
         content = content_bytes[:4000].decode("utf-8", errors="ignore") + "\n\n> ⚠️ 内容已截断（原消息超 4096 字节）"
 
-    payload = json.dumps({
-        "msgtype": "markdown",
-        "markdown": {"content": content},
-    }).encode("utf-8")
-
-    req = urllib.request.Request(
-        webhook,
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            body = resp.read().decode()
+    result = enterprise_wechat_sender({"text": content, "format": "markdown"})
+    if result.get("ok"):
         print(f"✅ 企业微信通知已发送: {title}")
         return True
-    except Exception as e:
-        print(f"⚠️ 企业微信通知失败 ({title}): {e}")
-        return False
+    print(f"⚠️ 企业微信通知失败 ({title}): {result.get('error', 'unknown_error')}")
+    return False
 
 
 def _check_cooldown(event_key: str, cooldown_seconds: int = 300) -> bool:
@@ -135,11 +89,6 @@ def notify_goal_done(goal_name: str, summary: str = "", status: str = "completed
         summary:   摘要 (如 "ret5+ma20_gate Sharpe+26%")
         status:    completed / failed / partial
     """
-    webhook = _get_webhook()
-    if not webhook:
-        print("⚠️ WECHAT_WEBHOOK_URL 未配置, 跳过企业微信通知")
-        return
-
     now = datetime.now(CST).strftime("%m-%d %H:%M")
     status_icon = {"completed": "✅", "failed": "❌", "partial": "⚠️"}.get(status, "✅")
 
@@ -152,23 +101,7 @@ def notify_goal_done(goal_name: str, summary: str = "", status: str = "completed
         content += f"> {summary}\n"
     content += "> 请回到 Hermes 会话查看详细结果\n"
 
-    payload = json.dumps({
-        "msgtype": "markdown",
-        "markdown": {"content": content},
-    }).encode("utf-8")
-
-    req = urllib.request.Request(
-        webhook,
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            body = resp.read().decode()
-        print(f"✅ 企业微信通知已发送: {goal_name}")
-    except Exception as e:
-        print(f"⚠️ 企业微信通知失败: {e}")
+    _send_wecom_markdown(goal_name, content)
 
 
 def notify_risk_event(
@@ -197,7 +130,6 @@ def notify_risk_event(
         return False
 
     label = _SEVERITY_LABELS.get(severity, "ℹ️ 信息")
-    color = _COLORS.get(severity, "info")
     now = datetime.now(CST).strftime("%H:%M:%S")
 
     lines = [
