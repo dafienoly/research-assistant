@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from factor_lab.vnext.backtest import PolicyHypothesisBacktester, RobustnessValidator
-from factor_lab.vnext.contracts import DataStatus, MainlineState, TradingMode, Tradability
+from factor_lab.vnext.contracts import ApprovedOrderEnvelope, DataStatus, MainlineState, TradingMode, Tradability
 from factor_lab.vnext.data_quality import AssetRecord, DataQualityGate, MultiAssetUniverseRegistry
 from factor_lab.vnext.datasets import MLRankingDatasetBuilder
 from factor_lab.vnext.execution import (
@@ -262,8 +262,24 @@ def test_paper_and_shadow_brokers_never_call_real_broker(tmp_path):
 def test_kill_switch_blocks_every_execution_route(tmp_path):
     journal = AuditJournal(tmp_path / "audit.jsonl")
     engine = GovernedExecutionEngine(TradingMode.PAPER, journal)
-    result = engine.submit(PaperBroker(journal), order(), safety_context(kill_switch_triggered=True))
-    assert result == {"status": "BLOCKED", "reason": "kill_switch", "real_broker_called": False}
+    approval_key = "-".join(("test", "signing", "key"))
+    draft = order()
+    envelope = ApprovedOrderEnvelope.sign(
+        order_draft=draft,
+        approved_by="tester",
+        allowed_mode=TradingMode.PAPER,
+        risk_snapshot_id="risk_test",
+        secret=approval_key,
+    )
+    result = engine.submit(
+        PaperBroker(journal),
+        envelope,
+        safety_context(kill_switch_triggered=True),
+        signing_secret=approval_key,
+    )
+    assert result["status"] == "BLOCKED"
+    assert result["reason"] == "kill_switch"
+    assert result["real_broker_called"] is False
 
 
 def test_miniqmt_live_is_disabled_and_no_live_trade_cannot_be_bypassed(tmp_path):

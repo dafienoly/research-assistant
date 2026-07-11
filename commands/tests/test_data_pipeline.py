@@ -58,6 +58,7 @@ def clean_normalized_dirs(tmp_path, monkeypatch):
     valuation_dir = tmp_path / "valuation"
     fund_flow_dir = tmp_path / "fund_flow"
     etc_dir = tmp_path / "normalized"
+    recovery_dir = tmp_path / "audit" / "recovery"
 
     for directory in [daily_dir, fina_dir, valuation_dir, fund_flow_dir, etc_dir]:
         directory.mkdir(parents=True, exist_ok=True)
@@ -68,6 +69,7 @@ def clean_normalized_dirs(tmp_path, monkeypatch):
         "VALUATION_DIR": valuation_dir,
         "FUND_FLOW_DIR": fund_flow_dir,
         "ETC_DIR": etc_dir,
+        "RECOVERY_AUDIT_DIR": recovery_dir,
     }
     for name, directory in isolated_dirs.items():
         monkeypatch.setattr(data_pipeline_module, name, directory)
@@ -246,6 +248,72 @@ class TestBatchDaily:
             end_date="20260708",
         )
 
+    def test_verified_success_resumes_without_second_provider_call(
+        self,
+        mock_market_provider,
+        clean_normalized_dirs,
+    ):
+        first = batch_daily(["688012.SH"], start="20200101", end="20260708")
+        second = batch_daily(["688012.SH"], start="20200101", end="20260708")
+
+        assert first == second == {"688012.SH": 10}
+        mock_market_provider.daily.assert_called_once()
+        manifests = list((data_pipeline_module.RECOVERY_AUDIT_DIR / "manifests").glob("daily-*.json"))
+        assert len(manifests) == 1
+        payload = json.loads(manifests[0].read_text(encoding="utf-8"))
+        assert payload["status"] == "OK"
+        assert payload["resume_count"] == 1
+        assert payload["entries"]["688012.SH"]["resume_hits"] == 1
+        assert len(payload["entries"]["688012.SH"]["content_hash"]) == 64
+
+    def test_changed_output_hash_forces_refetch(
+        self,
+        mock_market_provider,
+        clean_normalized_dirs,
+    ):
+        batch_daily(["688012.SH"], start="20200101", end="20260708")
+        output = DAILY_DIR / "688012.SH.csv"
+        output.write_text("tampered", encoding="utf-8")
+
+        result = batch_daily(["688012.SH"], start="20200101", end="20260708")
+
+        assert result == {"688012.SH": 10}
+        assert mock_market_provider.daily.call_count == 2
+        assert len(pd.read_csv(output)) == 10
+
+    def test_existing_history_outside_request_window_is_preserved(
+        self,
+        mock_market_provider,
+        clean_normalized_dirs,
+    ):
+        output = DAILY_DIR / "688012.SH.csv"
+        pd.DataFrame(
+            [{"ts_code": "688012.SH", "trade_date": "20200102", "close": 8.0}]
+        ).to_csv(output, index=False, encoding="utf-8-sig")
+
+        result = batch_daily(["688012.SH"], start="20260101", end="20260708")
+
+        durable = pd.read_csv(output, encoding="utf-8-sig")
+        assert result == {"688012.SH": 10}
+        assert len(durable) == 11
+        assert "20200102" in durable["trade_date"].astype(str).str.replace(".0", "", regex=False).tolist()
+
+    def test_equivalent_date_formats_are_deduplicated(
+        self,
+        mock_market_provider,
+        clean_normalized_dirs,
+    ):
+        output = DAILY_DIR / "688012.SH.csv"
+        pd.DataFrame(
+            [{"ts_code": "688012.SH", "trade_date": "20260105", "close": 8.0}]
+        ).to_csv(output, index=False, encoding="utf-8-sig")
+
+        batch_daily(["688012.SH"], start="20260101", end="20260708")
+
+        durable = pd.read_csv(output, encoding="utf-8-sig")
+        assert len(durable) == 10
+        assert durable["trade_date"].astype(str).str.replace(".0", "", regex=False).nunique() == 10
+
 
 # ═════════════════════════════════════════════════════════════════════════
 # batch_fina 测试
@@ -374,6 +442,51 @@ class TestCLIHandlers:
 
 
 class TestGapReport:
+    def test_concept_industry_pull_prefers_complete_named_tushare_sources(
+        self, monkeypatch, clean_normalized_dirs
+    ):
+        ts_client = MagicMock()
+
+        def query(api_name, **kwargs):
+            if api_name == "ths_index":
+                return pd.DataFrame(
+                    {
+                        "ts_code": ["885001.TI", "885002.TI"],
+                        "name": ["概念一", "概念二"],
+                    }
+                )
+            if api_name == "index_classify":
+                level = kwargs["level"]
+                return pd.DataFrame(
+                    {
+                        "index_code": [f"{level}-001"],
+                        "industry_name": [f"行业-{level}"],
+                        "level": [level],
+                    }
+                )
+            raise AssertionError(f"unexpected api: {api_name}")
+
+        ts_client._query.side_effect = query
+        monkeypatch.setattr(data_pipeline_module, "_get_ts_client", lambda: ts_client)
+        monkeypatch.setattr(
+            data_pipeline_module,
+            "_mx_data_query",
+            lambda _query: (_ for _ in ()).throw(AssertionError("mx alternative must not be called")),
+        )
+
+        result = data_pipeline_module.pull_concept_industry_mx()
+        concept = pd.read_csv(data_pipeline_module.ETC_DIR / "concept" / "concept_list.csv")
+        industry = pd.read_csv(data_pipeline_module.ETC_DIR / "industry" / "industry_list.csv")
+
+        assert result["status"] == "OK"
+        assert result["silent_fallback_used"] is False
+        assert result["concept"]["source"] == "tushare:ths_index"
+        assert result["industry"]["source"] == "tushare:index_classify:SW2021"
+        assert len(concept) == 2
+        assert len(industry) == 3
+        assert set(concept["quality_status"]) == {"OK"}
+        assert set(industry["quality_status"]) == {"OK"}
+
     def test_partial_concept_and_industry_are_reported_as_gaps(
         self, monkeypatch, clean_normalized_dirs, capsys
     ):

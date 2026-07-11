@@ -57,6 +57,9 @@ GET /api/vnext/approvals/{approval_id}
 GET /api/vnext/execution-status?date=YYYY-MM-DD
 GET /api/vnext/antifragile-review?date=YYYY-MM-DD
 GET /api/vnext/reports?date=YYYY-MM-DD
+GET /api/vnext/runs/{run_id}
+GET /api/vnext/snapshots/{snapshot_id}
+GET /api/vnext/reconciliation/{run_id}
 GET /api/vnext/reports/download?date=YYYY-MM-DD&format=md|json|csv
 POST /api/vnext/approvals/{approval_id}/approve
 POST /api/vnext/approvals/{approval_id}/reject

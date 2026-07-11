@@ -3,7 +3,22 @@ from factor_lab.vnext.execution import AuditJournal, MiniQMTLiveBroker, OrderDra
 
 
 def test_miniqmt_live_submit_is_unconditionally_blocked(tmp_path):
-    order = OrderDraft("a", "600000.SH", "BUY", 100, 10, "test", "test", "RANGE_BOUND", "SEMI_DORMANT", None, {}, [], "OK", "OK")
+    order = OrderDraft(
+        approval_id="a",
+        symbol="600000.SH",
+        side="BUY",
+        quantity=100,
+        limit_price=10,
+        strategy_source="test",
+        rationale="test",
+        regime="RANGE_BOUND",
+        semiconductor_state="SEMI_DORMANT",
+        model_score=None,
+        portfolio_impact={},
+        risk_summary=[],
+        data_freshness="OK",
+        account_permission="OK",
+    )
     context = SafetyContext(
         data_status=DataStatus.OK.value,
         data_fresh=True,

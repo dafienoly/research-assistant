@@ -1,0 +1,4 @@
+# Hermes VNext isolated OpenBB sidecar environment
+# STATUS: DEFERRED_NOT_INSTALLED
+# OpenBB remains an optional out-of-process provider.  AGPL review and an exact
+# dependency resolution are mandatory before this environment may be enabled.

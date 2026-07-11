@@ -1,13 +1,31 @@
-version: 1
-default_mode: READ_ONLY
+version: 2
+default_mode: PAPER
 no_live_trade: true
 live_enabled: false
 allow_direct_ui_order: false
+trading:
+  mode: PAPER
+  no_live_trade: true
+  live_broker_enabled: false
+  live_send_compiled: false
+  approval_required: true
+  kill_switch_required: true
+execution:
+  accepted_input_contract: ApprovedOrderEnvelope
+  reject_stale_market_data: true
+  reject_missing_position_snapshot_for_sell: true
+  reject_watch_only: true
+  reject_restricted: true
+  revalidate_before_send: true
 approval:
   provider: telegram
   required_for_every_live_order: true
   actions: [APPROVE, REJECT, MODIFY, DELAY]
   modification_requires_reapproval: true
+  signing_key_env: HERMES_APPROVAL_SIGNING_KEY
+  ttl_seconds: 300
+  one_time_nonce: true
+  signature_algorithm: HMAC-SHA256
 kill_switch:
   enabled: true
   bypass_allowed: false

@@ -10,36 +10,24 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
+import threading
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, replace
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
-from .contracts import DataStatus, TradingMode, now_iso
-
-
-@dataclass(slots=True)
-class OrderDraft:
-    approval_id: str
-    symbol: str
-    side: str
-    quantity: int
-    limit_price: float | None
-    strategy_source: str
-    rationale: str
-    regime: str
-    semiconductor_state: str
-    model_score: float | None
-    portfolio_impact: dict[str, Any]
-    risk_summary: list[str]
-    data_freshness: str
-    account_permission: str
-    alternative_etf: str | None = None
-    watch_only: bool = False
-    created_at: str = field(default_factory=now_iso)
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+from .contracts import (
+    ApprovedOrderEnvelope,
+    DataStatus,
+    OrderDraft,
+    QualityStatus,
+    TradingMode,
+    aware_now,
+    now_iso,
+    sha256_payload,
+)
 
 
 @dataclass(slots=True)
@@ -64,15 +52,139 @@ class SafetyContext:
 
 
 class AuditJournal:
+    """Append-only JSONL ledger with a verifiable SHA-256 hash chain."""
+
+    ZERO_HASH = "0" * 64
+    RESERVED_FIELDS = {
+        "event_id",
+        "event",
+        "timestamp",
+        "payload_hash",
+        "previous_event_hash",
+        "event_hash",
+    }
+
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.RLock()
 
     def append(self, event: str, payload: Mapping[str, Any]) -> dict[str, Any]:
-        record = {"event_id": uuid.uuid4().hex, "event": event, "timestamp": now_iso(), **dict(payload)}
-        with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
-        return record
+        payload_dict = dict(payload)
+        collision = self.RESERVED_FIELDS.intersection(payload_dict)
+        if collision:
+            raise ValueError(f"audit payload uses reserved fields: {sorted(collision)}")
+        with self._lock:
+            previous_hash = self._last_event_hash()
+            record = {
+                "event_id": uuid.uuid4().hex,
+                "event": event,
+                "timestamp": now_iso(),
+                "payload_hash": sha256_payload(payload_dict),
+                "previous_event_hash": previous_hash,
+                **payload_dict,
+            }
+            record["event_hash"] = sha256_payload(record)
+            with self.path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(record, ensure_ascii=False, default=str, sort_keys=True) + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            return record
+
+    def verify_chain(self) -> dict[str, Any]:
+        if not self.path.exists():
+            return {"status": DataStatus.MISSING.value, "valid": False, "events": 0, "reason": "ledger_missing"}
+        previous = self.ZERO_HASH
+        legacy_events = 0
+        events = 0
+        for line_number, line in enumerate(self.path.read_text(encoding="utf-8").splitlines(), start=1):
+            if not line.strip():
+                continue
+            events += 1
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                return {
+                    "status": DataStatus.BLOCKED.value,
+                    "valid": False,
+                    "events": events,
+                    "reason": "invalid_json",
+                    "line": line_number,
+                }
+            if "event_hash" not in record:
+                legacy_events += 1
+                previous = sha256_payload(record)
+                continue
+            if record.get("previous_event_hash") != previous:
+                return {
+                    "status": DataStatus.BLOCKED.value,
+                    "valid": False,
+                    "events": events,
+                    "reason": "previous_event_hash_mismatch",
+                    "line": line_number,
+                }
+            supplied = str(record["event_hash"])
+            expected = sha256_payload({key: value for key, value in record.items() if key != "event_hash"})
+            if not secrets.compare_digest(supplied, expected):
+                return {
+                    "status": DataStatus.BLOCKED.value,
+                    "valid": False,
+                    "events": events,
+                    "reason": "event_hash_mismatch",
+                    "line": line_number,
+                }
+            payload = {key: value for key, value in record.items() if key not in self.RESERVED_FIELDS}
+            if record.get("payload_hash") != sha256_payload(payload):
+                return {
+                    "status": DataStatus.BLOCKED.value,
+                    "valid": False,
+                    "events": events,
+                    "reason": "payload_hash_mismatch",
+                    "line": line_number,
+                }
+            previous = supplied
+        return {
+            "status": DataStatus.OK.value if not legacy_events else DataStatus.PARTIAL.value,
+            "valid": True,
+            "events": events,
+            "legacy_events": legacy_events,
+            "last_event_hash": previous,
+        }
+
+    def _last_event_hash(self) -> str:
+        if not self.path.exists():
+            return self.ZERO_HASH
+        for line in reversed(self.path.read_text(encoding="utf-8").splitlines()):
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                raise RuntimeError("cannot append to a corrupt audit ledger") from None
+            return str(record.get("event_hash") or sha256_payload(record))
+        return self.ZERO_HASH
+
+
+class NonceRegistry:
+    """Persist one-time approval nonce consumption using atomic create semantics."""
+
+    def __init__(self, directory: str | Path) -> None:
+        self.directory = Path(directory)
+        self.directory.mkdir(parents=True, exist_ok=True)
+
+    def consume(self, nonce: str, *, approval_id: str) -> bool:
+        marker = self.directory / f"{sha256_payload(nonce)}.json"
+        try:
+            with marker.open("x", encoding="utf-8") as handle:
+                json.dump(
+                    {"approval_id": approval_id, "nonce_hash": sha256_payload(nonce), "consumed_at": now_iso()},
+                    handle,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+        except FileExistsError:
+            return False
+        return True
 
 
 class SafetyGate:
@@ -147,7 +259,7 @@ class Broker(Protocol):
 
     def submit(self, order: OrderDraft, context: SafetyContext) -> dict[str, Any]:
         """Submit through a concrete governed broker implementation."""
-        raise NotImplementedError("broker implementations must enforce the VNext safety gate")
+        raise TypeError("Broker Protocol cannot submit directly")
 
 
 class PaperBroker:
@@ -191,6 +303,23 @@ class ShadowBroker:
         }
         self.journal.append("shadow_submit", {"order": order.to_dict(), "result": result})
         return result
+
+
+class LiveDryRunBroker:
+    """Explicit non-transmitting adapter for live-shaped certification runs."""
+
+    name = "LiveDryRunBroker"
+    no_live_trade = True
+
+    def submit(self, order: OrderDraft, context: SafetyContext) -> dict[str, Any]:
+        return {
+            "status": "LIVE_DRY_RUN",
+            "approval_id": order.approval_id,
+            "symbol": order.symbol,
+            "quantity": order.quantity,
+            "real_broker_called": False,
+            "no_live_trade": True,
+        }
 
 
 class MiniQMTReadOnlyBroker:
@@ -250,6 +379,9 @@ class MiniQMTLiveBroker:
         self.journal = journal
 
     def submit(self, order: OrderDraft, context: SafetyContext) -> dict[str, Any]:
+        # A valid signed envelope is the approval evidence.  Never trust a raw
+        # input boolean to manufacture approval, and do not require callers to
+        # duplicate the cryptographic result in SafetyContext.
         gate = SafetyGate.evaluate(context)
         result = {
             "status": "BLOCKED",
@@ -268,16 +400,33 @@ class MiniQMTLiveBroker:
 class TelegramApprovalGate:
     VALID_ACTIONS = {"APPROVE", "REJECT", "MODIFY", "DELAY"}
 
-    def __init__(self, directory: str | Path, journal: AuditJournal | None = None) -> None:
+    def __init__(
+        self,
+        directory: str | Path,
+        journal: AuditJournal | None = None,
+        *,
+        signing_secret: str | None = None,
+        approval_ttl_seconds: int = 300,
+    ) -> None:
         self.directory = Path(directory)
         self.directory.mkdir(parents=True, exist_ok=True)
         self.journal = journal or AuditJournal(self.directory / "approval_audit.jsonl")
+        self.signing_secret = signing_secret or os.environ.get("HERMES_APPROVAL_SIGNING_KEY", "")
+        if approval_ttl_seconds < 1:
+            raise ValueError("approval_ttl_seconds must be positive")
+        self.approval_ttl_seconds = approval_ttl_seconds
 
     def create(self, order: OrderDraft, *, kill_switch: bool, miniqmt_mode: str) -> dict[str, Any]:
         record = {
             "approval_id": order.approval_id,
             "status": "PENDING",
             "order_draft": order.to_dict(),
+            "order_draft_id": order.order_draft_id,
+            "order_draft_hash": order.draft_hash,
+            "expires_at": order.expires_at.isoformat(),
+            "one_time_nonce": secrets.token_urlsafe(24),
+            "signature_status": "PENDING",
+            "execution_eligible": False,
             "trading_reason": order.rationale,
             "regime": order.regime,
             "semiconductor_mainline_state": order.semiconductor_state,
@@ -297,7 +446,14 @@ class TelegramApprovalGate:
             "updated_at": now_iso(),
         }
         self._write(record)
-        self.journal.append("approval_created", {"approval_id": order.approval_id})
+        self.journal.append(
+            "approval_created",
+            {
+                "approval_id": order.approval_id,
+                "order_draft_id": order.order_draft_id,
+                "order_draft_hash": order.draft_hash,
+            },
+        )
         return record
 
     def format_message(self, record: Mapping[str, Any]) -> str:
@@ -368,14 +524,19 @@ class TelegramApprovalGate:
         if normalized not in self.VALID_ACTIONS:
             raise ValueError(f"invalid approval action: {action}")
         record = self.get(approval_id)
-        if record["status"] not in {"PENDING", "DELAYED", "MODIFIED"}:
+        if record["status"] not in {"PENDING", "DELAYED"}:
             raise ValueError(f"approval is already final: {record['status']}")
         if normalized == "APPROVE" and (record.get("kill_switch_triggered") or record.get("watch_only")):
             raise PermissionError("cannot approve a kill-switch or watch-only order")
+        order = OrderDraft.model_validate(record["order_draft"])
+        if order.draft_hash != record.get("order_draft_hash"):
+            raise PermissionError("cannot approve an order whose hash changed")
+        if aware_now() >= order.expires_at:
+            raise PermissionError("cannot approve an expired order draft")
         record["status"] = {
-            "APPROVE": "APPROVED",
+            "APPROVE": "APPROVED" if self.signing_secret else "APPROVED_UNSIGNABLE",
             "REJECT": "REJECTED",
-            "MODIFY": "MODIFIED",
+            "MODIFY": "INVALIDATED_BY_MODIFICATION",
             "DELAY": "DELAYED",
         }[normalized]
         record["approver"] = approver
@@ -385,8 +546,41 @@ class TelegramApprovalGate:
         if normalized == "MODIFY":
             record["modifications"] = dict(modifications or {})
             record["requires_reapproval"] = True
+            record["invalidated_order_draft_hash"] = record["order_draft_hash"]
+            record["execution_eligible"] = False
+            record["signature_status"] = "INVALIDATED"
+        elif normalized == "APPROVE" and self.signing_secret:
+            envelope = ApprovedOrderEnvelope.sign(
+                order_draft=order,
+                approved_by=approver,
+                allowed_mode=record.get("miniqmt_mode", TradingMode.PAPER.value),
+                risk_snapshot_id=str(record.get("risk_snapshot_id") or f"risk_{approval_id}"),
+                secret=self.signing_secret,
+                ttl_seconds=self.approval_ttl_seconds,
+                one_time_nonce=str(record["one_time_nonce"]),
+                kill_switch_snapshot=bool(record.get("kill_switch_triggered")),
+            )
+            record["approved_envelope"] = envelope.to_dict()
+            record["signature_status"] = "SIGNED"
+            record["execution_eligible"] = True
+        elif normalized == "APPROVE":
+            record["signature_status"] = "MISSING"
+            record["missing_evidence"] = ["HERMES_APPROVAL_SIGNING_KEY"]
+            record["execution_eligible"] = False
+        elif normalized == "DELAY":
+            record["requires_revalidation"] = True
+            record["execution_eligible"] = False
         self._write(record)
-        self.journal.append("approval_decision", {"approval_id": approval_id, "action": normalized, "approver": approver})
+        self.journal.append(
+            "approval_decision",
+            {
+                "approval_id": approval_id,
+                "action": normalized,
+                "approver": approver,
+                "order_draft_hash": record["order_draft_hash"],
+                "execution_eligible": record.get("execution_eligible", False),
+            },
+        )
         return record
 
     def is_approved(self, approval_id: str) -> bool:
@@ -394,7 +588,22 @@ class TelegramApprovalGate:
             record = self.get(approval_id)
         except FileNotFoundError:
             return False
-        return record.get("status") == "APPROVED" and not record.get("requires_reapproval", False)
+        if record.get("status") != "APPROVED" or record.get("requires_reapproval", False):
+            return False
+        if not self.signing_secret or not record.get("approved_envelope"):
+            return False
+        try:
+            envelope = ApprovedOrderEnvelope.model_validate(record["approved_envelope"])
+        except ValueError:
+            return False
+        valid, _ = envelope.verify(self.signing_secret)
+        return valid and bool(record.get("execution_eligible"))
+
+    def get_envelope(self, approval_id: str) -> ApprovedOrderEnvelope:
+        record = self.get(approval_id)
+        if not self.is_approved(approval_id):
+            raise PermissionError("approval is not a valid signed executable envelope")
+        return ApprovedOrderEnvelope.model_validate(record["approved_envelope"])
 
     def list(self) -> list[dict[str, Any]]:
         records = []
@@ -424,7 +633,7 @@ class TelegramApprovalGate:
 
 
 class GovernedExecutionEngine:
-    """Create order drafts and route only to permitted non-live brokers."""
+    """Create drafts and accept only signed ApprovedOrderEnvelope submissions."""
 
     def __init__(self, mode: TradingMode | str, journal: AuditJournal) -> None:
         self.mode = TradingMode(mode)
@@ -449,6 +658,11 @@ class GovernedExecutionEngine:
         positions: Mapping[str, Any] | None,
         alternative_etf: str | None = None,
         watch_only: bool = False,
+        portfolio_run_id: str = "legacy_unbound",
+        account_snapshot_id: str = "legacy_unbound",
+        position_snapshot_id: str = "legacy_unbound",
+        data_snapshot_id: str = "legacy_unbound",
+        quality_status: QualityStatus | str = QualityStatus.BACKTEST_ONLY,
     ) -> OrderDraft:
         normalized_side = side.upper()
         if normalized_side not in {"BUY", "SELL"}:
@@ -476,25 +690,51 @@ class GovernedExecutionEngine:
             account_permission=account_permission,
             alternative_etf=alternative_etf,
             watch_only=watch_only,
+            portfolio_run_id=portfolio_run_id,
+            account_snapshot_id=account_snapshot_id,
+            position_snapshot_id=position_snapshot_id,
+            data_snapshot_id=data_snapshot_id,
+            quality_status=quality_status,
         )
         self.journal.append("order_draft_created", {"mode": self.mode.value, "order": draft.to_dict()})
         return draft
 
-    def submit(self, broker: Broker, order: OrderDraft, context: SafetyContext) -> dict[str, Any]:
-        if context.kill_switch_triggered:
-            result = {"status": "BLOCKED", "reason": "kill_switch", "real_broker_called": False}
-        elif context.data_status != DataStatus.OK.value or not context.data_fresh:
-            result = {"status": "BLOCKED", "reason": "data_quality_or_freshness", "real_broker_called": False}
+    def submit(
+        self,
+        broker: Broker,
+        envelope: ApprovedOrderEnvelope,
+        context: SafetyContext,
+        *,
+        signing_secret: str,
+        nonce_registry: NonceRegistry | None = None,
+    ) -> dict[str, Any]:
+        guard = ExecutionGuard(
+            journal=self.journal,
+            nonce_registry=nonce_registry or NonceRegistry(self.journal.path.parent / "consumed_nonces"),
+        )
+        authorization = guard.authorize(
+            envelope,
+            context,
+            mode=self.mode,
+            signing_secret=signing_secret,
+        )
+        if not authorization["passed"]:
+            result = {
+                "status": "BLOCKED",
+                "reason": authorization["reason"],
+                "guard": authorization,
+                "real_broker_called": False,
+            }
         elif self.mode == TradingMode.PAPER and isinstance(broker, PaperBroker):
-            result = broker.submit(order, context)
+            result = broker.submit(envelope.order_draft, context)
         elif self.mode == TradingMode.SHADOW and isinstance(broker, ShadowBroker):
-            result = broker.submit(order, context)
+            result = broker.submit(envelope.order_draft, context)
         elif self.mode == TradingMode.LIVE_DRY_RUN:
             result = {
                 "status": "LIVE_DRY_RUN",
-                "approval_id": order.approval_id,
-                "order_envelope": order.to_dict(),
-                "safety_gate": SafetyGate.evaluate(context),
+                "approval_id": envelope.approval_id,
+                "approved_order_envelope": envelope.to_dict(),
+                "execution_guard": authorization,
                 "real_broker_called": False,
             }
         else:
@@ -503,5 +743,103 @@ class GovernedExecutionEngine:
                 "reason": f"broker {getattr(broker, 'name', type(broker).__name__)} not allowed in {self.mode.value}",
                 "real_broker_called": False,
             }
-        self.journal.append("execution_route", {"mode": self.mode.value, "approval_id": order.approval_id, "result": result})
+        self.journal.append(
+            "execution_route",
+            {"mode": self.mode.value, "approval_id": getattr(envelope, "approval_id", ""), "result": result},
+        )
+        return result
+
+
+class ExecutionGuard:
+    """Single authorization boundary between signed approvals and broker adapters."""
+
+    def __init__(self, *, journal: AuditJournal, nonce_registry: NonceRegistry) -> None:
+        self.journal = journal
+        self.nonce_registry = nonce_registry
+
+    def authorize(
+        self,
+        envelope: ApprovedOrderEnvelope,
+        context: SafetyContext,
+        *,
+        mode: TradingMode | str,
+        signing_secret: str,
+        at: datetime | None = None,
+    ) -> dict[str, Any]:
+        if not isinstance(envelope, ApprovedOrderEnvelope):
+            return self._blocked("approved_order_envelope_required", approval_id="")
+        current_mode = TradingMode(mode)
+        if current_mode in {TradingMode.LIVE_ENABLED, TradingMode.LIVE_APPROVAL_REQUIRED}:
+            return self._blocked("live_send_disabled", approval_id=envelope.approval_id)
+        if current_mode not in {TradingMode.PAPER, TradingMode.SHADOW, TradingMode.LIVE_DRY_RUN}:
+            return self._blocked("mode_not_executable", approval_id=envelope.approval_id)
+        valid, reason = envelope.verify(signing_secret, at=at)
+        if not valid:
+            return self._blocked(reason, approval_id=envelope.approval_id)
+        if envelope.allowed_mode != current_mode:
+            return self._blocked("approval_mode_mismatch", approval_id=envelope.approval_id)
+        if context.approval_id != envelope.approval_id:
+            return self._blocked("approval_id_mismatch", approval_id=envelope.approval_id)
+        if context.kill_switch_triggered:
+            return self._blocked("kill_switch", approval_id=envelope.approval_id)
+        order = envelope.order_draft
+        if order.watch_only:
+            return self._blocked("watch_only", approval_id=envelope.approval_id)
+        if order.quality_status != QualityStatus.OK:
+            return self._blocked("order_quality_not_executable", approval_id=envelope.approval_id)
+        required_lineage = {
+            "portfolio_run_id": order.portfolio_run_id,
+            "account_snapshot_id": order.account_snapshot_id,
+            "position_snapshot_id": order.position_snapshot_id,
+            "data_snapshot_id": order.data_snapshot_id,
+        }
+        missing_lineage = [name for name, value in required_lineage.items() if not value or value == "legacy_unbound"]
+        if missing_lineage:
+            return self._blocked(
+                "order_lineage_incomplete",
+                approval_id=envelope.approval_id,
+                failed_checks=missing_lineage,
+            )
+        if order.account_permission.upper() not in {"OK", "ALLOWED", "TRADABLE"}:
+            return self._blocked("account_permission", approval_id=envelope.approval_id)
+        # A valid signed envelope is the approval evidence. Never trust a raw
+        # input boolean to manufacture approval, and do not require callers to
+        # duplicate the cryptographic result in SafetyContext.
+        gate = SafetyGate.evaluate(replace(context, telegram_approved=True))
+        if not gate["passed"]:
+            return self._blocked(
+                "safety_gate_failed",
+                approval_id=envelope.approval_id,
+                failed_checks=gate["failed_checks"],
+            )
+        if not self.nonce_registry.consume(envelope.one_time_nonce, approval_id=envelope.approval_id):
+            return self._blocked("approval_nonce_reused", approval_id=envelope.approval_id)
+        result = {
+            "passed": True,
+            "reason": "approved_order_envelope_authorized",
+            "approval_id": envelope.approval_id,
+            "order_draft_hash": envelope.order_draft_hash,
+            "mode": current_mode.value,
+            "nonce_consumed": True,
+            "no_live_trade": True,
+        }
+        self.journal.append("execution_guard_authorized", result)
+        return result
+
+    def _blocked(
+        self,
+        reason: str,
+        *,
+        approval_id: str,
+        failed_checks: list[str] | None = None,
+    ) -> dict[str, Any]:
+        result = {
+            "passed": False,
+            "reason": reason,
+            "approval_id": approval_id,
+            "failed_checks": failed_checks or [],
+            "nonce_consumed": False,
+            "no_live_trade": True,
+        }
+        self.journal.append("execution_guard_blocked", result)
         return result

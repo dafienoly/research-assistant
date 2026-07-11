@@ -18,3 +18,27 @@ def test_vnext_api_can_be_disabled_without_affecting_legacy_routes(monkeypatch):
         legacy = client.get("/api/health")
     assert blocked.status_code == 503
     assert legacy.status_code == 200
+
+
+def test_vnext_formal_run_snapshot_and_reconciliation_routes_read_real_artifacts():
+    snapshot_id = "vnext-2026-07-10-3645917185de479e2cdc"
+    with TestClient(app) as client:
+        run = client.get("/api/vnext/runs/2026-07-10")
+        snapshot = client.get(f"/api/vnext/snapshots/{snapshot_id}")
+        reconciliation = client.get("/api/vnext/reconciliation/2026-07-10")
+
+    assert run.status_code == 200
+    assert run.json()["data"]["lineage"]["data_snapshot_ids"] == [snapshot_id]
+    assert snapshot.status_code == 200
+    assert snapshot.json()["data"]["payload"]["snapshot_id_valid"] is True
+    assert reconciliation.status_code == 200
+    assert reconciliation.json()["data"]["payload"]["same_snapshot_and_weights_proven"] is True
+
+
+def test_vnext_artifact_routes_reject_unknown_or_invalid_identifiers():
+    with TestClient(app) as client:
+        missing = client.get("/api/vnext/runs/not-a-real-run")
+        invalid = client.get("/api/vnext/reconciliation/%20invalid%20")
+
+    assert missing.status_code == 404
+    assert invalid.status_code == 400

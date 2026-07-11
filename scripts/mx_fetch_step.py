@@ -19,7 +19,7 @@ from datetime import datetime, timezone, timedelta
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 CST = timezone(timedelta(hours=8))
-APIKEY = "mkt_pWU9CKf9BhFJqe3W3OXcUDOeLivCj7jWEpK-lhcrY28"
+APIKEY = os.environ.get("MX_APIKEY", "").strip()
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _SCRIPTS_DIR.parent  # research-assistant/
 _COMMANDS_DIR = _PROJECT_ROOT / "commands"
@@ -507,6 +507,8 @@ TABLE_DEFS = [
 
 def fetch_table(defn: dict) -> int:
     """对一个表执行增量拉取，返回新增行数"""
+    if not APIKEY:
+        raise RuntimeError("MX_APIKEY is required; hard-coded credentials are forbidden")
     csv_path = defn["csv"]
     query_suffix = defn["query_suffix"]
     limit = defn["limit"]

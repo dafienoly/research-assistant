@@ -1,31 +1,102 @@
 name: Hermes Research CI
 
 on:
-  workflow_dispatch:
   pull_request:
   push:
-    branches: [ main ]
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
-  hermes-research-checks:
+  vnext-security-and-integration:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-      - name: Install test dependencies
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements/core.lock
+            requirements/vectorbt.lock
+
+      - name: Install exact core lock
+        run: python -m pip install -r requirements/core.lock
+
+      - name: Install isolated vectorbt lock
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install pytest pandas numpy
-      - name: Run Hermes tests
-        working-directory: commands
-        run: pytest -q
-      - name: Run Leader acceptance when local Hermes paths exist
-        working-directory: commands
-        run: |
-          if [ -x /home/ly/.hermes/research-assistant/.venv_quant/bin/python3 ]; then
-            /home/ly/.hermes/research-assistant/.venv_quant/bin/python3 hermes_cli.py leader:accept --full-tests
-          else
-            echo "Skip local Leader acceptance: Hermes local venv not available on this runner."
-          fi
+          python -m venv .venv_vectorbt
+          .venv_vectorbt/bin/python -m pip install -r requirements/vectorbt.lock
+
+      - name: Dependency, license, secret and Broker-boundary gate
+        env:
+          PYTHONPATH: commands
+        run: python commands/vnext_ci_gate.py --root .
+
+      - name: VNext security, contract and integration tests
+        env:
+          PYTHONPATH: commands
+          TMPDIR: /tmp
+        run: >-
+          pytest
+          --basetemp=/tmp/hermes-vnext-ci
+          --junitxml=artifacts/vnext/integration_test_report.xml
+          commands/tests/test_vnext.py
+          commands/tests/test_vnext_contract_security.py
+          commands/tests/test_vnext_data_audit.py
+          commands/tests/test_vnext_providers.py
+          commands/tests/test_vnext_target_weights.py
+          commands/tests/test_vnext_vectorbt_adapter.py
+          commands/tests/test_vnext_event_truth.py
+          commands/tests/test_vnext_reconciliation.py
+          commands/tests/test_vnext_domain_engine.py
+          commands/tests/test_vnext_optimization.py
+          commands/tests/test_vnext_ml_governance.py
+          commands/tests/test_vnext_execution_certification.py
+          commands/tests/test_vnext_review_orchestrator.py
+          commands/tests/test_vnext_sbom.py
+          commands/tests/test_vnext_ci_gate.py
+          commands/tests/test_routes_vnext.py
+
+      - name: Generate CycloneDX SBOM
+        env:
+          PYTHONPATH: commands
+        run: >-
+          python -c "from pathlib import Path;
+          from factor_lab.vnext.sbom import CycloneDXGenerator;
+          CycloneDXGenerator().generate(Path('.'), output_path=Path('artifacts/vnext/sbom.cdx.json'))"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: commands/frontend/package-lock.json
+
+      - name: Frontend exact install
+        working-directory: commands/frontend
+        run: npm ci
+
+      - name: Frontend lint
+        working-directory: commands/frontend
+        run: npm run lint
+
+      - name: Frontend tests
+        working-directory: commands/frontend
+        run: npm run test
+
+      - name: Frontend production build
+        working-directory: commands/frontend
+        run: npm run build
+
+      - name: Upload acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermes-vnext-evidence
+          path: |
+            artifacts/vnext/integration_test_report.xml
+            artifacts/vnext/sbom.cdx.json
+            commands/frontend/dist

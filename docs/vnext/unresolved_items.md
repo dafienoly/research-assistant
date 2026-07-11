@@ -1,0 +1,26 @@
+# Hermes VNext 未解决项
+
+更新时间：2026-07-11。以下项目不会被示例、mock、静默 fallback 或“已开发”措辞掩盖。
+
+## 阻止模型/策略晋级的真实缺口
+
+- 数据审计仍为 `PARTIAL`：按 U0 代码集合核对，资金流匹配 5,401/5,530、缺 129，财务匹配 5,528/5,530、缺 2；精确补拉对这些代码得到上游空结果。概念 409/380、行业 511/80 已转为 OK；另有 3 个标签文件缺失。
+- legacy DataHub 新鲜度仍为 stale/blocking；正式 ML、Shadow 候选和生产 OrderDraft 保持 BLOCKED。
+- Event Truth 缺官方 `stk_limit`、`suspend_d`、现金分红事件和复权因子；当前只能 `PARTIAL/BACKTEST_ONLY`。
+- Antifragile Review 缺 realized Regime/Semi/Style 标签、滚动模型衰减历史及连续 Paper/Shadow 权益曲线，因此相关六项指标为 null。
+- vectorbt 第二个 OOS fold 收益为 -6.03%，不得用第一段或样本内结果替代。
+
+## 外部运行条件
+
+- Telegram Bot/Chat 凭据未配置；本轮只完成 DRY_RUN 格式、签名审批封套和审计链，没有伪造消息发送。
+- `QMT_BRIDGE_BASE_URL` 未配置；QMT 只读探针为 MISSING，订单通道仍为 DISABLED。
+- 应用内浏览器运行时可加载，但本轮 `agent.browsers.list()` 返回空列表；HTTP、DOM、lint、Vitest 和生产构建已通过，真实浏览器 console/点击证据仍 BLOCKED。
+- `scripts/mx_fetch_step.py` 曾包含硬编码高熵凭据，现已改为 `MX_APIKEY` 环境变量；旧凭据必须在提供方撤销/轮换，代码删除不能清除 Git 历史。
+
+## 供应链与产品化剩余风险
+
+- Python 锁是精确版本 pin，但未包含 wheel/sdist 哈希；`pip-audit` 对 137 个组件未发现已知漏洞，这不等于供应链完整性证明。
+- 前端生产 bundle 主块约 2.99 MB，构建有 chunk-size warning，后续可做路由级 code splitting。
+- vectorbt 受 Apache-2.0 + Commons Clause 约束，仅批准隔离内部研究；商业托管或分发前需重新审查。
+- vn.py、OpenBB、FinRL/FinRL-X、Qbot 均未装入 Core；comment-only lock 表示“未安装”，不能宣称对应运行时已适配完成。
+- 无真实订单发送实现；任何未来 Live 通道必须另行授权、安全评审、Paper/Shadow 稳定性证明和小额白名单验收。

@@ -101,3 +101,18 @@ class TestRunGate1:
         # 应该有 NO_TASKS 或 NO_PLAN 或 CHANGED_FILES
         categories = {f.category for f in r.findings}
         assert categories & {"NO_TASKS", "NO_PLAN", "CHANGED_FILES", "GIT_DIFF"}
+
+    def test_plan_with_multiple_expected_files_does_not_hash_nested_lists(self, tmp_path):
+        from factor_lab.audit.base import AuditReport
+        from factor_lab.audit.gate1_traceability import run_gate1
+
+        plan = tmp_path / "plan.md"
+        plan.write_text(
+            "### Task 1: Files\n"
+            "- **Create:** `commands/a.py`, `commands/b.py`\n"
+            "- **Modify:** `commands/c.py`\n",
+            encoding="utf-8",
+        )
+        report = AuditReport(version="test")
+        run_gate1(report, plan_path=str(plan))
+        assert any(f.category == "PLAN_FOUND" for f in report.findings)

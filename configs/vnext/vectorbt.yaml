@@ -1,0 +1,32 @@
+version: "1.0"
+enabled: true
+environment:
+  python: .venv_vectorbt/bin/python
+  lock_file: requirements/vectorbt.lock
+  package: vectorbt==1.1.0
+  optional_rust_engine: false
+  full_extras: false
+license:
+  expression: Apache-2.0 WITH Commons-Clause
+  approval: conditional_research_only
+  commercial_review_required: true
+boundaries:
+  input_contract: TargetPortfolioWeights
+  snapshot_manifest_required: true
+  data_download_allowed: false
+  broker_import_allowed: false
+  broker_access_allowed: false
+  execution_truth: false
+  paper_or_live_promotion_allowed: false
+research:
+  initial_cash: 1000000
+  commission_rate: 0.0003
+  fast_lane_fee_approximation: 0.0005
+  slippage_bps: 10
+  rebalance_frequencies_days: [5, 20]
+  momentum_lookbacks: [5, 20, 60]
+  top_k: [2, 3, 5]
+  walk_forward:
+    train_fraction: 0.6
+    test_fraction: 0.2
+    folds: 2

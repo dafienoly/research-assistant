@@ -18,7 +18,7 @@ SOURCE_DEF = {
     "description": "全A股票行情、财务数据、估值数据、行业分类 — 通过 ts.gyzcloud.top 代理接入",
     "status": "active",
     "refresh_frequency": "1d",
-    "token_placeholder": "66d9505c0bd943b3b00b8bf26df0b862",
+    "token_placeholder": "env:TUSHARE_TOKEN",
     "expires": "2026-08-07",
     "rate_limit": "150次/分钟",
     "stock_coverage": 5528,

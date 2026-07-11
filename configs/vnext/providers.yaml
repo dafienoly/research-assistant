@@ -1,0 +1,72 @@
+version: "1.1"
+router:
+  silent_fallback: false
+  promote_alternative_to_primary: false
+  persist_failed_envelopes: true
+  immutable_snapshot_root: data/vnext/provider-snapshots
+
+primary_by_dataset:
+  a_share_daily: tushare
+  a_share_fund_daily: tushare
+  a_share_index_daily: tushare
+  a_share_financials: tushare
+  a_share_valuation: tushare
+  local_curated_history: local_csv
+  intraday_quote: tencent
+  broker_market_observation: miniqmt_market_data
+
+providers:
+  tushare:
+    enabled: true
+    role: primary_a_share_structured_data
+    credentials_env: TUSHARE_TOKEN
+  local_csv:
+    enabled: true
+    role: point_in_time_curated_and_cached_data
+    allowed_roots:
+      - data
+      - /mnt/c/Users/ly/.codex/data/a-share-data-hub
+  akshare:
+    enabled: false
+    role: alternative_observation_only
+  tencent:
+    enabled: false
+    role: intraday_primary_when_explicitly_configured
+  eastmoney:
+    enabled: false
+    role: alternative_observation_only
+  miniqmt_market_data:
+    enabled: true
+    role: read_only_market_observation
+    order_capability: false
+  openbb_proxy:
+    enabled: false
+    isolated_sidecar: true
+    allowed_scope:
+      - overseas_proxy
+      - macro
+      - rates
+      - fx
+      - commodities
+    forbidden_scope:
+      - a_share_primary
+    license_review_required: true
+
+quality:
+  required_metadata:
+    - provider
+    - requested_at
+    - observed_at
+    - available_at
+    - ingested_at
+    - as_of
+    - quality_status
+    - content_hash
+    - raw_snapshot_id
+  financial_point_in_time_fields:
+    observed_at:
+      - end_date
+    available_at:
+      - f_ann_date
+      - ann_date
+  conflict_resolution: PRIMARY_RETAINED_REVIEW_REQUIRED

@@ -274,7 +274,6 @@ def run_gate1(report: AuditReport, plan_path: Optional[str] = None) -> AuditRepo
     ))
 
     # 3. 逐 Task 检查文件
-    all_creates = list(set(t.expected_creates for t in tasks for _ in [1]))
     all_creates = []
     all_modifies = []
     for t in tasks:

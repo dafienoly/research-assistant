@@ -10,7 +10,16 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from .contracts import DataStatus, Tradability, clamp, finite_number, now_iso
+from .contracts import DataStatus, QualityStatus, Tradability, clamp, finite_number, now_iso, sha256_payload
+from .providers import (
+    ImmutableSnapshotStore,
+    LocalCsvFetcher,
+    ProviderQuery,
+    ProviderRegistry,
+    ProviderRouteResult,
+    ProviderRouter,
+    TushareFetcher,
+)
 
 
 ANCHORS = {
@@ -58,6 +67,7 @@ class HubSnapshotBuilder:
         project_root: str | Path,
         *,
         live_snapshot: str | Path | None = None,
+        provider_router: ProviderRouter | None = None,
     ) -> None:
         self.project_root = Path(project_root)
         self.data_root = self.project_root / "data"
@@ -66,8 +76,20 @@ class HubSnapshotBuilder:
             "/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/live_snapshot.csv"
         )
         self.source_statuses: list[dict[str, Any]] = []
+        self.provider_route_summaries: list[dict[str, Any]] = []
+        if provider_router is None:
+            registry = ProviderRegistry()
+            registry.register(TushareFetcher(self._client()))
+            registry.register(LocalCsvFetcher([self.data_root, self.live_snapshot.parent]))
+            provider_router = ProviderRouter(
+                registry,
+                ImmutableSnapshotStore(self.data_root / "vnext" / "provider-snapshots"),
+            )
+        self.provider_router = provider_router
 
     def build(self, as_of: str) -> dict[str, Any]:
+        self.source_statuses = []
+        self.provider_route_summaries = []
         target = pd.Timestamp(as_of)
         start = (target - pd.Timedelta(days=220)).strftime("%Y%m%d")
         end = target.strftime("%Y%m%d")
@@ -131,12 +153,29 @@ class HubSnapshotBuilder:
             self._record("assumption:cash-zero-daily-return", DataStatus.OK, len(style_dates), "explicit cash benchmark")
         candidates = self._build_candidates(anchors, funds)
         missing_sources = [item["source"] for item in self.source_statuses if item["status"] != DataStatus.OK.value]
+        manifest_paths = sorted(
+            {
+                path
+                for route in self.provider_route_summaries
+                for path in route.get("snapshot_manifest_paths", [])
+            }
+        )
+        data_snapshot_id = f"vnext-{as_of}-{sha256_payload(manifest_paths)[:20]}"
         return {
             "status": DataStatus.OK.value if not missing_sources else DataStatus.PARTIAL.value,
             "as_of": as_of,
+            "data_snapshot_id": data_snapshot_id,
             "updated_at": now_iso(),
             "data_sources": [item["source"] for item in self.source_statuses],
             "source_statuses": self.source_statuses,
+            "provider_routes": self.provider_route_summaries,
+            "snapshot_manifest_paths": manifest_paths,
+            "provider_conflicts": [
+                conflict
+                for route in self.provider_route_summaries
+                for conflict in route.get("conflicts", [])
+            ],
+            "silent_fallback_used": False,
             "missing_evidence": missing_sources,
             "index_history": index_history,
             "current_index": current_index,
@@ -186,60 +225,103 @@ class HubSnapshotBuilder:
 
     def _fetch_index(self, symbol: str, start: str, end: str) -> pd.DataFrame:
         source = f"tushare:index_daily:{symbol}"
-        try:
-            frame = self._client()._query("index_daily", ts_code=symbol, start_date=start, end_date=end)
-            frame = self._normalise_date(frame)
-            status = DataStatus.OK if not frame.empty else DataStatus.MISSING
-            self._record(source, status, len(frame))
-            return frame
-        except Exception as exc:
-            self._record(source, DataStatus.MISSING, 0, type(exc).__name__)
-            return pd.DataFrame()
+        route = self.provider_router.route(
+            ProviderQuery(
+                dataset="index_daily",
+                instrument_id=symbol,
+                as_of=pd.Timestamp(end).strftime("%Y-%m-%d"),
+                params={"api_name": "index_daily", "ts_code": symbol, "start_date": start, "end_date": end},
+                required_fields=["trade_date", "close"],
+            ),
+            primary_provider="tushare",
+        )
+        frame = self._frame_from_route(route)
+        self._record_route(source, route, len(frame))
+        return self._normalise_date(frame)
 
     def _fetch_fund(self, symbol: str, start: str, end: str) -> pd.DataFrame:
         source = f"tushare:fund_daily:{symbol}"
-        try:
-            frame = self._client()._query("fund_daily", ts_code=symbol, start_date=start, end_date=end)
-            frame = self._normalise_date(frame)
-            status = DataStatus.OK if not frame.empty else DataStatus.MISSING
-            self._record(source, status, len(frame))
-            return frame
-        except Exception as exc:
-            self._record(source, DataStatus.MISSING, 0, type(exc).__name__)
-            return pd.DataFrame()
+        route = self.provider_router.route(
+            ProviderQuery(
+                dataset="fund_daily",
+                instrument_id=symbol,
+                as_of=pd.Timestamp(end).strftime("%Y-%m-%d"),
+                params={"api_name": "fund_daily", "ts_code": symbol, "start_date": start, "end_date": end},
+                required_fields=["trade_date", "close"],
+            ),
+            primary_provider="tushare",
+        )
+        frame = self._frame_from_route(route)
+        self._record_route(source, route, len(frame))
+        return self._normalise_date(frame)
 
     def _load_live_snapshot(self, as_of: str) -> pd.DataFrame:
         source = f"local:{self.live_snapshot}"
-        if not self.live_snapshot.exists():
-            self._record(source, DataStatus.MISSING, 0, "file missing")
-            return pd.DataFrame()
-        try:
-            frame = pd.read_csv(self.live_snapshot, encoding="utf-8-sig")
-            update = pd.to_datetime(frame.get("update_time"), errors="coerce")
-            stale = update.notna().any() and update.max().date() < pd.Timestamp(as_of).date()
-            status = DataStatus.STALE if stale else (DataStatus.OK if not frame.empty else DataStatus.MISSING)
-            self._record(source, status, len(frame), "snapshot older than as_of" if stale else "")
-            return frame
-        except Exception as exc:
-            self._record(source, DataStatus.PARTIAL, 0, type(exc).__name__)
-            return pd.DataFrame()
+        route = self.provider_router.route(
+            ProviderQuery(
+                dataset="live_snapshot",
+                instrument_id="A_SHARE_ALL",
+                as_of=as_of,
+                params={"path": str(self.live_snapshot), "as_of_field": "update_time"},
+                required_fields=["change_pct"],
+            ),
+            primary_provider="local_csv",
+        )
+        frame = self._frame_from_route(route)
+        update = pd.to_datetime(frame.get("update_time"), errors="coerce") if not frame.empty else pd.Series(dtype="datetime64[ns]")
+        stale = update.notna().any() and update.max().date() < pd.Timestamp(as_of).date()
+        self._record_route(source, route, len(frame), force_stale=bool(stale))
+        return frame
 
     def _load_local_daily(self, symbol: str, as_of: str) -> pd.DataFrame:
         path = self.daily_root / f"{symbol}.csv"
         source = f"local:{path}"
-        if not path.exists():
-            self._record(source, DataStatus.MISSING, 0, "file missing")
-            return pd.DataFrame()
-        try:
-            frame = pd.read_csv(path, encoding="utf-8-sig")
-            frame = self._normalise_date(frame)
-            frame = frame[frame["trade_date"] <= pd.Timestamp(as_of)] if "trade_date" in frame else frame
-            status = DataStatus.OK if not frame.empty else DataStatus.MISSING
-            self._record(source, status, len(frame))
-            return frame
-        except Exception as exc:
-            self._record(source, DataStatus.PARTIAL, 0, type(exc).__name__)
-            return pd.DataFrame()
+        route = self.provider_router.route(
+            ProviderQuery(
+                dataset="local_daily",
+                instrument_id=symbol,
+                as_of=as_of,
+                params={"path": str(path), "as_of_field": "trade_date"},
+                required_fields=["trade_date", "close"],
+            ),
+            primary_provider="local_csv",
+        )
+        frame = self._normalise_date(self._frame_from_route(route))
+        self._record_route(source, route, len(frame))
+        return frame
+
+    @staticmethod
+    def _frame_from_route(route: ProviderRouteResult) -> pd.DataFrame:
+        data = route.primary.data
+        return pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame([data])
+
+    def _record_route(
+        self,
+        source: str,
+        route: ProviderRouteResult,
+        records: int,
+        *,
+        force_stale: bool = False,
+    ) -> None:
+        quality = route.primary.quality_status
+        if force_stale:
+            status = DataStatus.STALE
+            message = "snapshot older than as_of"
+        elif quality == QualityStatus.OK:
+            status = DataStatus.OK
+            message = ""
+        elif quality == QualityStatus.MISSING:
+            status = DataStatus.MISSING
+            message = "; ".join(route.primary.warnings)
+        else:
+            status = DataStatus.PARTIAL
+            message = "; ".join(route.primary.warnings)
+        self._record(source, status, records, message)
+        summary = route.to_dict()
+        summary["primary"].pop("data", None)
+        for alternative in summary.get("alternatives", []):
+            alternative.get("envelope", {}).pop("data", None)
+        self.provider_route_summaries.append(summary)
 
     def _record(self, source: str, status: DataStatus, records: int, message: str = "") -> None:
         self.source_statuses.append(

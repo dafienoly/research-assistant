@@ -221,9 +221,25 @@ class VNextService:
 
     def execution_status(self, as_of: str) -> dict[str, Any]:
         kill_switch = os.environ.get("HERMES_KILL_SWITCH", "false").lower() == "true"
-        mode = TradingMode.KILL_SWITCH_TRIGGERED if kill_switch else TradingMode.READ_ONLY
+        configured_mode = os.environ.get("HERMES_VNEXT_TRADING_MODE", TradingMode.PAPER.value)
+        configuration_error = None
+        try:
+            requested_mode = TradingMode(configured_mode)
+        except ValueError:
+            requested_mode = TradingMode.LIVE_DISABLED
+            configuration_error = f"invalid trading mode: {configured_mode}"
+        if requested_mode == TradingMode.LIVE_ENABLED:
+            requested_mode = TradingMode.LIVE_DISABLED
+            configuration_error = "LIVE_ENABLED is unreachable while no_live_trade=true"
+        mode = TradingMode.KILL_SWITCH_TRIGGERED if kill_switch else requested_mode
         approvals = self.approvals.list()
-        pending = sum(record.get("status") in {"PENDING", "MODIFIED", "DELAYED"} for record in approvals)
+        pending = sum(record.get("status") in {"PENDING", "DELAYED", "APPROVED_UNSIGNABLE"} for record in approvals)
+        probe = self.store.read("qmt-probe")
+        probe_ok = probe.get("status") in {DataStatus.OK.value, DataStatus.PARTIAL.value}
+        connected = probe_ok and bool(probe.get("connected"))
+        account_readable = connected and bool(probe.get("account_readable"))
+        positions_readable = connected and bool(probe.get("positions_readable"))
+        signing_configured = bool(os.environ.get("HERMES_APPROVAL_SIGNING_KEY"))
         return {
             "status": DataStatus.OK.value,
             "as_of": as_of,
@@ -233,15 +249,21 @@ class VNextService:
             "kill_switch_triggered": kill_switch,
             "telegram_configured": bool(os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID")),
             "telegram_pending": pending,
+            "approval_signing_configured": signing_configured,
+            "approval_envelope_required": True,
+            "accepted_input_contract": "ApprovedOrderEnvelope",
+            "execution_readiness": DataStatus.PARTIAL.value if not signing_configured else DataStatus.OK.value,
+            "configuration_error": configuration_error,
             "miniqmt": {
-                "connection_status": DataStatus.MISSING.value,
-                "account_permission_status": DataStatus.MISSING.value,
+                "connection_status": DataStatus.OK.value if connected else DataStatus.MISSING.value,
+                "account_permission_status": DataStatus.OK.value if account_readable else DataStatus.MISSING.value,
                 "funds_status": DataStatus.MISSING.value,
-                "position_sync_status": DataStatus.MISSING.value,
+                "position_sync_status": DataStatus.OK.value if positions_readable else DataStatus.MISSING.value,
                 "order_channel_status": "DISABLED",
                 "cancel_channel_status": "DISABLED",
                 "trade_callback_status": DataStatus.MISSING.value,
-                "last_probe": None,
+                "last_probe": probe.get("updated_at") if probe_ok else None,
+                "probe_status": probe.get("status", DataStatus.MISSING.value),
             },
             "message": "当前不会真实下单",
             "updated_at": now_iso(),

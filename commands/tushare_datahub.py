@@ -41,7 +41,6 @@ VAL_DIR = NORM_DIR / "market"       # valuation_*.csv
 FF_DIR = NORM_DIR / "fund_flow"     # {ts_code}.csv
 FA_DIR = NORM_DIR / "fundamentals"  # {ts_code}.csv
 
-TUSHARE_TOKEN = "66d9505c0bd943b3b00b8bf26df0b862"
 TUSHARE_API = "https://ts.gyzcloud.top/api"
 
 # 每批次间隔(秒) — 月卡 60次/分钟，设 1.5s = 40次/分钟 留余量
@@ -60,8 +59,8 @@ def ensure_dirs():
 
 def get_tc():
     tc = get_ts_client()
-    # 确保 token 和 api_url 正确
-    tc.token = TUSHARE_TOKEN
+    if not tc.token:
+        raise RuntimeError("TUSHARE_TOKEN is not configured")
     tc.api_url = TUSHARE_API
     return tc
 

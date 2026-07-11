@@ -1,0 +1,71 @@
+schema_version: "1.0"
+reviewed_at: "2026-07-11"
+policy:
+  exact_version_pins_required: true
+  lock_hash_review_required: true
+  denied_in_core:
+    - AGPL-3.0-only
+    - GPL-3.0-only
+    - proprietary-unknown
+  conditional:
+    Apache-2.0-WITH-Commons-Clause-1.0: isolated_research_only
+    LGPL-2.1-or-later: tooling_only_reviewed
+environments:
+  hermes-core:
+    status: active
+    lock_file: requirements/core.lock
+    sha256: 9c7595d4d3dbf60223f275f800cd354ef8bdcc1b0844abed0bd30d6ed73387a7
+    allow_all_exactly_locked_packages: true
+    prohibited_packages: [vectorbt, vnpy, openbb, finrl]
+  hermes-research-vectorbt:
+    status: active_isolated
+    lock_file: requirements/vectorbt.lock
+    sha256: 7644b92b35332d89522058e0377979531c9c7721f76a80641cb6a7f5cb540d22
+    approval: conditional_research_only
+    prohibited_capabilities: [network_data_download, broker_import, order_transmission]
+  hermes-execution-vnpy:
+    status: deferred_not_installed
+    lock_file: requirements/execution-vnpy.lock
+    sha256: aed08b6af4e69f02fdd2482cbdefe858d0495f62e0ba6313cbe40c1c37a31f0c
+    activation_gate: separate_security_and_license_review
+  hermes-openbb-sidecar:
+    status: deferred_not_installed
+    lock_file: requirements/openbb-sidecar.lock
+    sha256: e0591eea89ed99ad3fd60b582514fac4cd985a5cb7136b796a003de5fefff29b
+    activation_gate: AGPL_sidecar_legal_review
+  hermes-finrl-lab:
+    status: deferred_not_installed
+    lock_file: requirements/finrl-lab.lock
+    sha256: 8fdd45bba7d712fb2bcfe2d8f94ef4cd1d5295336af9c878e84d0b01186fc61d
+    activation_gate: offline_leakage_and_cost_benchmark
+  hermes-frontend:
+    status: active
+    lock_file: commands/frontend/package-lock.json
+    sha256: 4c719849482a3de1f18b98f9f07cbb318903a83b4167dcfad1d2a6bd570a3966
+    package_manager: npm
+upstream_frameworks:
+  vectorbt:
+    version: "1.1.0"
+    license: Apache-2.0-WITH-Commons-Clause-1.0
+    installed_in: hermes-research-vectorbt
+    decision: conditional_research_only
+  vnpy:
+    license: MIT
+    installed_in: none
+    decision: deferred_design_adapter
+  openbb:
+    license: AGPL-3.0-only
+    installed_in: none
+    decision: optional_out_of_process_sidecar_only
+  finrl_classic:
+    license: MIT
+    installed_in: none
+    decision: deferred_research_reference
+  finrl_x_trading:
+    license: Apache-2.0
+    installed_in: none
+    decision: architecture_reference_only
+  qbot:
+    license: MIT
+    installed_in: none
+    decision: ui_product_reference_only

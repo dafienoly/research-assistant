@@ -1,0 +1,5 @@
+# Hermes VNext isolated execution-vnpy environment
+# STATUS: DEFERRED_NOT_INSTALLED
+# vn.py is not required by the current Hermes-owned Event Truth/OMS adapter.
+# Any activation must replace this comment-only lock with exact pins and pass
+# license, security, API/Broker-boundary, Paper and Shadow acceptance gates.

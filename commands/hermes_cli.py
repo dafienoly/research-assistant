@@ -145,6 +145,8 @@ def show_help():
                                 从真实 Tushare 指数/ETF与全A日线构建假设回测数据集
   vnext:ml-dataset-build --start YYYY-MM-DD --end YYYY-MM-DD [--max-symbols N]
                                 从真实日线构建无未来泄漏的 ML 训练/评分数据集
+  vnext:contract-schemas [--output DIR]
+                                导出 Hermes 七个核心跨进程 JSON Schema
   factor:review-decisions --start YYYY-MM-DD --end YYYY-MM-DD
                                 决策复盘: 系统推荐 vs 人工执行表现 (V1.13)
   factor:rebalance-diff --date 2026-07-03 --positions data/positions/current_positions.csv --plan B

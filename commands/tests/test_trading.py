@@ -5,7 +5,13 @@ from factor_lab.vnext.trading import PaperShadowLoop, summarize_execution_compar
 
 def test_trading_loop_reports_no_draft_without_orders(tmp_path):
     journal = AuditJournal(tmp_path / "audit.jsonl")
-    loop = PaperShadowLoop(GovernedExecutionEngine(TradingMode.PAPER, journal), PaperBroker(journal), lambda: [])
+    approval_key = "-".join(("test", "signing", "key"))
+    loop = PaperShadowLoop(
+        GovernedExecutionEngine(TradingMode.PAPER, journal),
+        PaperBroker(journal),
+        lambda: [],
+        signing_secret=approval_key,
+    )
     result = loop.run_once()
     assert result["orders_seen"] == 0
     assert result["real_broker_called"] is False

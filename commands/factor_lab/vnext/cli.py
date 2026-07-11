@@ -11,21 +11,34 @@ from typing import Any
 import pandas as pd
 
 from .backtest import PolicyHypothesisBacktester, RobustnessValidator
-from .contracts import DataStatus, TradingMode
+from .acceptance import AcceptanceEvidenceBuilder
+from .contracts import ApprovedOrderEnvelope, DataStatus, TradingMode, contract_json_schemas, now_iso
 from .datasets import MLRankingDatasetBuilder, PolicyBacktestDatasetBuilder
+from .data_audit import export_vnext_data_audit
+from .domain_engine import DomainDecisionOrchestrator
 from .execution import (
     AuditJournal,
     GovernedExecutionEngine,
-    OrderDraft,
     PaperBroker,
     QMTProbeBroker,
     SafetyContext,
     ShadowBroker,
 )
+from .event_truth import AShareEventTruthLane
+from .execution_certification import ExecutionCertificationLab
 from .ml import CrossSectionalRanker, MLFactorSelector
+from .ml_governance import MLRankerGovernanceLab
+from .optimization import PortfolioOptimizationLab
+from .providers import build_snapshot_manifest
+from .recovery_drill import run_backup_restore_drill
+from .reconciliation import BacktestReconciler
 from .review import AntifragileReviewEngine
+from .review_orchestrator import ArtifactAntifragileReview
 from .service import VNextService
+from .sbom import CycloneDXGenerator
+from .target_weights import DailyArtifactTargetWeightAdapter
 from .trading import PaperShadowLoop, summarize_execution_comparison
+from .vectorbt_adapter import VectorbtFastLaneAdapter
 
 
 COMMANDS = {
@@ -43,6 +56,21 @@ COMMANDS = {
     "vnext:backtest-validate",
     "vnext:backtest-build",
     "vnext:ml-dataset-build",
+    "vnext:contract-schemas",
+    "vnext:snapshot-manifest",
+    "vnext:data-audit-export",
+    "vnext:data-recovery-drill",
+    "vnext:target-weights",
+    "vnext:fast-backtest",
+    "vnext:event-backtest",
+    "vnext:reconcile",
+    "vnext:domain-decision",
+    "vnext:portfolio-optimize",
+    "vnext:ml-governance-run",
+    "vnext:execution-certify",
+    "vnext:antifragile-review",
+    "vnext:sbom-generate",
+    "vnext:acceptance-build",
 }
 
 
@@ -199,26 +227,66 @@ def handle(command: str, args: list[str]) -> bool:
         else:
             raw = json.loads(orders_path.read_text(encoding="utf-8"))
             entries = raw.get("orders", []) if isinstance(raw, dict) else raw
-            parsed = []
-            for entry in entries:
-                parsed.append((OrderDraft(**entry["order"]), SafetyContext(**entry["safety"])))
-            mode = TradingMode.PAPER if command.endswith("paper-run") else TradingMode.SHADOW
-            journal = AuditJournal(service.store.root / "audit" / "execution.jsonl")
-            engine = GovernedExecutionEngine(mode, journal)
-            broker = PaperBroker(journal) if mode == TradingMode.PAPER else ShadowBroker(journal)
-            loop = PaperShadowLoop(engine, broker, lambda: parsed)
-            cycles = int(_arg(args, "--cycles", "1") or 1)
-            interval = int(_arg(args, "--interval", "60") or 60)
-            runs = loop.run_continuous(interval_seconds=interval, max_cycles=cycles)
-            payload = {
-                "status": DataStatus.OK.value,
-                "as_of": as_of,
-                "mode": mode.value,
-                "orders_path": str(orders_path),
-                "cycles": runs,
-                "comparison": summarize_execution_comparison(runs),
-                "real_broker_called": False,
-            }
+            signing_secret = os.environ.get("HERMES_APPROVAL_SIGNING_KEY", "")
+            if not signing_secret:
+                payload = {
+                    "status": DataStatus.BLOCKED.value,
+                    "as_of": as_of,
+                    "reason": "approval_signing_key_missing",
+                    "missing_evidence": ["HERMES_APPROVAL_SIGNING_KEY"],
+                    "orders_path": str(orders_path),
+                    "real_broker_called": False,
+                }
+            else:
+                parsed = []
+                errors = []
+                for index, entry in enumerate(entries):
+                    if "approved_envelope" not in entry:
+                        errors.append(f"orders[{index}]:approved_order_envelope_required")
+                        continue
+                    try:
+                        parsed.append(
+                            (
+                                ApprovedOrderEnvelope.model_validate(entry["approved_envelope"]),
+                                SafetyContext(**entry["safety"]),
+                            )
+                        )
+                    except (TypeError, ValueError, KeyError) as exc:
+                        errors.append(f"orders[{index}]:{type(exc).__name__}")
+                if errors or not parsed:
+                    payload = {
+                        "status": DataStatus.BLOCKED.value,
+                        "as_of": as_of,
+                        "reason": "invalid_approved_order_input",
+                        "missing_evidence": errors or ["approved_envelope"],
+                        "orders_path": str(orders_path),
+                        "real_broker_called": False,
+                    }
+                else:
+                    mode = TradingMode.PAPER if command.endswith("paper-run") else TradingMode.SHADOW
+                    journal = AuditJournal(service.store.root / "audit" / "execution.jsonl")
+                    engine = GovernedExecutionEngine(mode, journal)
+                    broker = PaperBroker(journal) if mode == TradingMode.PAPER else ShadowBroker(journal)
+                    loop = PaperShadowLoop(engine, broker, lambda: parsed, signing_secret=signing_secret)
+                    cycles = int(_arg(args, "--cycles", "1") or 1)
+                    interval = int(_arg(args, "--interval", "60") or 60)
+                    runs = loop.run_continuous(interval_seconds=interval, max_cycles=cycles)
+                    blocked = [
+                        result
+                        for run in runs
+                        for result in run.get("results", [])
+                        if result.get("status") == DataStatus.BLOCKED.value
+                    ]
+                    payload = {
+                        "status": DataStatus.PARTIAL.value if blocked else DataStatus.OK.value,
+                        "as_of": as_of,
+                        "mode": mode.value,
+                        "orders_path": str(orders_path),
+                        "cycles": runs,
+                        "comparison": summarize_execution_comparison(runs),
+                        "approval_envelopes_verified": len(parsed),
+                        "real_broker_called": False,
+                    }
         component = "paper" if command.endswith("paper-run") else "shadow"
         service.store.write(component, as_of, payload)
         _print(payload)
@@ -247,6 +315,202 @@ def handle(command: str, args: list[str]) -> bool:
         result.update({"no_live_trade": True, "live_enabled": False, "real_broker_called": False})
         service.store.write("qmt-probe", as_of, result)
         _print(result)
+        return True
+
+    if command == "vnext:contract-schemas":
+        output_value = _arg(args, "--output")
+        output_dir = Path(output_value) if output_value else service.project_root / "artifacts" / "vnext" / "schemas"
+        if not output_dir.is_absolute():
+            output_dir = service.project_root / output_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
+        written = []
+        for name, schema in contract_json_schemas().items():
+            path = output_dir / f"{name}.schema.json"
+            temporary = path.with_suffix(".json.tmp")
+            temporary.write_text(json.dumps(schema, ensure_ascii=False, indent=2), encoding="utf-8")
+            temporary.replace(path)
+            written.append(str(path))
+        result = {
+            "status": DataStatus.OK.value,
+            "schema_version": "1.0",
+            "contracts": sorted(contract_json_schemas()),
+            "files": written,
+            "generated_at": now_iso(),
+        }
+        index_path = output_dir / "index.json"
+        index_tmp = index_path.with_suffix(".json.tmp")
+        index_tmp.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        index_tmp.replace(index_path)
+        _print(result)
+        return True
+
+    if command == "vnext:snapshot-manifest":
+        refresh = "--refresh" in args
+        snapshot = service.store.read("snapshot", as_of)
+        if refresh or not snapshot.get("data_snapshot_id"):
+            service.run_daily(as_of, refresh_real_data=True)
+            snapshot = service.store.read("snapshot", as_of)
+        output_value = _arg(args, "--output")
+        output_path = Path(output_value) if output_value else service.project_root / "artifacts" / "vnext" / "snapshot_manifest.json"
+        if not output_path.is_absolute():
+            output_path = service.project_root / output_path
+        result = build_snapshot_manifest(
+            data_snapshot_id=str(snapshot.get("data_snapshot_id", "missing-snapshot-id")),
+            as_of=as_of,
+            manifest_paths=list(snapshot.get("snapshot_manifest_paths", [])),
+            output_path=output_path,
+            silent_fallback_used=bool(snapshot.get("silent_fallback_used", False)),
+        )
+        result["output_path"] = str(output_path)
+        result["snapshot_source_status"] = snapshot.get("status", DataStatus.MISSING.value)
+        _print(result)
+        return True
+
+    if command == "vnext:data-audit-export":
+        output_value = _arg(args, "--output-root")
+        output_root = Path(output_value) if output_value else service.project_root / "artifacts" / "vnext"
+        if not output_root.is_absolute():
+            output_root = service.project_root / output_root
+        result = export_vnext_data_audit(service.project_root, as_of=as_of, output_root=output_root)
+        result["output_root"] = str(output_root)
+        _print(result)
+        return True
+
+    if command == "vnext:data-recovery-drill":
+        files_value = _arg(args, "--files")
+        if files_value:
+            source_paths = [
+                Path(value.strip()) if Path(value.strip()).is_absolute() else service.project_root / value.strip()
+                for value in files_value.split(",")
+                if value.strip()
+            ]
+        else:
+            recovery_manifests = sorted(
+                (service.project_root / "data" / "audit" / "recovery" / "manifests").glob("*.json")
+            )
+            source_paths = [
+                service.project_root / "data" / "normalized" / "market" / "688012.SH.csv",
+                service.project_root / "artifacts" / "vnext" / "snapshot_manifest.json",
+                service.project_root / "artifacts" / "vnext" / "data_audit_report.json",
+                *recovery_manifests,
+            ]
+        output_value = _arg(args, "--output-root")
+        output_root = Path(output_value) if output_value else None
+        if output_root is not None and not output_root.is_absolute():
+            output_root = service.project_root / output_root
+        _print(
+            run_backup_restore_drill(
+                service.project_root,
+                source_paths=source_paths,
+                as_of=as_of,
+                output_root=output_root,
+            )
+        )
+        return True
+
+    if command == "vnext:target-weights":
+        output_value = _arg(args, "--output")
+        output_path = Path(output_value) if output_value else service.project_root / "artifacts" / "vnext" / "target_weights.json"
+        if not output_path.is_absolute():
+            output_path = service.project_root / output_path
+        book = DailyArtifactTargetWeightAdapter().build(
+            service.project_root,
+            as_of=as_of,
+            output_path=output_path,
+        )
+        result = book.to_dict()
+        result["output_path"] = str(output_path)
+        result["target_weights_hash"] = book.target_weights_hash
+        _print(result)
+        return True
+
+    if command == "vnext:fast-backtest":
+        result = VectorbtFastLaneAdapter(service.project_root).run(
+            as_of=as_of,
+            snapshot_manifest_path=service.project_root / "artifacts" / "vnext" / "snapshot_manifest.json",
+            target_weights_path=service.project_root / "artifacts" / "vnext" / "target_weights.json",
+            output_path=service.project_root / "artifacts" / "vnext" / "fast_backtest_manifest.json",
+        )
+        _print(result)
+        return True
+
+    if command == "vnext:event-backtest":
+        result = AShareEventTruthLane(service.project_root).run(
+            as_of=as_of,
+            snapshot_manifest_path=service.project_root / "artifacts" / "vnext" / "snapshot_manifest.json",
+            target_weights_path=service.project_root / "artifacts" / "vnext" / "target_weights.json",
+            output_path=service.project_root / "artifacts" / "vnext" / "event_backtest_manifest.json",
+        )
+        _print(result)
+        return True
+
+    if command == "vnext:reconcile":
+        result = BacktestReconciler().reconcile(
+            fast_manifest_path=service.project_root / "artifacts" / "vnext" / "fast_backtest_manifest.json",
+            event_manifest_path=service.project_root / "artifacts" / "vnext" / "event_backtest_manifest.json",
+            output_path=service.project_root / "artifacts" / "vnext" / "reconciliation_report.json",
+        )
+        _print(result)
+        return True
+
+    if command == "vnext:domain-decision":
+        result = DomainDecisionOrchestrator().run(
+            service.project_root,
+            as_of=as_of,
+            output_path=service.project_root / "artifacts" / "vnext" / "domain_decision.json",
+        )
+        _print(result.to_dict())
+        return True
+
+    if command == "vnext:portfolio-optimize":
+        result = PortfolioOptimizationLab().run(
+            service.project_root,
+            as_of=as_of,
+            output_path=service.project_root / "artifacts" / "vnext" / "portfolio_optimization.json",
+        )
+        _print(result)
+        return True
+
+    if command == "vnext:ml-governance-run":
+        result = MLRankerGovernanceLab().run(
+            service.project_root,
+            as_of=as_of,
+            output_path=service.project_root / "artifacts" / "vnext" / "ml_ranker_manifest.json",
+            max_rows=int(_arg(args, "--max-rows", "250000") or 250000),
+            n_estimators=int(_arg(args, "--estimators", "120") or 120),
+        )
+        _print(result)
+        return True
+
+    if command == "vnext:execution-certify":
+        result = ExecutionCertificationLab().run(
+            service.project_root,
+            as_of=as_of,
+            output_path=service.project_root / "artifacts" / "vnext" / "execution_certification.json",
+        )
+        _print(result)
+        return True
+
+    if command == "vnext:antifragile-review":
+        result = ArtifactAntifragileReview().run(
+            service.project_root,
+            as_of=as_of,
+            output_path=service.project_root / "artifacts" / "vnext" / "antifragile_review.json",
+        )
+        service.store.write("antifragile-review", as_of, result)
+        _print(result)
+        return True
+
+    if command == "vnext:sbom-generate":
+        result = CycloneDXGenerator().generate(
+            service.project_root,
+            output_path=service.project_root / "artifacts" / "vnext" / "sbom.cdx.json",
+        )
+        _print(result)
+        return True
+
+    if command == "vnext:acceptance-build":
+        _print(AcceptanceEvidenceBuilder().build(service.project_root))
         return True
 
     if command == "review:antifragile":

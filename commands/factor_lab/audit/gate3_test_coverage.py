@@ -18,8 +18,16 @@ from typing import Optional
 from .base import AuditFinding, AuditReport, Severity
 from .git_utils import get_all_changed_files, BASE, COMMANDS
 
-VENV = str(BASE / ".venv_quant" / "bin" / "python3")
+VENV = str(BASE / ".venv_quant" / "bin" / "python")
 TESTS_DIR = COMMANDS / "tests"
+TEST_ALIASES = {
+    "data_recovery": ("test_vnext_recovery_drill.py", "test_data_pipeline.py"),
+    "tushare_client": ("test_tushare_stock.py", "test_tushare_market.py"),
+    "tushare_registry": ("test_tushare_market.py",),
+    "artifact_reader": ("test_routes_vnext.py",),
+    "tushare_datahub": ("test_tushare_market.py",),
+    "vectorbt_worker": ("test_vnext_vectorbt_adapter.py",),
+}
 
 NO_TEST_EXTENSIONS = {".md", ".txt", ".rst", ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg"}
 NO_TEST_FILES = {"__init__.py", "conftest.py", "setup.py", "conf.py"}
@@ -47,6 +55,13 @@ def _classify_files(files: list[str]) -> tuple[list[str], list[str]]:
 def _expected_test_file(source: str) -> str:
     name = Path(source).stem
     return f"tests/test_{name}.py"
+
+
+def _candidate_test_files(source: str) -> list[Path]:
+    """Return existing conventional, VNext-prefixed and reviewed alias tests."""
+    stem = Path(source).stem
+    names = [f"test_{stem}.py", f"test_vnext_{stem}.py", *TEST_ALIASES.get(stem, ())]
+    return [path for name in dict.fromkeys(names) if (path := TESTS_DIR / name).is_file()]
 
 
 def _extract_function_names(file_path: str) -> list[str]:
@@ -171,17 +186,25 @@ def _run_pytest(source_files: list[str]) -> tuple[str, list[AuditFinding]]:
     # 只跑关联的测试文件
     test_files = []
     for sf in source_files:
-        expected = TESTS_DIR / f"test_{Path(sf).name}"
-        if expected.is_file():
-            test_files.append(str(expected))
+        test_files.extend(str(path) for path in _candidate_test_files(sf))
+    test_files = list(dict.fromkeys(test_files))
+    recursive_gate_test = (TESTS_DIR / "test_gate3_test_coverage.py").resolve()
+    test_files = [path for path in test_files if Path(path).resolve() != recursive_gate_test]
 
     if not test_files:
         return "", findings
 
     try:
-        cmd = [VENV, "-m", "pytest"] + test_files + ["-q", "--tb=line", "--no-header"]
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=60,
-                           cwd=str(COMMANDS))
+        cmd = [VENV, "-m", "pytest"] + test_files + [
+            "-q", "--tb=line", "--no-header", "--basetemp=/tmp/hermes-anti-cheat-gate3",
+        ]
+        environment = os.environ.copy()
+        environment["TMPDIR"] = "/tmp"
+        environment["PYTHONPATH"] = os.pathsep.join(
+            [str(BASE), str(COMMANDS), environment.get("PYTHONPATH", "")]
+        )
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=180,
+                           cwd=str(COMMANDS), env=environment)
         output = r.stdout + r.stderr
         log = output[:3000]
 
@@ -230,8 +253,7 @@ def _check_test_file_exists(source_file: str) -> Optional[AuditFinding]:
     expected_full = COMMANDS / expected
     if expected_full.is_file():
         return None
-    alt = TESTS_DIR / f"test_{Path(source_file).name}"
-    if alt.is_file():
+    if _candidate_test_files(source_file):
         return None
     return AuditFinding(
         gate="gate3", severity="FAIL", category="NO_TEST_FILE",
@@ -260,9 +282,8 @@ def _run_pytest_coverage(source_files: list[str]) -> list[AuditFinding]:
         return findings
     test_files = []
     for sf in source_files:
-        expected = TESTS_DIR / f"test_{Path(sf).name}"
-        if expected.is_file():
-            test_files.append(str(expected))
+        test_files.extend(str(path) for path in _candidate_test_files(sf))
+    test_files = list(dict.fromkeys(test_files))
     if not test_files:
         return findings
 
@@ -281,10 +302,17 @@ def _run_pytest_coverage(source_files: list[str]) -> list[AuditFinding]:
                 cov_args.extend(["--cov", mod_dir])
 
     try:
-        cmd = [VENV, "-m", "pytest"] + test_files + ["-q", "--tb=line",
-               "--cov-report=term-missing:skip-covered"] + cov_args
+        cmd = [VENV, "-m", "pytest"] + test_files + [
+            "-q", "--tb=line", "--basetemp=/tmp/hermes-anti-cheat-coverage",
+            "--cov-report=term-missing:skip-covered",
+        ] + cov_args
+        environment = os.environ.copy()
+        environment["TMPDIR"] = "/tmp"
+        environment["PYTHONPATH"] = os.pathsep.join(
+            [str(BASE), str(COMMANDS), environment.get("PYTHONPATH", "")]
+        )
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=30,
-                           cwd=str(COMMANDS))
+                           cwd=str(COMMANDS), env=environment)
         output = (r.stdout + r.stderr)
     except subprocess.TimeoutExpired:
         findings.append(AuditFinding(
@@ -361,9 +389,10 @@ def run_gate3(report: AuditReport) -> AuditReport:
     # 2. 函数级测试检查
     untested_funcs = 0
     for sf in source_files:
-        expected_test = COMMANDS / _expected_test_file(sf)
-        if not expected_test.is_file():
+        candidates = _candidate_test_files(sf)
+        if not candidates:
             continue
+        expected_test = candidates[0]
         funcs = _extract_function_names(sf)
         for fn in funcs:
             finding = _check_function_tested(sf, fn, expected_test)
@@ -373,9 +402,8 @@ def run_gate3(report: AuditReport) -> AuditReport:
 
     # 3. 新增: 弱测试检查
     for sf in source_files:
-        expected_test = COMMANDS / _expected_test_file(sf)
-        weak = _check_weak_test(expected_test)
-        report.extend(weak)
+        for test_file in _candidate_test_files(sf):
+            report.extend(_check_weak_test(test_file))
 
     # 4. 新增: 执行 pytest
     pytest_log, pytest_findings = _run_pytest(source_files)

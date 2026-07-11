@@ -33,7 +33,7 @@ class TushareStockProvider(BaseProvider):
         return ProviderCapability(
             name="tushare_stock", can_stock_basic=True, can_trade_cal=True,
             can_index_daily=True, can_namechange=True, can_suspend=True,
-            coverage_start="20000101", stock_count=5528, daily_history_years=25,
+            coverage_start="19901219", stock_count=5528, daily_history_years=35,
         )
 
     def self_check(self) -> ProviderHealth:
@@ -56,6 +56,7 @@ class TushareStockProvider(BaseProvider):
         tc = self._get_client()
         fields = "ts_code,name,area,industry,market,list_date,delist_date,is_hs"
         df = tc._query("stock_basic", fields=fields, list_status=list_status)
+        df = df.copy()
         if not df.empty and "list_date" in df.columns:
             df["list_date"] = pd.to_datetime(df["list_date"], format="%Y%m%d", errors="coerce")
         if not df.empty and "delist_date" in df.columns:
@@ -75,7 +76,12 @@ class TushareStockProvider(BaseProvider):
 
     def index_daily(self, ts_code: str = "", start_date: str = "", end_date: str = "") -> pd.DataFrame:
         tc = self._get_client()
-        df = tc._query("index_daily", ts_code=ts_code, start_date=start_date, end_date=end_date)
+        params = {
+            key: value
+            for key, value in {"ts_code": ts_code, "start_date": start_date, "end_date": end_date}.items()
+            if value
+        }
+        df = tc._query("index_daily", **params)
         if not df.empty and "trade_date" in df.columns:
             df["trade_date"] = pd.to_datetime(df["trade_date"], format="%Y%m%d", errors="coerce")
         return df
@@ -90,7 +96,12 @@ class TushareStockProvider(BaseProvider):
 
     def suspend(self, ts_code: str = "", start_date: str = "", end_date: str = "") -> pd.DataFrame:
         tc = self._get_client()
-        df = tc._query("suspend_d", ts_code=ts_code, start_date=start_date, end_date=end_date)
+        params = {
+            key: value
+            for key, value in {"ts_code": ts_code, "start_date": start_date, "end_date": end_date}.items()
+            if value
+        }
+        df = tc._query("suspend_d", **params)
         if not df.empty and "trade_date" in df.columns:
             df["trade_date"] = pd.to_datetime(df["trade_date"], format="%Y%m%d", errors="coerce")
         return df

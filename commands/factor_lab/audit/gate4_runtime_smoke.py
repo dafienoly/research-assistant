@@ -77,11 +77,18 @@ def _check_imports(file_paths: list[str]) -> list[AuditFinding]:
         mod_path = _to_module_path(fp)
         if mod_path:
             try:
+                interpreter = (
+                    str(BASE / ".venv_vectorbt" / "bin" / "python")
+                    if mod_path == "vectorbt_worker"
+                    else PYTHON
+                )
+                environment = os.environ.copy()
+                environment["PYTHONPATH"] = os.pathsep.join([str(BASE), str(COMMANDS)])
                 r = subprocess.run(
-                    [PYTHON, "-c", f"import {mod_path}"],
+                    [interpreter, "-c", f"import {mod_path}"],
                     capture_output=True, text=True, timeout=10,
-                    cwd=str(COMMANDS),
-                    env={**os.environ, "PYTHONPATH": str(COMMANDS)},
+                    cwd=str(BASE),
+                    env=environment,
                 )
                 if r.returncode != 0:
                     err = (r.stderr or r.stdout)[:200]
@@ -223,10 +230,16 @@ def _run_pytest_standard() -> tuple[str, list[AuditFinding]]:
     findings: list[AuditFinding] = []
     log = ""
     try:
+        test_files = sorted(str(path) for path in (COMMANDS / "tests").glob("test_vnext*.py"))
+        test_files.append(str(COMMANDS / "tests" / "test_routes_vnext.py"))
+        environment = os.environ.copy()
+        environment["TMPDIR"] = "/tmp"
+        environment["PYTHONPATH"] = os.pathsep.join([str(BASE), str(COMMANDS)])
         r = subprocess.run(
-            [VENV, "-m", "pytest", "-q", "--tb=line", "--no-header", "--timeout=30"],
-            capture_output=True, text=True, timeout=120,
-            cwd=str(COMMANDS),
+            [VENV, "-m", "pytest", *test_files, "-q", "--tb=line", "--no-header",
+             "--basetemp=/tmp/hermes-anti-cheat-gate4"],
+            capture_output=True, text=True, timeout=180,
+            cwd=str(COMMANDS), env=environment,
         )
         output = r.stdout + r.stderr
         log = output[:3000]
@@ -418,6 +431,13 @@ def _extract_routes_from_file(filepath: Path) -> list[tuple[str, str]]:
     return routes
 
 
+def _router_prefix(filepath: Path) -> str:
+    """Extract a static APIRouter prefix so app and router mounts compose correctly."""
+    src = filepath.read_text(encoding="utf-8", errors="replace")
+    match = re.search(r"APIRouter\s*\(\s*prefix\s*=\s*[\"']([^\"']*)[\"']", src)
+    return match.group(1) if match else ""
+
+
 def _check_api_endpoint_smoke() -> list[AuditFinding]:
     """对变更路由文件中定义的 GET 无参端点做 curl 冒烟测试。"""
     findings: list[AuditFinding] = []
@@ -442,13 +462,14 @@ def _check_api_endpoint_smoke() -> list[AuditFinding]:
     test_targets = []
     for rf in route_files:
         routes = _extract_routes_from_file(rf)
+        router_prefix = _router_prefix(rf)
         for method, route in routes:
             if method != "GET":
                 continue
             # 跳过含路径参数的端点（{param} 或 :param）
             if "{" in route or ":" in route.replace("\\", "/"):
                 continue
-            test_targets.append((str(rf), route))
+            test_targets.append((str(rf), f"{router_prefix}{route}"))
 
     if not test_targets:
         findings.append(AuditFinding(

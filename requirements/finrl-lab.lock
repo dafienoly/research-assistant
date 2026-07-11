@@ -1,0 +1,4 @@
+# Hermes VNext isolated FinRL research environment
+# STATUS: DEFERRED_NOT_INSTALLED
+# FinRL/FinRL-X is not installed.  RL work remains offline research-only until
+# a leakage-controlled MDP, costs and walk-forward baselines justify activation.

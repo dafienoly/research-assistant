@@ -3,7 +3,6 @@
 Tushare Pro 客户端 V1.0 — A 股全量数据接口
 
 数据源: ts.gyzcloud.top (Tushare Pro Proxy)
-Token: 66d9505c0bd943b3b00b8bf26df0b862
 套餐: 月卡 (60次/分钟)
 到期: 2026-08-07
 
@@ -61,7 +60,7 @@ CST = timezone(timedelta(hours=8))
 
 # ─── 配置 ────────────────────────────────────────────────────
 
-TUSHARE_TOKEN = "66d9505c0bd943b3b00b8bf26df0b862"
+TUSHARE_TOKEN_ENV = "TUSHARE_TOKEN"
 TUSHARE_API_URL = "https://ts.gyzcloud.top/api"
 
 # 频率限制: 150次/分钟 → 保守设 120次/分钟 → 每0.5秒1次
@@ -86,6 +85,23 @@ FIELD_MAP_DAILY = {
 # ─── 客户端 ───────────────────────────────────────────────────
 
 
+def _resolve_tushare_token(explicit_token: str | None = None) -> str:
+    """Resolve credentials without embedding or logging the token."""
+    if explicit_token:
+        return explicit_token
+    token = os.environ.get(TUSHARE_TOKEN_ENV, "")
+    if token:
+        return token
+    try:
+        from dotenv import load_dotenv
+
+        project_root = Path(__file__).resolve().parents[3]
+        load_dotenv(project_root / ".env", override=False)
+    except ImportError:
+        pass
+    return os.environ.get(TUSHARE_TOKEN_ENV, "")
+
+
 class TushareClient:
     """Tushare Pro 客户端封装
 
@@ -99,8 +115,8 @@ class TushareClient:
 
     _instance: Optional["TushareClient"] = None
 
-    def __init__(self, token: str = TUSHARE_TOKEN, api_url: str = TUSHARE_API_URL):
-        self.token = token
+    def __init__(self, token: str | None = None, api_url: str = TUSHARE_API_URL):
+        self.token = _resolve_tushare_token(token)
         self.api_url = api_url
         self._pro = None
         self._last_request_time = 0.0
@@ -108,7 +124,7 @@ class TushareClient:
         self._rate_limit_reset = time.time() + 60
 
     @classmethod
-    def get_instance(cls, token: str = TUSHARE_TOKEN, api_url: str = TUSHARE_API_URL) -> "TushareClient":
+    def get_instance(cls, token: str | None = None, api_url: str = TUSHARE_API_URL) -> "TushareClient":
         if cls._instance is None:
             cls._instance = cls(token, api_url)
         return cls._instance
@@ -117,6 +133,9 @@ class TushareClient:
         """延迟初始化 tushare pro API"""
         if self._pro is not None:
             return self._pro
+
+        if not self.token:
+            raise RuntimeError("TUSHARE_TOKEN is not configured")
 
         import tushare as ts
         ts.set_token(self.token)

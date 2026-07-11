@@ -6,8 +6,8 @@ import time
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from .contracts import TradingMode, now_iso
-from .execution import GovernedExecutionEngine, OrderDraft, SafetyContext
+from .contracts import ApprovedOrderEnvelope, TradingMode, now_iso
+from .execution import GovernedExecutionEngine, SafetyContext
 
 
 def summarize_execution_comparison(cycles: Iterable[dict[str, Any]]) -> dict[str, Any]:
@@ -37,16 +37,29 @@ class PaperShadowLoop:
         self,
         engine: GovernedExecutionEngine,
         broker: Any,
-        order_source: Callable[[], Iterable[tuple[OrderDraft, SafetyContext]]],
+        order_source: Callable[[], Iterable[tuple[ApprovedOrderEnvelope, SafetyContext]]],
+        *,
+        signing_secret: str,
     ) -> None:
         if engine.mode not in {TradingMode.PAPER, TradingMode.SHADOW}:
             raise ValueError("PaperShadowLoop accepts PAPER or SHADOW mode only")
         self.engine = engine
         self.broker = broker
         self.order_source = order_source
+        if not signing_secret:
+            raise ValueError("PaperShadowLoop requires HERMES_APPROVAL_SIGNING_KEY")
+        self.signing_secret = signing_secret
 
     def run_once(self) -> dict[str, Any]:
-        results = [self.engine.submit(self.broker, order, context) for order, context in self.order_source()]
+        results = [
+            self.engine.submit(
+                self.broker,
+                envelope,
+                context,
+                signing_secret=self.signing_secret,
+            )
+            for envelope, context in self.order_source()
+        ]
         return {
             "mode": self.engine.mode.value,
             "run_at": now_iso(),

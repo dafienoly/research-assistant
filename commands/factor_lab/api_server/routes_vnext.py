@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 
 from factor_lab.api_server.response import api_success
+from factor_lab.vnext.artifact_reader import VNextArtifactReader
 from factor_lab.vnext.service import VNextService
 
 
@@ -27,6 +28,10 @@ def _service() -> VNextService:
 
 def _component(request: Request, name: str, as_of: str | None):
     return api_success(_service().component(name, as_of), request=request)
+
+
+def _artifacts() -> VNextArtifactReader:
+    return VNextArtifactReader(_service().project_root)
 
 
 @router.get("/status")
@@ -73,14 +78,26 @@ async def vnext_ml_ranker(request: Request, date: str | None = Query(default=Non
 async def vnext_backtests(request: Request):
     service = _service()
     latest = service.component("backtests")
+    try:
+        formal_validation = VNextArtifactReader(service.project_root).run("latest")
+    except (FileNotFoundError, ValueError):
+        formal_validation = {
+            "status": "MISSING",
+            "missing_evidence": ["formal VNext validation artifacts"],
+            "payload": {},
+        }
     return api_success(
         {
-            "status": latest.get("status", "MISSING"),
-            "as_of": latest.get("as_of"),
-            "confidence": latest.get("confidence", 0.0),
-            "evidence": latest.get("evidence", []),
-            "missing_evidence": latest.get("missing_evidence", []),
-            "payload": {"latest": latest, "runs": service.store.list("backtests")},
+            "status": formal_validation.get("status", latest.get("status", "MISSING")),
+            "as_of": formal_validation.get("as_of", latest.get("as_of")),
+            "confidence": formal_validation.get("confidence", latest.get("confidence", 0.0)),
+            "evidence": formal_validation.get("evidence", latest.get("evidence", [])),
+            "missing_evidence": formal_validation.get("missing_evidence", latest.get("missing_evidence", [])),
+            "payload": {
+                "formal_validation": formal_validation,
+                "latest_legacy_validation": latest,
+                "runs": service.store.list("backtests"),
+            },
         },
         request=request,
     )
@@ -179,6 +196,39 @@ async def vnext_reports(request: Request, date: str | None = Query(default=None)
         },
         request=request,
     )
+
+
+@router.get("/runs/{run_id}")
+async def vnext_run_detail(run_id: str, request: Request):
+    try:
+        payload = _artifacts().run(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="VNext run not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return api_success(payload, request=request)
+
+
+@router.get("/snapshots/{snapshot_id}")
+async def vnext_snapshot_detail(snapshot_id: str, request: Request):
+    try:
+        payload = _artifacts().snapshot(snapshot_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="VNext snapshot not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return api_success(payload, request=request)
+
+
+@router.get("/reconciliation/{run_id}")
+async def vnext_reconciliation_detail(run_id: str, request: Request):
+    try:
+        payload = _artifacts().reconciliation(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="VNext reconciliation not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return api_success(payload, request=request)
 
 
 @router.get("/reports/download")

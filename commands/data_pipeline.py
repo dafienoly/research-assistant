@@ -24,14 +24,16 @@ import logging
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Optional
 
 import pandas as pd
 
 try:
     from commands.data_providers.tushare import TushareMarketProvider, TushareFinaProvider
+    from commands.data_recovery import RecoveryManifest, atomic_write_frame, frame_date_range, merge_without_data_loss
 except ModuleNotFoundError:
     from data_providers.tushare import TushareMarketProvider, TushareFinaProvider
+    from data_recovery import RecoveryManifest, atomic_write_frame, frame_date_range, merge_without_data_loss
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +49,7 @@ FUND_FLOW_DIR = NORMALIZED_DIR / "fund_flow" # 个股资金流向
 NORTH_FLOW_DIR = BASE / "data"               # 北向资金文件直接放 data/
 ETC_DIR = NORMALIZED_DIR                     # concept, industry 等
 INTRADAY_SNAPSHOT = BASE / "data" / "market" / "live_snapshot.csv"
+RECOVERY_AUDIT_DIR = BASE / "data" / "audit" / "recovery"
 
 # ─── 分批配置 ────────────────────────────────────────────────────────
 BATCH_SIZE = 10           # 每批最多同时拉取的股票数（逐股模式）
@@ -1116,100 +1119,135 @@ def pull_remaining_market_data() -> dict:
 
 
 def pull_concept_industry_mx() -> dict:
-    """P1: 概念板块 + 行业分类 → mx-data 调优查询"""
+    """Pull complete concept/industry catalogs with explicit source provenance.
+
+    Tushare ``ths_index`` and SW2021 ``index_classify`` are the primary
+    sources.  mx-data is queried only when a primary dataset is empty, and
+    any such observation is persisted as ``PARTIAL`` with its source named;
+    it is never silently promoted to a successful Tushare result.
+    """
     print(f"{'='*50}")
-    print("📡 P1: 概念板块+行业分类 (mx-data)")
+    print("📡 P1: 概念板块+行业分类 (Tushare primary, mx-data explicit alternative)")
     print(f"{'='*50}")
 
-    # 尝试多个查询词取最佳结果
-    concept_queries = [
-        "A股全部概念板块列表 代码 名称",
-        "东方财富概念板块列表 板块代码 板块名称",
-        "概念板块 板块代码 板块名称 成分股数量",
+    errors: list[str] = []
+    tc = _get_ts_client()
+
+    def _query_primary(api_name: str, **kwargs: str) -> pd.DataFrame:
+        try:
+            frame = tc._query(api_name, **kwargs)
+            return frame if frame is not None else pd.DataFrame()
+        except Exception as exc:
+            errors.append(f"{api_name}: {type(exc).__name__}: {exc}")
+            return pd.DataFrame()
+
+    def _query_mx_alternative(queries: list[str], name_column: str) -> pd.DataFrame:
+        best = pd.DataFrame()
+        for query in queries:
+            response = _mx_data_query(query)
+            if "error" in response:
+                errors.append(f"mx_data: {response['error']}")
+                continue
+            try:
+                tables = (
+                    response.get("data", {})
+                    .get("data", {})
+                    .get("searchDataResultDTO", {})
+                    .get("dataTableDTOList", [])
+                )
+                rows: list[dict[str, Any]] = []
+                for table in tables:
+                    raw = table.get("table") or table.get("rawTable") or {}
+                    name_map = table.get("nameMap") or {}
+                    headings = raw.get("headName", [])
+                    if headings and len(headings) > 2:
+                        candidate = pd.DataFrame({name_column: headings})
+                        if len(candidate) > len(best):
+                            best = candidate
+                        continue
+                    for key, values in raw.items():
+                        if key in {"headName", "headNameSub"}:
+                            continue
+                        for index, value in enumerate(values):
+                            while len(rows) <= index:
+                                rows.append({})
+                            rows[index][name_map.get(key, key)] = value
+                    for index, heading in enumerate(headings):
+                        if index < len(rows):
+                            rows[index][name_column] = heading
+                candidate = pd.DataFrame(rows)
+                if len(candidate) > len(best):
+                    best = candidate
+            except (AttributeError, TypeError, ValueError) as exc:
+                errors.append(f"mx_data_parse: {type(exc).__name__}: {exc}")
+        return best
+
+    concept = _query_primary("ths_index", exchange="A", type="N")
+    concept_source = "tushare:ths_index"
+    concept_quality = "OK"
+    if concept.empty:
+        print("   ⚠️ Tushare ths_index 为空；查询 mx-data 备选观察")
+        concept = _query_mx_alternative(
+            [
+                "A股全部概念板块列表 代码 名称",
+                "东方财富概念板块列表 板块代码 板块名称",
+                "概念板块 板块代码 板块名称 成分股数量",
+            ],
+            "板块名称",
+        )
+        concept_source = "mx_data:search"
+        concept_quality = "PARTIAL" if not concept.empty else "MISSING"
+
+    industry_parts = [
+        _query_primary("index_classify", level=level, src="SW2021")
+        for level in ("L1", "L2", "L3")
     ]
-    best_concept = pd.DataFrame()
-    for q in concept_queries:
-        mx = _mx_data_query(q)
-        if "error" in mx:
+    populated_parts = [frame for frame in industry_parts if not frame.empty]
+    industry = pd.concat(populated_parts, ignore_index=True) if populated_parts else pd.DataFrame()
+    if not industry.empty and "index_code" in industry.columns:
+        industry = industry.drop_duplicates(subset=["index_code"], keep="last")
+    industry_source = "tushare:index_classify:SW2021"
+    industry_quality = "OK"
+    if industry.empty:
+        print("   ⚠️ Tushare index_classify 为空；查询 mx-data 备选观察")
+        industry = _query_mx_alternative(
+            [
+                "申万行业分类 行业代码 行业名称",
+                "A股行业分类列表 行业代码 行业名称",
+                "行业板块 板块代码 板块名称",
+            ],
+            "行业名称",
+        )
+        industry_source = "mx_data:search"
+        industry_quality = "PARTIAL" if not industry.empty else "MISSING"
+
+    results: dict[str, Any] = {"errors": errors}
+    for label, frame, source, quality, relative_path in (
+        ("concept", concept, concept_source, concept_quality, Path("concept/concept_list.csv")),
+        ("industry", industry, industry_source, industry_quality, Path("industry/industry_list.csv")),
+    ):
+        if frame.empty:
+            print(f"   ⚠️ {label}: 所有明确来源均未返回有效数据")
+            results[label] = {"rows": 0, "source": source, "quality_status": "MISSING", "sha256": None}
             continue
-        try:
-            dtos = mx.get("data",{}).get("data",{}).get("searchDataResultDTO",{}).get("dataTableDTOList",[])
-            rows = []
-            for tbl in dtos:
-                raw = tbl.get("table") or tbl.get("rawTable") or {}
-                name_map = tbl.get("nameMap") or {}
-                head = raw.get("headName", [])
-                if head and len(head) > 2:
-                    df = pd.DataFrame({"板块名称": head})
-                    if len(df) > len(best_concept):
-                        best_concept = df
-                    continue
-                for key, vals in raw.items():
-                    if key in ("headName","headNameSub"): continue
-                    col_name = name_map.get(key, key)
-                    for i, v in enumerate(vals):
-                        while len(rows) <= i: rows.append({})
-                        rows[i][col_name] = v
-                    for i, h in enumerate(head):
-                        if i < len(rows): rows[i]["板块名称"] = h
-            if rows:
-                df = pd.DataFrame(rows)
-                if len(df) > len(best_concept):
-                    best_concept = df
-        except:
-            pass
+        durable = frame.copy()
+        durable["source_provider"] = source
+        durable["quality_status"] = quality
+        durable["observed_at"] = datetime.now(CST).isoformat()
+        output_path = ETC_DIR / relative_path
+        content_hash = atomic_write_frame(durable, output_path)
+        print(f"   {'✅' if quality == 'OK' else '⚠️'} {label}_list: {len(durable)} 条 ({source}, {quality})")
+        results[label] = {
+            "rows": len(durable),
+            "source": source,
+            "quality_status": quality,
+            "sha256": content_hash,
+        }
 
-    if not best_concept.empty:
-        out = ETC_DIR / "concept" / "concept_list.csv"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        best_concept.to_csv(out, index=False, encoding="utf-8-sig")
-        print(f"   ✅ concept_list: {len(best_concept)} 条")
-    else:
-        print("   ⚠️ concept_list: mx-data 未返回有效数据")
-
-    # 行业分类
-    ind_queries = [
-        "申万行业分类 行业代码 行业名称",
-        "A股行业分类列表 行业代码 行业名称",
-        "行业板块 板块代码 板块名称",
-    ]
-    best_ind = pd.DataFrame()
-    for q in ind_queries:
-        mx = _mx_data_query(q)
-        if "error" in mx: continue
-        try:
-            dtos = mx.get("data",{}).get("data",{}).get("searchDataResultDTO",{}).get("dataTableDTOList",[])
-            rows = []
-            for tbl in dtos:
-                raw = tbl.get("table") or tbl.get("rawTable") or {}
-                name_map = tbl.get("nameMap") or {}
-                head = raw.get("headName", [])
-                if head and len(head) > 2:
-                    df = pd.DataFrame({"行业名称": head})
-                    if len(df) > len(best_ind): best_ind = df
-                    continue
-                for key, vals in raw.items():
-                    if key in ("headName","headNameSub"): continue
-                    col_name = name_map.get(key, key)
-                    for i, v in enumerate(vals):
-                        while len(rows) <= i: rows.append({})
-                        rows[i][col_name] = v
-                    for i, h in enumerate(head):
-                        if i < len(rows): rows[i]["行业名称"] = h
-            if rows:
-                df = pd.DataFrame(rows)
-                if len(df) > len(best_ind): best_ind = df
-        except: pass
-
-    if not best_ind.empty:
-        out = ETC_DIR / "industry" / "industry_list.csv"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        best_ind.to_csv(out, index=False, encoding="utf-8-sig")
-        print(f"   ✅ industry_list: {len(best_ind)} 条")
-    else:
-        print("   ⚠️ industry: mx-data 未返回有效数据")
-
-    return {"status": "ok", "concept": len(best_concept), "industry": len(best_ind)}
+    qualities = {results[name]["quality_status"] for name in ("concept", "industry")}
+    results["status"] = "OK" if qualities == {"OK"} else "PARTIAL"
+    results["silent_fallback_used"] = False
+    return results
 
 
 def gap_report_and_plan() -> dict:
@@ -1312,6 +1350,113 @@ def gap_report_and_plan() -> dict:
     return {"status": "ok", "total_stocks": total, "gaps": gaps}
 
 
+def _recoverable_batch_pull(
+    *,
+    dataset: str,
+    api_name: str,
+    ts_codes: list[str],
+    start: str,
+    end: str,
+    fetch: Callable[..., pd.DataFrame],
+    output_path: Callable[[str], Path],
+    label: str,
+) -> dict[str, int]:
+    """Execute a provider pull with durable per-symbol resume state."""
+    total = len(ts_codes)
+    results: dict[str, int] = {}
+    total_rows = 0
+    failed: list[str] = []
+    missing: list[str] = []
+    resumed: list[str] = []
+    recovery = RecoveryManifest(
+        RECOVERY_AUDIT_DIR,
+        dataset=dataset,
+        provider="tushare",
+        api_name=api_name,
+        start=start,
+        end=end,
+        symbols=ts_codes,
+        batch_size=BATCH_SIZE,
+        batch_sleep_seconds=BATCH_SLEEP,
+    )
+
+    print(f"🚀 批量{label}拉取: {total} 只股票, {start} ~ {end}")
+    print(f"   checkpoint: {recovery.checkpoint_path}")
+    print(f"   manifest:   {recovery.manifest_path}")
+    print()
+
+    batches = [ts_codes[i:i + BATCH_SIZE] for i in range(0, total, BATCH_SIZE)]
+    for batch_idx, batch in enumerate(batches):
+        print(f"  ── 批次 {batch_idx + 1}/{len(batches)} ({len(batch)} 只) ──")
+        for ts_code in batch:
+            out_path = output_path(ts_code)
+            resume = recovery.resume_record(ts_code, out_path)
+            if resume.reusable:
+                results[ts_code] = resume.rows
+                total_rows += resume.rows
+                resumed.append(ts_code)
+                print(f"     ↪️  {ts_code:12s}  {resume.rows:>5d} 行（hash 校验后恢复）")
+                continue
+
+            started_at = datetime.now(timezone.utc).isoformat()
+            try:
+                frame = fetch(ts_code=ts_code, start_date=start, end_date=end)
+                if not isinstance(frame, pd.DataFrame):
+                    raise TypeError(f"{api_name} returned {type(frame).__name__}, expected DataFrame")
+                if frame.empty:
+                    logger.warning("%s %s无数据", ts_code, label)
+                    results[ts_code] = 0
+                    missing.append(ts_code)
+                    recovery.record_missing(ts_code, started_at=started_at)
+                    continue
+
+                min_date, max_date = frame_date_range(frame)
+                durable_frame = (
+                    frame.copy()
+                    if resume.reason == "output_hash_changed"
+                    else merge_without_data_loss(frame, out_path)
+                )
+                content_hash = atomic_write_frame(durable_frame, out_path)
+                row_count = len(frame)
+                recovery.record_success(
+                    ts_code,
+                    output_path=out_path,
+                    rows=row_count,
+                    persisted_rows=len(durable_frame),
+                    min_date=min_date,
+                    max_date=max_date,
+                    content_hash=content_hash,
+                    started_at=started_at,
+                )
+                results[ts_code] = row_count
+                total_rows += row_count
+                print(f"     ✅ {ts_code:12s}  {row_count:>5d} 行 → {out_path.name}")
+            except Exception as error:
+                logger.error("%s %s拉取失败: %s", ts_code, label, error)
+                results[ts_code] = -1
+                failed.append(ts_code)
+                recovery.record_error(ts_code, error, started_at=started_at)
+                print(f"     ❌ {ts_code:12s}  失败: {error}")
+
+        if batch_idx < len(batches) - 1:
+            print(f"     💤 休眠 {BATCH_SLEEP}s ...")
+            time.sleep(BATCH_SLEEP)
+
+    manifest_path = recovery.finish()
+    print()
+    print(f"📋 {label}批量拉取完成")
+    print(f"   总股票: {total}")
+    print(f"   成功:   {sum(1 for value in results.values() if value > 0)} ({total_rows} 行)")
+    print(f"   恢复:   {len(resumed)}")
+    print(f"   无数据: {len(missing)}")
+    print(f"   失败:   {len(failed)}")
+    print(f"   清单:   {manifest_path}")
+    if failed:
+        suffix = "..." if len(failed) > 10 else ""
+        print(f"   失败列表: {', '.join(failed[:10])}{suffix}")
+    return results
+
+
 def batch_daily(
     ts_codes: list[str],
     start: str = "20190101",
@@ -1331,64 +1476,16 @@ def batch_daily(
     provider = _get_market_provider()
     if not end:
         end = datetime.now(CST).strftime("%Y%m%d")
-
-    total = len(ts_codes)
-    results: dict[str, int] = {}
-    total_rows = 0
-    failed: list[str] = []
-
-    print(f"🚀 批量日线拉取: {total} 只股票, {start} ~ {end}")
-    print(f"   分批大小: {BATCH_SIZE}, 批间休眠: {BATCH_SLEEP}s")
-    print()
-
-    # 分批处理
-    batches = [ts_codes[i:i + BATCH_SIZE] for i in range(0, total, BATCH_SIZE)]
-    for batch_idx, batch in enumerate(batches):
-        print(f"  ── 批次 {batch_idx + 1}/{len(batches)} ({len(batch)} 只) ──")
-
-        for ts_code in batch:
-            try:
-                df = provider.daily(ts_code=ts_code, start_date=start, end_date=end)
-
-                if df.empty:
-                    logger.warning(f"{ts_code} 日线无数据")
-                    results[ts_code] = 0
-                    continue
-
-                # 写出完整 DataFrame（含所有字段）
-                out_path = DAILY_DIR / f"{ts_code}.csv"
-                df.to_csv(out_path, index=False, encoding="utf-8-sig")
-                _fsync_file(out_path)
-                row_count = len(df)
-                results[ts_code] = row_count
-                total_rows += row_count
-                print(f"     ✅ {ts_code:12s}  {row_count:>5d} 行 → {out_path.name}")
-
-            except Exception as e:
-                logger.error(f"{ts_code} 拉取失败: {e}")
-                results[ts_code] = -1
-                failed.append(ts_code)
-                print(f"     ❌ {ts_code:12s}  失败: {e}")
-
-        # 批间休眠
-        if batch_idx < len(batches) - 1:
-            print(f"     💤 休眠 {BATCH_SLEEP}s ...")
-            time.sleep(BATCH_SLEEP)
-
-    # 汇总
-    print()
-    ok_count = sum(1 for v in results.values() if v > 0)
-    empty_count = sum(1 for v in results.values() if v == 0)
-    err_count = len(failed)
-    print(f"📋 日线批量拉取完成")
-    print(f"   总股票: {total}")
-    print(f"   成功:   {ok_count} ({total_rows} 行)")
-    print(f"   无数据: {empty_count}")
-    print(f"   失败:   {err_count}")
-    if failed:
-        print(f"   失败列表: {', '.join(failed[:10])}{'...' if len(failed) > 10 else ''}")
-
-    return results
+    return _recoverable_batch_pull(
+        dataset="daily",
+        api_name="daily",
+        ts_codes=ts_codes,
+        start=start,
+        end=end,
+        fetch=provider.daily,
+        output_path=lambda symbol: DAILY_DIR / f"{symbol}.csv",
+        label="日线",
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1415,58 +1512,16 @@ def batch_fina(
     provider = _get_fina_provider()
     if not end:
         end = datetime.now(CST).strftime("%Y%m%d")
-
-    total = len(ts_codes)
-    results: dict[str, int] = {}
-    total_rows = 0
-    failed: list[str] = []
-
-    print(f"🚀 批量财务指标拉取: {total} 只股票, {start} ~ {end}")
-    print()
-
-    batches = [ts_codes[i:i + BATCH_SIZE] for i in range(0, total, BATCH_SIZE)]
-    for batch_idx, batch in enumerate(batches):
-        print(f"  ── 批次 {batch_idx + 1}/{len(batches)} ({len(batch)} 只) ──")
-
-        for ts_code in batch:
-            try:
-                df = provider.fina_indicator(
-                    ts_code=ts_code, start_date=start, end_date=end,
-                )
-
-                if df.empty:
-                    logger.warning(f"{ts_code} 财务数据无数据")
-                    results[ts_code] = 0
-                    continue
-
-                out_path = FINA_DIR / f"{ts_code}.csv"
-                df.to_csv(out_path, index=False, encoding="utf-8-sig")
-                _fsync_file(out_path)
-                row_count = len(df)
-                results[ts_code] = row_count
-                total_rows += row_count
-                print(f"     ✅ {ts_code:12s}  {row_count:>5d} 行 → {out_path.name}")
-
-            except Exception as e:
-                logger.error(f"{ts_code} 财务拉取失败: {e}")
-                results[ts_code] = -1
-                failed.append(ts_code)
-                print(f"     ❌ {ts_code:12s}  失败: {e}")
-
-        if batch_idx < len(batches) - 1:
-            print(f"     💤 休眠 {BATCH_SLEEP}s ...")
-            time.sleep(BATCH_SLEEP)
-
-    print()
-    ok_count = sum(1 for v in results.values() if v > 0)
-    err_count = len(failed)
-    print(f"📋 财务批量拉取完成")
-    print(f"   总股票: {total}")
-    print(f"   成功:   {ok_count} ({total_rows} 行)")
-    print(f"   无数据: {total - ok_count - err_count}")
-    print(f"   失败:   {err_count}")
-
-    return results
+    return _recoverable_batch_pull(
+        dataset="fina_indicator",
+        api_name="fina_indicator",
+        ts_codes=ts_codes,
+        start=start,
+        end=end,
+        fetch=provider.fina_indicator,
+        output_path=lambda symbol: FINA_DIR / f"{symbol}.csv",
+        label="财务指标",
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1493,58 +1548,16 @@ def batch_valuation(
     provider = _get_market_provider()
     if not end:
         end = datetime.now(CST).strftime("%Y%m%d")
-
-    total = len(ts_codes)
-    results: dict[str, int] = {}
-    total_rows = 0
-    failed: list[str] = []
-
-    print(f"🚀 批量估值数据拉取: {total} 只股票, {start} ~ {end}")
-    print()
-
-    batches = [ts_codes[i:i + BATCH_SIZE] for i in range(0, total, BATCH_SIZE)]
-    for batch_idx, batch in enumerate(batches):
-        print(f"  ── 批次 {batch_idx + 1}/{len(batches)} ({len(batch)} 只) ──")
-
-        for ts_code in batch:
-            try:
-                df = provider.daily_basic(
-                    ts_code=ts_code, start_date=start, end_date=end,
-                )
-
-                if df.empty:
-                    logger.warning(f"{ts_code} 估值数据无数据")
-                    results[ts_code] = 0
-                    continue
-
-                out_path = VALUATION_DIR / f"valuation_{ts_code}.csv"
-                df.to_csv(out_path, index=False, encoding="utf-8-sig")
-                _fsync_file(out_path)
-                row_count = len(df)
-                results[ts_code] = row_count
-                total_rows += row_count
-                print(f"     ✅ {ts_code:12s}  {row_count:>5d} 行 → {out_path.name}")
-
-            except Exception as e:
-                logger.error(f"{ts_code} 估值拉取失败: {e}")
-                results[ts_code] = -1
-                failed.append(ts_code)
-                print(f"     ❌ {ts_code:12s}  失败: {e}")
-
-        if batch_idx < len(batches) - 1:
-            print(f"     💤 休眠 {BATCH_SLEEP}s ...")
-            time.sleep(BATCH_SLEEP)
-
-    print()
-    ok_count = sum(1 for v in results.values() if v > 0)
-    err_count = len(failed)
-    print(f"📋 估值批量拉取完成")
-    print(f"   总股票: {total}")
-    print(f"   成功:   {ok_count} ({total_rows} 行)")
-    print(f"   无数据: {total - ok_count - err_count}")
-    print(f"   失败:   {err_count}")
-
-    return results
+    return _recoverable_batch_pull(
+        dataset="daily_basic",
+        api_name="daily_basic",
+        ts_codes=ts_codes,
+        start=start,
+        end=end,
+        fetch=provider.daily_basic,
+        output_path=lambda symbol: VALUATION_DIR / f"valuation_{symbol}.csv",
+        label="估值数据",
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════
