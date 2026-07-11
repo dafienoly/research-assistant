@@ -86,3 +86,7 @@ raw → staging → normalized → manifest/conflict/freshness
 4. 扫描并迁移遗留消息直发调用。
 5. 为因子数据增加 snapshot/manifest/universe/version 强制字段。
 6. 完成浏览器、真实通知、真实持仓、连续 Shadow 和小额 QMT 验收。
+
+## 持久化补充整改
+
+每日 17:00 能力文档任务已负责对事件、执行审计、通知回执、周期历史和 ReviewRecord 做 90 日归档。归档实现已改为临时文件、`fsync`、`os.replace`；先安全落盘 archive，再替换当前账本，异常时不允许截断源 JSONL。

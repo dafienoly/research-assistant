@@ -129,9 +129,32 @@ class DecisionLoopStore:
                 return None
             archive = target.parent / "archive" / f"{target.stem}_{before:%Y%m%d}.jsonl"
             archive.parent.mkdir(parents=True, exist_ok=True)
-            archive.write_text("".join(json.dumps(row, ensure_ascii=False, default=str) + "\n" for row in old), encoding="utf-8")
-            target.write_text("".join(json.dumps(row, ensure_ascii=False, default=str) + "\n" for row in current), encoding="utf-8")
+            archived_rows = []
+            if archive.exists():
+                archived_rows = [json.loads(line) for line in archive.read_text(encoding="utf-8").splitlines() if line.strip()]
+            self._atomic_text(
+                archive,
+                "".join(json.dumps(row, ensure_ascii=False, default=str) + "\n" for row in [*archived_rows, *old]),
+            )
+            self._atomic_text(
+                target,
+                "".join(json.dumps(row, ensure_ascii=False, default=str) + "\n" for row in current),
+            )
+            self._bump_version(name)
             return archive
+
+    @staticmethod
+    def _atomic_text(target: Path, content: str) -> None:
+        fd, tmp_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(tmp_name, target)
+        finally:
+            if os.path.exists(tmp_name):
+                os.unlink(tmp_name)
 
     @contextmanager
     def _lock(self, target: Path, timeout: float = 10.0):

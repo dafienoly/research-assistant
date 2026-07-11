@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -718,3 +719,16 @@ def test_auxiliary_gate_reads_durable_source_time_and_conflicts(tmp_path, monkey
     assert capital_flow.source == "tushare"
     assert conflicts[0]["dataset"] == "capital_flow"
     assert manifest["datasets"]["capital_flow"]["conflict_count"] == 1
+
+
+def test_jsonl_archive_is_atomic_and_preserves_current_rows(tmp_path):
+    review_store = store(tmp_path)
+    review_store.append_jsonl("events/events.jsonl", {"event_id": "old", "created_at": "2025-01-01T00:00:00+08:00"})
+    review_store.append_jsonl("events/events.jsonl", {"event_id": "current", "created_at": "2026-07-10T00:00:00+08:00"})
+    archive = review_store.archive_jsonl(
+        "events/events.jsonl",
+        datetime.fromisoformat("2026-01-01T00:00:00+08:00"),
+    )
+    assert archive is not None
+    assert [row["event_id"] for row in review_store.read_jsonl("events/events.jsonl")] == ["current"]
+    assert json.loads(archive.read_text(encoding="utf-8").strip())["event_id"] == "old"

@@ -280,8 +280,19 @@
       ],
       "expected_keywords": ["market_series_root", "datahub:index_daily", "primary_provider=\"local_csv\""],
       "behavior": "Snapshot 默认不注册外部 provider；指数、ETF、日线与实时快照均从 DataHub canonical 文件路由并生成不可变来源清单。"
+    },
+    {
+      "id": "P2-ARCHIVE-ATOMIC",
+      "title": "JSONL 定期归档原子化",
+      "code_locations": [
+        {"file": "commands/factor_lab/decision_loop/storage.py", "function": "archive_jsonl", "line": 114},
+        {"file": "commands/factor_lab/decision_loop/storage.py", "function": "_atomic_text", "line": 145},
+        {"file": "commands/scripts/generate_capability_status.py", "function": "main", "line": 28}
+      ],
+      "expected_keywords": ["archive_jsonl", "mkstemp", "os.replace", "timedelta(days=90)"],
+      "behavior": "每日调度归档关键 JSONL；archive 与当前账本均原子替换，崩溃时允许保守重复但禁止数据截断或丢失。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-11T23:30:00+08:00"
+  "generated_at": "2026-07-11T23:45:00+08:00"
 }
