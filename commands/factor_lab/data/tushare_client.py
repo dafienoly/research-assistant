@@ -119,7 +119,7 @@ class TushareClient:
         self._pro = None
         self._last_request_time = 0.0
         self._request_count = 0
-        self._rate_limit_reset = time.time() + 60
+        self._rate_limit_reset = time.time()
 
     @classmethod
     def get_instance(cls, token: str | None = None, api_url: str = TUSHARE_API_URL) -> "TushareClient":
@@ -147,7 +147,7 @@ class TushareClient:
         now = time.time()
 
         # 每分钟重置计数器
-        if now - self._rate_limit_reset > 60:
+        if now - self._rate_limit_reset >= 60:
             self._request_count = 0
             self._rate_limit_reset = now
 

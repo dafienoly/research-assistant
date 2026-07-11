@@ -477,8 +477,8 @@
         {"file": "commands/factor_lab/datahub_ingestion/corporate_events.py", "function": "CorporateEventIngestion", "line": 25},
         {"file": "commands/tests/test_tushare_client_strict.py", "line": 1}
       ],
-      "expected_keywords": ["raise_on_failure", "request failed", "cumulative", "legitimate empty response"],
-      "behavior": "共享客户端默认保持空 DataFrame 兼容；安全关键 ingestion 显式启用严格模式，三次异常后抛出并进入 manifest/熔断，合法空响应仍按空数据处理。"
+      "expected_keywords": ["raise_on_failure", "request failed", "cumulative", "legitimate empty response", "_rate_limit_reset", ">= 60"],
+      "behavior": "共享客户端默认保持空 DataFrame 兼容；安全关键 ingestion 启用严格模式；合法空响应仍为空。限流窗口从当前时间起算并在满 60 秒时重置，避免错误的 120 秒窗口。"
     },
     {
       "id": "P0-MARKET-SERIES-MANIFEST-01",
