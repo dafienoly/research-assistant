@@ -22,6 +22,7 @@ if __name__ == "__main__":
         "fund_daily": sorted(
             set(PolicyBacktestDatasetBuilder.FUND_CODES.values())
             | {symbol for symbol, _ in ASSET_PROXIES.values()}
+            | {"159516.SZ"}
         ),
     }
     print(json.dumps(MarketSeriesIngestion(ROOT).fetch(datasets, start, end), ensure_ascii=False, indent=2))

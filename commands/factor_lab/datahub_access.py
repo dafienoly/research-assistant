@@ -32,6 +32,8 @@ def _daily_kline_candidates() -> tuple[Path, ...]:
         SHARED_DATAHUB_ROOT / "market" / "daily_kline",
         PROJECT_ROOT / "data" / "market" / "daily_kline",
         DATAHUB_ROOT / "market",
+        DATAHUB_ROOT / "market_series" / "fund",
+        DATAHUB_ROOT / "market_series" / "index",
     )
 
 
@@ -207,20 +209,22 @@ def daily_kline_root() -> Path:
 
 
 def daily_kline_path(symbol: str, root: Path | None = None) -> Path:
-    source_root = root or daily_kline_root()
     normalized = symbol.upper()
     code = normalized.split(".")[0]
-    candidates = (
-        source_root / f"{normalized}.csv",
-        source_root / f"{code}.csv",
-        source_root / f"{code}_daily_kline.csv",
-    )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    exchange_qualified = sorted(source_root.glob(f"{code}.*.csv"))
-    if exchange_qualified:
-        return exchange_qualified[0]
+    roots = (root,) if root is not None else _daily_kline_candidates()
+    for source_root in roots:
+        candidates = (
+            source_root / f"{normalized}.csv",
+            source_root / f"{code}.csv",
+            source_root / f"{code}_daily_kline.csv",
+        )
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        if source_root.is_dir():
+            exchange_qualified = sorted(source_root.glob(f"{code}.*.csv"))
+            if exchange_qualified:
+                return exchange_qualified[0]
     raise FileNotFoundError(f"canonical DataHub daily kline missing for {normalized}")
 
 
