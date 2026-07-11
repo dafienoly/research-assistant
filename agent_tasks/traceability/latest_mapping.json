@@ -840,6 +840,17 @@
       "behavior": "旧 refresh_kline_data 兼容入口只委托带锁、staging 和审计的 canonical 日增量管线；不直接访问 provider，不覆盖、改 schema 或删除任何行情文件。"
     },
     {
+      "id": "INFRA-TUSHARE-DATAHUB-FACADE-01",
+      "title": "伪 DataHub 平行 Tushare writer 退役",
+      "code_locations": [
+        {"file": "commands/tushare_datahub.py", "function": "run_incremental", "line": 14},
+        {"file": "commands/tushare_datahub.py", "function": "run_full", "line": 21},
+        {"file": "commands/tests/test_tushare_datahub_facade.py", "line": 1}
+      ],
+      "expected_keywords": ["cmd_update_daily", "run_incremental", "run_full", "has_no_parallel_provider_or_writer"],
+      "behavior": "旧脚本的全量与增量入口只委托 canonical daily owner；不再拥有行情、估值、资金流或财务 provider，不创建目录或写 CSV。"
+    },
+    {
       "id": "INFRA-STOCK-CONTEXT-DATAHUB-01",
       "title": "股票研究上下文只读 canonical DataHub",
       "code_locations": [
