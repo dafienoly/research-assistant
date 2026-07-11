@@ -584,6 +584,29 @@
       "behavior": "五类公司事件只在 ingestion 层拉取并原子发布；累计三次异常触发熔断；合法空结果标记 EMPTY 而非 MISSING；每个标的后原子更新运行中 manifest。"
     },
     {
+      "id": "INFRA-TAG-MAINTAINER-DATAHUB-01",
+      "title": "标签维护只读 canonical reference 并原子发布",
+      "code_locations": [
+        {
+          "file": "commands/tag_maintainer.py",
+          "function": "TagMaintainer",
+          "line": 63
+        },
+        {
+          "file": "commands/tests/test_tag_maintainer_datahub.py",
+          "line": 1
+        }
+      ],
+      "expected_keywords": [
+        "read_stock_name_map",
+        "read_stock_industry_map",
+        "atomic_write_frame",
+        "datahub:stock_basic",
+        "FactorInputProjection"
+      ],
+      "behavior": "标签名称与行业只读 canonical stock_basic，三个标签文件均原子发布；旧 fundamentals 命令委托 FactorInputProjection，不再登录 Baostock 或写平行 financial_snapshot。"
+    },
+    {
       "id": "INFRA-FACTOR-INPUT-OWNER-01",
       "title": "因子辅助输入统一由 DataHub projection owner 物化",
       "code_locations": [

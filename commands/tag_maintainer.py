@@ -1,67 +1,13 @@
-"""A 股产业链和主题标签维护 — Phase 2
+"""A 股产业链和主题标签维护（canonical DataHub consumer）。"""
 
-维护产业链标签 CSV 文件，供盘中选择和板块分析使用。
-通过 Baostock 获取行业分类数据（免费无限量）。
-"""
-
-import csv
 from pathlib import Path
 
-from config import PATHS, now_str, now_cst, date_id, read_csv_safe, append_jsonl
+import pandas as pd
 
-
-def baostock_login():
-    """登录 Baostock（带 DNS 修补）"""
-    try:
-        import dns_patch
-    except ImportError:
-        pass
-    import baostock as bs
-    bs.login()
-    return bs
-
-
-def enrich_industry_from_baostock():
-    """用 Baostock 行业分类数据丰富标签文件"""
-    bs = baostock_login()
-    updated = 0
-
-    # 读取现有标签中的股票代码
-    existing_codes = set()
-    for tag_file in ['semiconductor_chain_tags.csv', 'stock_theme_tags.csv', 'industry_chain_tags.csv']:
-        f = PATHS['tags'] / tag_file
-        if f.exists():
-            for row in read_csv_safe(f):
-                c = row.get('code', '') or row.get('symbol', '')
-                if c:
-                    existing_codes.add(c)
-    
-    # 用 Baostock 查行业分类
-    results = []
-    for code in sorted(existing_codes):
-        exchange = "sh" if code.startswith(("6", "9")) else "sz"
-        rs = bs.query_stock_industry(f"{exchange}.{code}")
-        if rs.next():
-            row = rs.get_row_data()
-            if row and len(row) >= 4:
-                results.append({
-                    "code": code,
-                    "name": row[2],
-                    "industry": row[3],
-                    "industry_source": "baostock",
-                    "updated_at": now_str(),
-                })
-                updated += 1
-
-    # 写入 industry_chain_tags.csv
-    tag_path = PATHS['tags'] / 'industry_chain_tags.csv'
-    with open(tag_path, 'w', encoding='utf-8-sig', newline='') as f:
-        w = csv.DictWriter(f, fieldnames=["code", "name", "industry", "industry_source", "updated_at"])
-        w.writeheader()
-        w.writerows(results)
-
-    bs.logout()
-    return updated, len(existing_codes)
+from config import PATHS, append_jsonl, now_str
+from data_recovery import atomic_write_frame
+from factor_lab.datahub_access import read_stock_industry_map, read_stock_name_map
+from factor_lab.datahub_ingestion.factor_inputs import FactorInputProjection
 
 
 # ========== 标签维护 ==========
@@ -117,20 +63,16 @@ class TagMaintainer:
         """更新半导体产业链标签"""
         path = PATHS["tags"] / "semiconductor_chain_tags.csv"
         fieldnames = ["code", "name", "chain_position", "sub_sector", "product", "notes"]
-        with open(path, "w", encoding="utf-8-sig", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-            w.writeheader()
-            for stock in SEMICONDUCTOR_CHAIN_STOCKS:
-                w.writerow(stock)
+        frame = pd.DataFrame(SEMICONDUCTOR_CHAIN_STOCKS)
+        frame["notes"] = ""
+        atomic_write_frame(frame.loc[:, fieldnames], path)
         self._log("semiconductor_chain_tags", len(SEMICONDUCTOR_CHAIN_STOCKS))
 
     def update_theme_tags(self):
         """更新主题标签"""
         path = PATHS["tags"] / "stock_theme_tags.csv"
         fieldnames = ["code", "name", "theme", "weight", "notes"]
-        # 需要 name, 从 pool 中获取
-        pool = read_csv_safe(PATHS["market"] / "pool.csv")
-        name_map = {r.get("code", ""): r.get("name", "") for r in pool}
+        name_map = read_stock_name_map()
 
         rows = []
         # 构建扁平结构
@@ -151,15 +93,11 @@ class TagMaintainer:
                     "notes": "",
                 })
 
-        with open(path, "w", encoding="utf-8-sig", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-            w.writeheader()
-            for row in rows:
-                w.writerow(row)
+        atomic_write_frame(pd.DataFrame(rows, columns=fieldnames), path)
         self._log("stock_theme_tags", len(rows))
 
     def update_industry_tags(self):
-        """更新全产业链标签（手动 + Baostock 行业分类）"""
+        """更新全产业链标签（手动语义 + canonical 行业分类）。"""
         path = PATHS["tags"] / "industry_chain_tags.csv"
         fieldnames = ["code", "name", "chain", "sub_chain", "notes", "baostock_industry", "industry_source"]
 
@@ -173,42 +111,15 @@ class TagMaintainer:
                 "baostock_industry": "", "industry_source": "manual",
             })
 
-        # Baostock 行业分类补充
-        try:
-            bs = self._baostock_login()
-            codes = set(r["code"] for r in rows)
-            for code in sorted(codes):
-                exchange = "sh" if code.startswith(("6", "9")) else "sz"
-                rs = bs.query_stock_industry(f"{exchange}.{code}")
-                if rs.next():
-                    row_data = rs.get_row_data()
-                    if row_data and len(row_data) >= 4:
-                        industry = row_data[3]
-                        # 更新匹配的行
-                        for r in rows:
-                            if r["code"] == code:
-                                r["baostock_industry"] = industry
-                                r["industry_source"] = "baostock"
-            bs.logout()
-        except Exception as e:
-            print(f"  ⚠️ Baostock 行业分类失败: {e}")
+        industries = read_stock_industry_map()
+        for row in rows:
+            industry = industries.get(row["code"])
+            if industry:
+                row["baostock_industry"] = industry
+                row["industry_source"] = "datahub:stock_basic"
 
-        with open(path, "w", encoding="utf-8-sig", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-            w.writeheader()
-            for row in rows:
-                w.writerow(row)
+        atomic_write_frame(pd.DataFrame(rows, columns=fieldnames), path)
         self._log("industry_chain_tags", len(rows))
-
-    def _baostock_login(self):
-        """登录 Baostock（带 DNS 修补）"""
-        try:
-            import dns_patch
-        except ImportError:
-            pass
-        import baostock as bs
-        bs.login()
-        return bs
 
     def update_all(self):
         """更新所有标签"""
@@ -233,83 +144,19 @@ def cmd_update():
     maintainer.update_all()
 
 
+def cmd_update_fundamentals():
+    """Compatibility command for the canonical fundamentals projection."""
+    result = FactorInputProjection(Path(__file__).resolve().parents[1]).build("fundamentals")
+    print(f"📊 DataHub fundamentals projection: {result['status']} rows={result['rows']}")
+    return int(result["rows"])
+
+
 if __name__ == "__main__":
     import sys
+
     if len(sys.argv) > 1 and sys.argv[1] == "update":
         cmd_update()
     elif len(sys.argv) > 1 and sys.argv[1] == "fundamentals":
         cmd_update_fundamentals()
     else:
         print("Usage: python tag_maintainer.py [update|fundamentals]")
-
-
-# ========== Baostock 基本面更新 ==========
-
-def cmd_update_fundamentals():
-    """用 Baostock 更新基本面数据（替换 RSScast MCP 额度消耗）"""
-    import dns_patch
-    import baostock as bs
-
-    bs.login()
-    print("📊 Baostock 基本面更新...")
-
-    # 从标签文件读股票列表
-    codes = set()
-    for f_name in ["semiconductor_chain_tags.csv", "stock_theme_tags.csv", "industry_chain_tags.csv"]:
-        f = PATHS["tags"] / f_name
-        if f.exists():
-            for row in read_csv_safe(f):
-                c = row.get("code", "") or row.get("symbol", "")
-                if c:
-                    codes.add(c)
-    codes.add("600519")  # 贵州茅台作为基准
-    priority = sorted(codes)
-    print(f"  股票数: {len(priority)}")
-    results = []
-
-    for i, code in enumerate(priority):
-        exchange = "sh" if code.startswith(("6", "9")) else "sz"
-        full_code = f"{exchange}.{code}"
-        try:
-            # 优先获取最新完整季报（2026Q1），若没有则取 2025Q4
-            rs = bs.query_profit_data(full_code, year=2026, quarter=1)
-            row = None
-            while rs.next():
-                row = rs.get_row_data()
-                break
-            if not row or not row[3]:  # roe 为空，取 2025Q4
-                rs2 = bs.query_profit_data(full_code, year=2025, quarter=4)
-                while rs2.next():
-                    row = rs2.get_row_data()
-                    break
-            if row and len(row) > 7:
-                results.append({
-                    "code": code,
-                    "report_date": row[2] if row[2] else "",
-                    "roe": row[3] if len(row) > 3 else "",
-                    "net_profit_margin": row[4] if len(row) > 4 else "",
-                    "gross_profit_margin": row[5] if len(row) > 5 else "",
-                    "net_profit": row[6] if len(row) > 6 else "",
-                    "eps": row[7] if len(row) > 7 else "",
-                    "revenue": row[8] if len(row) > 8 else "",
-                    "source": "baostock",
-                    "updated_at": now_str(),
-                })
-        except Exception:
-            import logging; logging.warning('tag_maintainer: suppressed error')
-        if (i + 1) % 10 == 0:
-            print(f"\r  进度: {i+1}/{len(priority)} 已获:{len(results)}", end="", flush=True)
-
-    # 写入 financial_snapshot.csv
-    dest = PATHS["fundamentals"] / "financial_snapshot.csv"
-    fields = ["code", "report_date", "roe", "net_profit_margin", "gross_profit_margin",
-              "net_profit", "eps", "revenue", "source", "updated_at"]
-    with open(dest, "w", encoding="utf-8-sig", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
-        w.writeheader()
-        for row in results:
-            w.writerow(row)
-
-    bs.logout()
-    print(f"\n  已更新 {len(results)} 只基本面 → {dest.name}")
-    return len(results)
