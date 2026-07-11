@@ -86,3 +86,10 @@ def test_vnext_snapshot_is_read_only_datahub_consumer():
     assert "market_series_root" in source
     assert "TushareFetcher" not in source
     assert "get_ts_client" not in source
+
+
+def test_vnext_provider_router_has_no_structured_market_provider_client():
+    path = ROOT / "commands/factor_lab/vnext/providers.py"
+    source = path.read_text(encoding="utf-8")
+    assert "class TushareFetcher" not in source
+    assert "client._query" not in source

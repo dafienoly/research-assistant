@@ -179,24 +179,6 @@ class FrameFetcher(ABC):
         )
 
 
-class TushareFetcher(FrameFetcher):
-    provider_name = "tushare"
-
-    def __init__(self, client: Any) -> None:
-        self.client = client
-
-    def transform_query(self, query: ProviderQuery) -> Mapping[str, Any]:
-        params = dict(query.params)
-        api_name = str(params.pop("api_name", query.dataset))
-        return {"api_name": api_name, "params": params}
-
-    def extract_data(self, query: Mapping[str, Any]) -> pd.DataFrame:
-        if self.client is None:
-            raise RuntimeError("Tushare client unavailable")
-        frame = self.client._query(str(query["api_name"]), **dict(query["params"]))
-        return frame if isinstance(frame, pd.DataFrame) else pd.DataFrame()
-
-
 class LocalCsvFetcher(FrameFetcher):
     provider_name = "local_csv"
 
