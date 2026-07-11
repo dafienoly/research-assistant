@@ -584,6 +584,29 @@
       "behavior": "五类公司事件只在 ingestion 层拉取并原子发布；累计三次异常触发熔断；合法空结果标记 EMPTY 而非 MISSING；每个标的后原子更新运行中 manifest。"
     },
     {
+      "id": "INFRA-BATCH-FACTOR-DATAHUB-01",
+      "title": "批量因子计算只读取 canonical 日线索引",
+      "code_locations": [
+        {
+          "file": "commands/factor_lab/batch_compute.py",
+          "function": "_load_kline_data",
+          "line": 27
+        },
+        {
+          "file": "commands/tests/test_batch_compute_datahub.py",
+          "line": 1
+        }
+      ],
+      "expected_keywords": [
+        "daily_kline_index",
+        "trade_date",
+        "timeString",
+        "volume",
+        "symbol_raw"
+      ],
+      "behavior": "batch_compute 不再扫描 data/market/daily_kline 的 *_daily_kline 副本；通过 DataHub 一次索引读取 canonical 分区，并兼容 canonical/legacy 列名与 YYYYMMDD 日期。"
+    },
+    {
       "id": "INFRA-PROVIDER-BOUNDARY-GATE-01",
       "title": "全仓 provider SDK 边界成为阻断门禁",
       "code_locations": [

@@ -6,7 +6,8 @@ Usage:
     from factor_lab.batch_compute import compute_all_and_cache
     compute_all_and_cache()
 """
-import sys, json, math
+import json
+import sys
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
@@ -14,28 +15,34 @@ import numpy as np
 import pandas as pd
 from scipy import stats as scipy_stats
 
+from factor_lab.datahub_access import daily_kline_index
+
 BASE = Path(__file__).resolve().parent.parent.parent  # .../research-assistant
 sys.path.insert(0, str(BASE / "commands"))
 
 CST = timezone(timedelta(hours=8))
-KLINE_DIR = BASE / "data" / "market" / "daily_kline"
 CACHE_FILE = BASE / "data" / "factor_results.json"
 
 
 def _load_kline_data() -> pd.DataFrame:
     """从 daily_kline CSV 加载数据，返回 (date, symbol, close, high, low, volume, amount)。"""
-    if not KLINE_DIR.exists():
+    try:
+        sources = daily_kline_index()
+    except FileNotFoundError:
         return pd.DataFrame()
-    csvs = sorted(KLINE_DIR.glob("*_daily_kline.csv"))
-    if not csvs:
+    if not sources:
         return pd.DataFrame()
 
     frames = []
-    for f in csvs:
+    for code, source in sorted(sources.items()):
         try:
-            df = pd.read_csv(f)
-            df.rename(columns={"code": "symbol", "timeString": "date"}, inplace=True)
-            df["symbol"] = df["symbol"].astype(str)
+            df = pd.read_csv(source, encoding="utf-8-sig", low_memory=False)
+            df.rename(columns={"code": "symbol", "ts_code": "symbol", "timeString": "date", "trade_date": "date", "vol": "volume"}, inplace=True)
+            if "date" not in df or "close" not in df:
+                continue
+            if "symbol" not in df:
+                df["symbol"] = code
+            df["symbol"] = df["symbol"].astype(str).str.extract(r"(\d{6})", expand=False).fillna(code)
             df["symbol_raw"] = df["symbol"]  # 保留原始格式
             # 补齐交易所后缀
             if not df["symbol"].str.contains(r"\.").any():
@@ -43,7 +50,11 @@ def _load_kline_data() -> pd.DataFrame:
                 cond_sh = df["symbol"].str.match(r"^6")
                 df.loc[cond_sh, "symbol"] = df.loc[cond_sh, "symbol"] + ".SH"
                 df.loc[~cond_sh, "symbol"] = df.loc[~cond_sh, "symbol"] + ".SZ"
-            df["date"] = pd.to_datetime(df["date"])
+            raw_dates = df["date"].astype("string").str.replace(r"\.0$", "", regex=True)
+            compact = raw_dates.str.fullmatch(r"\d{8}", na=False)
+            parsed = pd.to_datetime(raw_dates.where(compact), format="%Y%m%d", errors="coerce")
+            df["date"] = parsed.fillna(pd.to_datetime(raw_dates.where(~compact), format="mixed", errors="coerce"))
+            df = df.dropna(subset=["date"])
             frames.append(df)
         except Exception:
             continue
