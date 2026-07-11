@@ -827,6 +827,8 @@ def _get_trade_days(start_date: str = "20210101") -> list[str]:
     cal = tc._query("trade_cal", start_date=start_date, end_date=end)
     if cal.empty or "cal_date" not in cal.columns:
         return []
+    calendar_path = NORMALIZED_DIR / "calendar" / "trade_calendar.csv"
+    _append_to_csv(calendar_path, cal.copy(), ["cal_date"], ["cal_date"])
     cal["cal_date"] = pd.to_datetime(cal["cal_date"], format="%Y%m%d", errors="coerce")
     days = cal[cal["is_open"] == 1]["cal_date"].dropna().sort_values()
     return [d.strftime("%Y%m%d") for d in days]

@@ -127,7 +127,7 @@ async def list_universes(request: Request):
 
     响应策略
     -------
-    * **缓存存在且未过期** → 立即返回，\ ``freshness: "fresh"``
+    * **缓存存在且未过期** → 立即返回，``freshness: "fresh"``
     * **缓存存在但已过期** → 返回旧数据 + ``refreshing: true``，后台触发重建
     * **完全无缓存** → 返回 ``202 Accepted``，后台触发重建
     """

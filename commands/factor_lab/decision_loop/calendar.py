@@ -15,7 +15,7 @@ class TradingCalendarGate:
         provider: Callable[[str], object] | None = None,
     ):
         self.store = store or DecisionLoopStore()
-        self.provider = provider or self._tushare_provider
+        self.provider = provider or self._datahub_provider
 
     def resolve(self, trading_date: date, now: datetime | None = None) -> dict:
         now = now or datetime.now().astimezone()
@@ -34,7 +34,7 @@ class TradingCalendarGate:
             result = {
                 "available": True,
                 "is_open": is_open,
-                "source": "tushare.trade_cal",
+                "source": "datahub.trade_calendar",
                 "checked_at": now.isoformat(),
                 "date": key,
             }
@@ -51,10 +51,10 @@ class TradingCalendarGate:
         return result
 
     @staticmethod
-    def _tushare_provider(date_text: str):
-        from factor_lab.data.tushare_client import TushareClient
+    def _datahub_provider(date_text: str):
+        from factor_lab.datahub_access import calendar_row
 
-        return TushareClient().trade_cal(start_date=date_text, end_date=date_text)
+        return calendar_row(datetime.strptime(date_text, "%Y%m%d").date())
 
     @staticmethod
     def _extract_is_open(raw: object, trading_date: date) -> bool:

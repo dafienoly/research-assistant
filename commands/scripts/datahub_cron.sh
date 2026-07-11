@@ -9,7 +9,7 @@
 #   bash datahub_cron.sh full-init                   # 首次全量初始化
 #   bash datahub_cron.sh all                         # 每日全流程（增量+重建+检查）
 # =====================================================
-set -e
+set -euo pipefail
 DIR="/home/ly/.hermes/research-assistant/commands"
 VENV="/home/ly/.hermes/research-assistant/.venv_quant/bin/activate"
 LOG="/home/ly/.hermes/research-assistant/data/audit/datahub_cron.log"
@@ -45,15 +45,15 @@ case "$CMD" in
 
   freshness-check)
     log "=== DataHub 新鲜度检查开始 ==="
-    python3 hermes_cli.py data:freshness-check 2>&1 | tee -a "$LOG"
-    python3 hermes_cli.py data:gap-report 2>&1 | tee -a "$LOG"
+    python3 hermes_cli.py data:audit 2>&1 | tee -a "$LOG"
+    python3 hermes_cli.py data:gap-plan 2>&1 | tee -a "$LOG"
     log "=== DataHub 新鲜度检查完成 ==="
     ;;
 
   full-init)
     log "=== DataHub 首次全量初始化开始 ==="
     echo "⚠️ 预计运行 1-2 小时，请确保网络稳定"
-    python3 hermes_cli.py data:full-init 2>&1 | tee -a "$LOG"
+    python3 hermes_cli.py data:full-init-by-date 2>&1 | tee -a "$LOG"
     log "=== DataHub 首次全量初始化完成 ==="
     ;;
 
@@ -67,8 +67,8 @@ case "$CMD" in
     python3 hermes_cli.py data:hub-rebuild fundamentals 2>&1 | tee -a "$LOG"
     python3 hermes_cli.py data:hub-rebuild sentiment 2>&1 | tee -a "$LOG"
     # 新鲜度检查
-    python3 hermes_cli.py data:freshness-check 2>&1 | tee -a "$LOG"
-    python3 hermes_cli.py data:gap-report 2>&1 | tee -a "$LOG"
+    python3 hermes_cli.py data:audit 2>&1 | tee -a "$LOG"
+    python3 hermes_cli.py data:gap-plan 2>&1 | tee -a "$LOG"
     log "=== DataHub 每日全流程完成 ==="
     ;;
 

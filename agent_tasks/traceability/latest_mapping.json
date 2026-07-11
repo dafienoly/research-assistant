@@ -204,8 +204,29 @@
       ],
       "expected_keywords": ["xttrader_connected", "account_readable", "BenchmarkMatcher.from_durable_registry", "decision_id"],
       "behavior": "QMT 健康端点可达但交易器断连时保持 PARTIAL；ReviewRecord 使用可信动态基准，周参数候选继承 decision/event/order 标识。"
+    },
+    {
+      "id": "INFRA-DATAHUB-01",
+      "title": "下游运行模块只读 canonical DataHub 交易日历",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_access.py", "function": "read_trade_calendar", "line": 19},
+        {"file": "commands/factor_lab/decision_loop/calendar.py", "function": "resolve", "line": 20},
+        {"file": "commands/tests/test_datahub_architecture.py", "function": "test_runtime_modules_do_not_bypass_datahub", "line": 41}
+      ],
+      "expected_keywords": ["TRADE_CALENDAR_PATH", "datahub.trade_calendar", "PROHIBITED_MODULES"],
+      "behavior": "DataHub ingestion 持久化交易日历；Decision Loop 和 API 不再查询 Tushare，架构测试阻断运行模块新增 provider 绕过。"
+    },
+    {
+      "id": "INFRA-CRON-01",
+      "title": "盘后任务依赖顺序和防重锁",
+      "code_locations": [
+        {"file": "commands/scripts/datahub_cron.sh", "line": 1},
+        {"file": "commands/scripts/crontab/hermes-crontab", "line": 1}
+      ],
+      "expected_keywords": ["data:incremental-update", "data:audit", "data:gap-plan", "flock -n", "factor-pipeline.lock"],
+      "behavior": "15:45 数据增量先于复盘、realized、Event Truth、认证和因子任务；关键任务使用独立锁，周度维护单独调度。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-11T21:48:00+08:00"
+  "generated_at": "2026-07-11T22:18:00+08:00"
 }

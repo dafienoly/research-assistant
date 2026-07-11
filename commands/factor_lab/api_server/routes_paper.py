@@ -13,12 +13,10 @@
 测试时可用 monkeypatch 替换 _get_service()。
 """
 
-from typing import Optional
-
 from fastapi import APIRouter, Query, Path
 
 from factor_lab.api_server.response import api_success, api_error
-from factor_lab.paper_trading_service import _get_service, _reset_service
+from factor_lab.paper_trading_service import _get_service
 
 router = APIRouter()
 
@@ -217,26 +215,9 @@ def shadow_dashboard(
         target_date = date
         if not target_date:
             from datetime import datetime, timezone, timedelta
-            from factor_lab.data.tushare_client import get_ts_client
+            from factor_lab.datahub_access import latest_open_date
             CST = timezone(timedelta(hours=8))
-            tc = get_ts_client()
-            today = datetime.now(CST).strftime("%Y%m%d")
-            cal = tc.trade_cal(start_date=(datetime.now(CST) - timedelta(days=10)).strftime("%Y%m%d"),
-                               end_date=today)
-            import pandas as pd
-            if isinstance(cal, pd.DataFrame) and not cal.empty:
-                dates = cal["cal_date"].tolist() if "cal_date" in cal.columns else []
-                if dates:
-                    latest = dates[-1]
-                    if hasattr(latest, "strftime"):
-                        target_date = latest.strftime("%Y-%m-%d")
-                    else:
-                        s = str(latest).replace("-", "").replace(" ", "").replace(":", "")[:8]
-                        target_date = datetime.strptime(s, "%Y%m%d").strftime("%Y-%m-%d")
-                else:
-                    target_date = datetime.now(CST).strftime("%Y-%m-%d")
-            else:
-                target_date = datetime.now(CST).strftime("%Y-%m-%d")
+            target_date = latest_open_date(datetime.now(CST).date()).isoformat()
 
         engine = ShadowTradingEngine(capital=50000)
         result = engine.run_shadow(target_date)
