@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -76,27 +76,6 @@ def main() -> int:
     output = ROOT / "docs/generated/current_capabilities.md"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    for name in (
-        "events/events.jsonl",
-        "execution/audit.jsonl",
-        "notifications/delivery_receipts.jsonl",
-        "notifications/acknowledgements.jsonl",
-        "notifications/dead_letter.jsonl",
-        "cycles/history.jsonl",
-        "reviews/records.jsonl",
-        "authorization/audit.jsonl",
-        "positions/history.jsonl",
-        "positions/rollback_audit.jsonl",
-        "reconciliation/history.jsonl",
-        "reconciliation/failure_history.jsonl",
-        "parameters/candidates.jsonl",
-        "parameters/weekly_candidates.jsonl",
-        "parameters/audit.jsonl",
-        "parameters/production_history.jsonl",
-        "certification/history.jsonl",
-        "scheduler/alerts.jsonl",
-    ):
-        service.store.archive_jsonl(name, datetime.now().astimezone() - timedelta(days=90))
     print(output)
     return 0
 

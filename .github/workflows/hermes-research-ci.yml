@@ -12,6 +12,10 @@ jobs:
   vnext-security-and-integration:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      TMPDIR: /tmp
+      TEMP: /tmp
+      TMP: /tmp
     steps:
       - uses: actions/checkout@v4
         with:
@@ -73,6 +77,8 @@ jobs:
           commands/tests/test_datahub_architecture.py
           commands/tests/test_datahub_access.py
           commands/tests/test_live_snapshot_ingestion.py
+          commands/tests/test_market_turnover_projection.py
+          commands/tests/test_reference_ingestion.py
           commands/tests/test_intraday_monitor.py
           commands/tests/test_etf_dive_warning.py
           commands/tests/test_monitor_588710.py
@@ -84,6 +90,8 @@ jobs:
           commands/tests/test_benchmark_projection.py
           commands/tests/test_universes.py
           commands/tests/test_scheduling.py
+          commands/tests/test_capability_status.py
+          commands/tests/test_decision_ledger_archive.py
           commands/tests/test_backup_retention_safety.py
           commands/tests/test_risk_datahub_contract.py
           commands/tests/test_test_data_isolation.py
@@ -91,6 +99,16 @@ jobs:
           commands/tests/test_decision_loop.py
           commands/tests/test_decision_loop_api.py
           commands/tests/test_decision_loop_production.py
+          commands/tests/test_notification_transport.py
+          commands/tests/test_legacy_notify_transport.py
+          commands/tests/test_wechat_push_transport.py
+          commands/tests/test_stock_card_transport.py
+          commands/tests/test_shadow_pipeline.py
+          commands/tests/test_shadow_forward.py
+          commands/tests/test_shadow_forward_hardening.py
+          commands/tests/test_shadow_forward_data_integrity.py
+          commands/tests/test_factor_promotion_safety.py
+          commands/tests/test_alpha_promotion_retirement.py
           commands/tests/test_qmt_integration.py
           commands/tests/test_miniqmt_adapter.py
 

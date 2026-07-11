@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -33,15 +35,19 @@ class ReferenceIngestion:
         if not frames:
             return {"status": "MISSING", "datasets": statuses}
         combined = pd.concat(frames, ignore_index=True).drop_duplicates("ts_code", keep="first")
+        combined["symbol"] = combined["ts_code"].astype("string").str.strip()
         destination = self.output_root / "stock_basic.csv"
         EventTruthIngestion._atomic_frame(destination, combined)
         manifest = {
             "status": "OK" if statuses["L"]["rows"] > 0 else "PARTIAL",
             "source": "tushare:stock_basic",
+            "generated_at": datetime.now().astimezone().isoformat(),
             "active_stocks": int((combined["list_status"] == "L").sum()),
             "total_records": len(combined),
             "datasets": statuses,
-            "path": str(destination),
+            "path": destination.name,
+            "sha256": hashlib.sha256(destination.read_bytes()).hexdigest(),
+            "conflicts": [],
         }
         EventTruthIngestion._atomic_json(self.output_root / "manifest.json", manifest)
         return manifest

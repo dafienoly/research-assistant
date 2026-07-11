@@ -106,7 +106,7 @@ class ShadowObserver:
     def _collect_ic_history(self, factor_name: str,
                             since_date: str) -> list[float]:
         """从 pipeline_results 中读取 IC 历史"""
-        ics = []
+        observations: list[tuple[str, float]] = []
 
         # 扫描结果目录中的 factor_meta.json
         if self.cfg.RESULT_DIR.exists():
@@ -124,11 +124,11 @@ class ShadowObserver:
                     if validated >= since_date:
                         ic = meta.get("ic_mean", None)
                         if ic is not None:
-                            ics.append(float(ic))
+                            observations.append((validated, float(ic)))
                 except Exception:
                     continue
 
-        return sorted(ics)
+        return [ic for _, ic in sorted(observations, key=lambda item: item[0])]
 
     # ── 衰减率计算 ──────────────────────────────────
 

@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-import json
+import os
+import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pytest
 
 from factor_lab.decision_loop.authorization import AuthorizationService
 from factor_lab.decision_loop.certification import DecisionLoopCertification
 from factor_lab.decision_loop.cycle import MinuteDecisionCycle
-from factor_lab.decision_loop.models import Book, PlannedOrder, Position
+from factor_lab.decision_loop.models import Book, PlannedOrder
 from factor_lab.decision_loop.qmt_sync import QMTReconciliationService
 from factor_lab.decision_loop.position_ingestion import PositionIngestionService, parse_ocr_text
 from factor_lab.decision_loop.storage import DecisionLoopStore
@@ -96,6 +97,41 @@ def test_store_cross_process_style_idempotency_and_corruption_recovery(tmp_path)
     store.write_json("state/current.json", {"value": 2})
     store.path("state/current.json").write_text("{broken", encoding="utf-8")
     assert store.read_json("state/current.json") == {"value": 1}
+
+
+def test_store_does_not_steal_old_but_live_lock(tmp_path):
+    store = DecisionLoopStore(tmp_path)
+    lock_path = store.path("notifications/outbox-worker").with_suffix(".lock")
+    with store.exclusive("notifications/outbox-worker"):
+        old = time.time() - 3600
+        os.utime(lock_path, (old, old))
+        with pytest.raises(TimeoutError, match="state lock timeout"):
+            with store.exclusive("notifications/outbox-worker", timeout=0.05):
+                pass
+
+
+def test_store_quarantines_bad_jsonl_row_without_losing_valid_rows(tmp_path):
+    store = DecisionLoopStore(tmp_path)
+    ledger = store.path("notifications/outbox.jsonl")
+    ledger.parent.mkdir(parents=True)
+    ledger.write_text(
+        '{"idempotency_key":"first","value":1}\n'
+        '{broken-json\n'
+        '{"idempotency_key":"second","value":2}\n',
+        encoding="utf-8",
+    )
+
+    assert [row["value"] for row in store.read_jsonl("notifications/outbox.jsonl")] == [1, 2]
+    _, created = store.append_unique_jsonl(
+        "notifications/outbox.jsonl", {"value": 3}, "third"
+    )
+    quarantine = store.read_jsonl("quarantine/jsonl_corruption.jsonl")
+
+    assert created is True
+    assert [row["value"] for row in store.read_jsonl("notifications/outbox.jsonl")] == [1, 2, 3]
+    assert len(quarantine) == 1
+    assert quarantine[0]["source_file"] == "notifications/outbox.jsonl"
+    assert quarantine[0]["raw_line"] == "{broken-json"
 
 
 def test_semiconductor_etf_gap_fade_replay_covers_all_three_exits(tmp_path):

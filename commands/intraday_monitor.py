@@ -13,15 +13,14 @@ import time
 import copy
 from pathlib import Path
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from config import (
-    PATHS, CODEX_READ_ONLY, now_str, now_cst, CST, date_id, ts_id,
-    ensure_dirs, read_csv_safe, append_jsonl, safe_write_json, file_rows,
-    VENV_PYTHON,
+    PATHS, CODEX_READ_ONLY, now_str, now_cst,
+    ensure_dirs, read_csv_safe, append_jsonl, safe_write_json,
 )
 from wechat_push import WeChatPusher, build_position_drop_notice, build_position_critical_alert
-from factor_lab.datahub_access import read_live_snapshot
+from factor_lab.datahub_access import read_live_snapshot, read_market_turnover
 
 # ========== V4.11 盘中低频监测常量 ==========
 
@@ -1220,59 +1219,30 @@ class LowFreqMonitor:
             "avg_20d": 0.0,
             "pct_deviation": 0.0,
             "alert": False,
+            "data_status": "MISSING",
+            "reason": "canonical_market_turnover_unavailable",
         }
 
-        # 汇总已有 quotes 中的成交额
-        total_amount = 0.0
-        count = 0
-        for code, q in self.quotes.items():
-            amt = q.get("amount")
-            if amt is not None:
-                total_amount += float(amt)
-                count += 1
-
-        # 尝试通过 mx:data 获取全A成交额
+        snapshot = self._load_datahub_snapshot()
+        today_vol = sum(
+            float(row["amount"])
+            for row in snapshot.values()
+            if row.get("amount") is not None
+        )
         try:
-            import subprocess
-            mx_script = PATHS["commands"] / "mx.py"
-            if mx_script.exists():
-                r = subprocess.run(
-                    [str(VENV_PYTHON), str(mx_script), "data", "全A成交额 今日"],
-                    capture_output=True, text=True, timeout=15,
-                )
-                output = r.stdout + r.stderr
-                import re
-                # 寻找 "成交额" 后的数字
-                amount_matches = re.findall(r'(\d+\.?\d*)\s*亿', output)
-                if amount_matches:
-                    total_amount = float(amount_matches[0]) * 1e8
-        except Exception:
-            pass
-
-        today_vol = total_amount if total_amount > 0 else 0.0
-
-        # 估算20日均（使用本地缓存或默认）
-        avg_20d = 0.0
-        cache_path = PATHS["market"] / "daily_kline"
-        if cache_path.exists():
-            try:
-                kline_files = sorted(cache_path.glob("*.csv"))
-                if kline_files:
-                    import csv
-                    amounts_20d = []
-                    for kf in kline_files[-3:]:  # 最近3个文件作为样本
-                        with open(kf, encoding="utf-8-sig") as f:
-                            for row in csv.DictReader(f):
-                                amt = row.get("amount", "")
-                                if amt:
-                                    amounts_20d.append(float(amt))
-                    if amounts_20d:
-                        avg_20d = sum(amounts_20d) / len(amounts_20d)
-            except Exception:
-                pass
-
-        if avg_20d == 0 and today_vol > 0:
-            avg_20d = today_vol * 0.85  # 保守估算
+            history = read_market_turnover()
+            avg_20d = float(history.tail(20)["market_amount"].mean())
+        except (FileNotFoundError, ValueError, OSError, json.JSONDecodeError) as error:
+            result.update(
+                {
+                    "today_volume": round(today_vol, 2),
+                    "volume_label": self._fmt_vol(today_vol),
+                    "avg_label": self._fmt_vol(0),
+                    "reason": str(error),
+                }
+            )
+            self.volume_anomaly = result
+            return result
 
         pct_dev = 0.0
         if avg_20d > 0 and today_vol > 0:
@@ -1292,6 +1262,9 @@ class LowFreqMonitor:
             "alert": alert,
             "volume_label": self._fmt_vol(today_vol),
             "avg_label": self._fmt_vol(avg_20d),
+            "data_status": "OK",
+            "source": "datahub:derived/market_turnover",
+            "reason": None,
         }
         self.volume_anomaly = result
         return result

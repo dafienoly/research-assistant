@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+import hashlib
+import json
+from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
 import pytest
@@ -13,6 +15,7 @@ from factor_lab.datahub_access import (
     read_live_snapshot,
     read_etf_holdings,
     read_latest_north_flow,
+    read_market_turnover,
     read_trade_calendar,
 )
 
@@ -27,6 +30,16 @@ def write_calendar(tmp_path):
         ]
     ).to_csv(path, index=False)
     return path
+
+
+def write_live_manifest(path, observed_at):
+    manifest = {
+        "status": "OK",
+        "observed_at": observed_at,
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "conflicts": [],
+    }
+    path.with_suffix(".manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
 
 def test_downstream_calendar_reads_canonical_datahub_file(tmp_path):
@@ -46,16 +59,28 @@ def test_missing_or_invalid_calendar_fails_closed(tmp_path):
 
 
 def test_daily_kline_path_uses_canonical_roots_and_fails_when_symbol_missing(tmp_path, monkeypatch):
-    shared = tmp_path / "shared"
-    kline = shared / "market/daily_kline/600000.csv"
+    normalized = tmp_path / "normalized"
+    kline = normalized / "market/600000.csv"
     kline.parent.mkdir(parents=True)
     kline.write_text("date,close\n2026-07-10,10\n", encoding="utf-8")
-    monkeypatch.setattr(datahub_access, "SHARED_DATAHUB_ROOT", shared)
-    monkeypatch.setattr(datahub_access, "PROJECT_ROOT", tmp_path / "project")
-    monkeypatch.setattr(datahub_access, "DATAHUB_ROOT", tmp_path / "normalized")
+    monkeypatch.setattr(datahub_access, "DATAHUB_ROOT", normalized)
     assert daily_kline_path("600000.SH") == kline
     with pytest.raises(FileNotFoundError):
         daily_kline_path("000001.SZ")
+
+
+def test_daily_kline_path_blocks_conflicting_canonical_datasets(tmp_path, monkeypatch):
+    normalized = tmp_path / "normalized"
+    equity = normalized / "market/159516.SZ.csv"
+    fund = normalized / "market_series/fund/159516.SZ.csv"
+    equity.parent.mkdir(parents=True)
+    fund.parent.mkdir(parents=True)
+    equity.write_text("trade_date,close\n20260710,1\n", encoding="utf-8")
+    fund.write_text("trade_date,close\n20260710,2\n", encoding="utf-8")
+    monkeypatch.setattr(datahub_access, "DATAHUB_ROOT", normalized)
+
+    with pytest.raises(ValueError, match="daily conflict"):
+        daily_kline_path("159516.SZ")
 
 
 def test_live_snapshot_normalizes_codes_and_reports_provenance(tmp_path):
@@ -67,6 +92,7 @@ def test_live_snapshot_normalizes_codes_and_reports_provenance(tmp_path):
             "update_time": "2026-07-10T10:30:00+08:00",
         }]
     ).to_csv(snapshot, index=False)
+    write_live_manifest(snapshot, "2026-07-10T10:30:00+08:00")
     rows = read_live_snapshot(
         ["600000", "sh600000"], path=snapshot,
         now=datetime(2026, 7, 10, 10, 30, 30, tzinfo=timezone.utc).astimezone(),
@@ -85,6 +111,7 @@ def test_live_snapshot_rejects_stale_truth(tmp_path):
             "source": "akshare", "update_time": "2026-07-10T10:00:00+08:00",
         }]
     ).to_csv(snapshot, index=False)
+    write_live_manifest(snapshot, "2026-07-10T10:00:00+08:00")
     with pytest.raises(ValueError, match="stale"):
         read_live_snapshot(
             ["600000"], path=snapshot,
@@ -113,3 +140,33 @@ def test_north_flow_reads_latest_canonical_observation(tmp_path):
         {"trade_date": 20260710, "north_money": -250},
     ]).to_csv(path, index=False)
     assert read_latest_north_flow(path)["north_money"] == -250
+
+
+def test_market_turnover_requires_matching_manifest_hash(tmp_path):
+    path = tmp_path / "derived/market_turnover/daily.csv"
+    path.parent.mkdir(parents=True)
+    frame = pd.DataFrame(
+        {
+            "trade_date": [f"202606{day:02d}" for day in range(1, 21)],
+            "market_amount": [500_000_000_000] * 20,
+        }
+    )
+    frame.to_csv(path, index=False)
+    manifest = {
+        "status": "OK",
+        "generated_at": "2026-07-10T16:00:00+08:00",
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+    }
+    (path.parent / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    result = read_market_turnover(
+        path,
+        now=datetime(2026, 7, 11, 16, 0, tzinfo=timezone(timedelta(hours=8))),
+    )
+    assert len(result) == 20
+
+    path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="hash mismatch"):
+        read_market_turnover(
+            path,
+            now=datetime(2026, 7, 11, 16, 0, tzinfo=timezone(timedelta(hours=8))),
+        )

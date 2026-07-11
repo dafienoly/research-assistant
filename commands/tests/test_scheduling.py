@@ -131,9 +131,11 @@ def test_crontab_routes_write_pipelines_through_scheduler() -> None:
 def test_production_data_dependencies_and_runtime_are_explicit() -> None:
     root = Path(__file__).resolve().parents[2]
     registry = ScheduleRegistry.load(root / "commands/config/scheduled_jobs.json")
-    assert registry.jobs["benchmark_projection"].depends_on == ("datahub_daily",)
+    assert registry.jobs["market_turnover_projection"].depends_on == ("datahub_daily",)
+    assert registry.jobs["benchmark_projection"].depends_on == ("market_turnover_projection",)
     assert registry.jobs["postmarket_review"].depends_on == ("benchmark_projection",)
     assert registry.jobs["data_backup"].depends_on == ("datahub_daily",)
+    assert registry.jobs["decision_ledger_archive"].depends_on == ("capability_status",)
     assert "normalized/events/corporate_events" in registry.jobs["event_truth"].owned_datasets
     crontab = (root / "commands/scripts/crontab/hermes-crontab").read_text(encoding="utf-8")
     assert "/usr/bin/python3" not in crontab

@@ -22,6 +22,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
+import pandas as pd
 
 # ─── path setup ─────────────────────────────────────────────────────────
 BASE = Path(__file__).resolve().parent.parent  # commands/
@@ -60,6 +61,12 @@ def _fake_quote(code: str, change_pct: float = 0.0, price: float = 10.0,
         "amount": amount,
         "source": "mock",
     }
+
+
+def _turnover_history(amount: float) -> pd.DataFrame:
+    return pd.DataFrame(
+        {"trade_date": [f"202606{day:02d}" for day in range(1, 21)], "market_amount": amount}
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -323,53 +330,56 @@ class TestCheckIndexRisk:
 
 class TestCheckVolumeAnomaly:
     def test_no_data(self, monitor):
-        result = monitor.check_volume_anomaly()
+        with patch("intraday_monitor.read_market_turnover", side_effect=FileNotFoundError("missing")):
+            result = monitor.check_volume_anomaly()
         assert result["today_volume"] == 0.0
         assert result["alert"] is False
+        assert result["data_status"] == "MISSING"
 
     def test_with_quotes_amount(self, monitor):
-        monitor.quotes = {
+        monitor.market_snapshot = {
             "600001": _fake_quote("600001", amount=2_000_000_000_000),  # 2000亿
             "600002": _fake_quote("600002", amount=1_000_000_000_000),
         }
-        result = monitor.check_volume_anomaly()
+        with patch("intraday_monitor.read_market_turnover", return_value=_turnover_history(3_000_000_000_000)):
+            result = monitor.check_volume_anomaly()
         # 今日 ≈ 3000亿
         assert result["today_volume"] == pytest.approx(3_000_000_000_000, rel=0.1)
-        # avg_20d 使用保守估算 today_vol * 0.85
-        assert result["avg_20d"] > 0
+        assert result["avg_20d"] == 3_000_000_000_000
         # 偏离不大 → 不告警
         assert result["alert"] is False
+        assert result["data_status"] == "OK"
 
     def test_volume_too_low(self, monitor):
         """全市场成交额低于5000亿 → alert"""
-        monitor.quotes = {
+        monitor.market_snapshot = {
             "600001": _fake_quote("600001", amount=200_000_000_000),  # 200亿
         }
-        result = monitor.check_volume_anomaly()
+        with patch("intraday_monitor.read_market_turnover", return_value=_turnover_history(600_000_000_000)):
+            result = monitor.check_volume_anomaly()
         assert result["alert"] is True  # below VOLUME_ANOMALY_ABS_THRESHOLD
 
     def test_large_deviation(self, monitor):
         """偏离超过 ±30% → alert"""
-        monitor.quotes = {
+        monitor.market_snapshot = {
             "600001": _fake_quote("600001", amount=1_000_000_000_000),
         }
-        result = monitor.check_volume_anomaly()
-        # today ~1000亿, avg estimates ~850亿 → deviation ~17.6%, no alert
-        # Inject an artificially low avg so deviation >30%
-        # Since avg is calculated internally, test via direct scenario
-        assert "today_volume" in result
+        with patch("intraday_monitor.read_market_turnover", return_value=_turnover_history(500_000_000_000)):
+            result = monitor.check_volume_anomaly()
+        assert result["pct_deviation"] == 100.0
+        assert result["alert"] is True
 
     def test_volume_label(self, monitor):
-        monitor.quotes = {
+        monitor.market_snapshot = {
             "600001": _fake_quote("600001", amount=2_500_000_000_000_000),  # 2.5万亿
         }
-        result = monitor.check_volume_anomaly()
+        with patch("intraday_monitor.read_market_turnover", return_value=_turnover_history(2_500_000_000_000_000)):
+            result = monitor.check_volume_anomaly()
         assert "万亿" in result.get("volume_label", "")
 
         monitor2 = LowFreqMonitor()
-        with patch.object(monitor2, "quotes", {
-            "600001": _fake_quote("600001", amount=500_000_000_000),
-        }):
+        monitor2.market_snapshot = {"600001": _fake_quote("600001", amount=500_000_000_000)}
+        with patch("intraday_monitor.read_market_turnover", return_value=_turnover_history(500_000_000_000)):
             result2 = monitor2.check_volume_anomaly()
             assert "亿" in result2.get("volume_label", "")
 

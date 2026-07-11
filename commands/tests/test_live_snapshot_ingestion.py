@@ -30,6 +30,8 @@ def test_live_snapshot_ingestion_atomically_publishes_manifest(tmp_path):
     assert manifest == durable_manifest
     assert manifest["rows"] == 1
     assert manifest["path"] == "live_snapshot.csv"
+    assert manifest["conflict_count"] == 1
+    assert manifest["conflicts"][0]["code"] == "600000"
 
 
 def test_empty_provider_response_never_overwrites_canonical_snapshot(tmp_path):

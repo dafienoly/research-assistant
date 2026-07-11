@@ -6,6 +6,26 @@
 
 VNext 的安全门禁和决策闭环已经成形，VNext、Decision Loop、股票池、动态基准、因子核心、主盘中监控、ETF/dive 实时与历史训练链路现已统一到 DataHub read-only facade。审计发现并恢复了 3 个活跃行情文件中的旧测试污染行，同时补上行级完整性门禁。监管公告已完成真实标的覆盖验证，公司事件除 forecast 上游故障外已形成可恢复快照。当前最高风险收敛为少数遗留政策/消息入口、真实券商验收、连续 Shadow 证据和外部 forecast 数据源。
 
+## 2026-07-12 第二轮系统复核与整改
+
+本轮不是基于旧结论抽样，而是重新检查生产可达 DataHub、cron、通知、账本、因子晋级和盘中监控路径。新增发现及处理如下：
+
+| 发现 | 风险 | 整改 |
+|---|---|---|
+| VNext 路由测试未适配真实 UI Token，单测顺序改变后出现 401 | CI 可能误报或诱导关闭生产鉴权 | 测试使用进程启动时真实 token；无 token 的 CI 不伪造；生产鉴权未放宽 |
+| 能力状态生成器同时归档 18 类账本 | 状态查询产生隐藏写副作用、职责耦合 | 生成器恢复为纯状态读取＋文档输出；新增独立 `decision_ledger_archive` DAG job |
+| JSONL 锁超过 120 秒会被无条件删除 | 通知积压时重复投递、并发写损坏 | `DecisionLoopStore` 改为内核 `flock`，锁文件年龄不再影响所有权；旧锁抢占故障注入通过 |
+| JSONL 任意坏行使整个 outbox/回执/执行账本不可读 | 一行损坏阻断完整安全闭环 | 逐行验证，合法行继续使用；坏行原文、SHA、行号写入 quarantine，幂等去重且不删除证据 |
+| 通知回执与 outbox 独立归档会使旧消息重新可投递 | 重复风险告警或重复运维消息 | 关联压缩先移走终态 outbox，再移走回执/dead-letter；仅已确认且全通道终态事件成组归档 |
+| `check_volume_anomaly` 子进程调用 `mx.py`，并以 3 个股票文件/`today×0.85` 合成 20 日均 | DataHub 绕过、虚假成交额告警 | 新增 canonical `derived/market_turnover` 投影和 manifest；实时端只读 DataHub，历史缺失时明确 MISSING、不告警 |
+| 日线 amount 千元与实时 amount 元未统一 | 偏离放大 1,000 倍 | 投影统一为 CNY 元，manifest 明示 source/unit；真实 60 日投影和 SHA 已生成 |
+| 日线 facade 按首个含 CSV 目录静默择根 | 不同机器/时点读取不同 truth | 股票批量根固定 `data/normalized/market`；fund/index 为声明数据集；同代码多根哈希冲突时 fail-closed |
+| live snapshot reader 不验证 manifest/hash，provider 覆盖无冲突记录 | 篡改或覆盖差异进入盘中判断 | reader 强制 `status/observed_at/sha256`；ingestion 记录字段级 provider 冲突及确定性优先级 |
+| Reference ingestion 写 `ts_code`，名称/行业 reader 只认 `symbol` | 真实名称/行业静默缺失 | producer 物化 symbol；reader 兼容历史 ts_code；增加 producer→consumer 契约测试和 manifest SHA |
+| Shadow IC 按数值排序；人工确认提前 `enabled=True` | 衰减率失真、绕过 Shadow/OOS | IC 按 validated_at 排序；人工确认状态为 `human_approved_shadow`，enabled/paper/live 均保持 false |
+
+真实复核结果：市场成交额投影 60 个交易日、5,738 个有效源分区，最近 20 日均约 3.27 万亿元；关键路径新增/回归专项 131 项通过。QMT 账户连接、连续 Shadow、小额白名单和浏览器证据仍属于外部运行验收，不由上述单测替代。
+
 ## P0 发现与整改
 
 | 问题 | 证据 | 风险 | 状态 |

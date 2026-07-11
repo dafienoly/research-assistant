@@ -802,3 +802,19 @@ def test_jsonl_archive_is_atomic_and_preserves_current_rows(tmp_path):
     assert archive is not None
     assert [row["event_id"] for row in review_store.read_jsonl("events/events.jsonl")] == ["current"]
     assert json.loads(archive.read_text(encoding="utf-8").strip())["event_id"] == "old"
+
+
+def test_jsonl_archive_retry_does_not_duplicate_already_archived_rows(tmp_path):
+    review_store = store(tmp_path)
+    row = {"event_id": "old", "created_at": "2025-01-01T00:00:00+08:00"}
+    review_store.append_jsonl("events/events.jsonl", row)
+    cutoff = datetime.fromisoformat("2026-01-01T00:00:00+08:00")
+    archive = review_store.archive_jsonl("events/events.jsonl", cutoff)
+    assert archive is not None
+
+    # Simulate a crash after the archive write but before the live ledger rewrite.
+    review_store.append_jsonl("events/events.jsonl", row)
+    repeated = review_store.archive_jsonl("events/events.jsonl", cutoff)
+
+    assert repeated == archive
+    assert archive.read_text(encoding="utf-8").count('"event_id": "old"') == 1

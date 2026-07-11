@@ -122,8 +122,8 @@
         {"file": "commands/factor_lab/decision_loop/storage.py", "function": "append_unique_jsonl", "line": 87},
         {"file": "commands/factor_lab/decision_loop/storage.py", "function": "archive_jsonl", "line": 114}
       ],
-      "expected_keywords": ["O_EXCL", "_bump_version", "idempotency_key", ".bak", "archive"],
-      "behavior": "关键账本使用独占锁文件、原子备份、旁路状态版本和幂等键，损坏时恢复，并定期归档 JSONL。"
+      "expected_keywords": ["flock", "_bump_version", "idempotency_key", "jsonl_corruption", "archive_selected_jsonl"],
+      "behavior": "关键账本使用内核 flock、原子备份、状态版本和幂等键；坏行保留到 quarantine，通知关联状态按终态成组归档且不会重新变为可投递。"
     },
     {
       "id": "P2-02",
@@ -155,8 +155,8 @@
       "code_locations": [
         {"file": "commands/scripts/generate_capability_status.py", "function": "main", "line": 28}
       ],
-      "expected_keywords": ["current_capabilities.md", "QMT_LIVE_TRADING_ENABLED", "xttrader_connected", "archive_jsonl"],
-      "behavior": "从真实运行状态生成当前能力和阻断文档；vectorbt 仅内部研究，vn.py/OpenBB/FinRL/Qbot 不进入 Core。"
+      "expected_keywords": ["current_capabilities.md", "QMT_LIVE_TRADING_ENABLED", "xttrader_connected"],
+      "behavior": "从真实运行状态生成当前能力和阻断文档且不执行账本维护；归档由独立调度任务负责；vectorbt 仅内部研究，vn.py/OpenBB/FinRL/Qbot 不进入 Core。"
     },
     {
       "id": "DATA-SAFETY-01",
@@ -1063,8 +1063,61 @@
       ],
       "expected_keywords": ["covered_symbols", "failed_symbols", "source_symbol", "orgId", "announcements", "coverage_policy", "no verifiable response", "regulatory truth does not cover"],
       "behavior": "公告 ingestion 同时发布完整公告和风险视图；来源记录必须以 secCode 匹配请求标的，CNINFO 二阶段使用代码+orgId 专属查询；无法验证来源代码或所有来源为空时 fail-closed。"
+    },
+    {
+      "id": "INFRA-LEDGER-HARDENING-02",
+      "title": "不可抢占账本锁、坏行隔离和关联通知归档",
+      "code_locations": [
+        {"file": "commands/factor_lab/decision_loop/storage.py", "function": "_lock", "line": 300},
+        {"file": "commands/factor_lab/decision_loop/storage.py", "function": "_read_jsonl_rows", "line": 235},
+        {"file": "commands/scripts/decision_ledger_archive.py", "function": "compact_notification_history", "line": 50}
+      ],
+      "expected_keywords": ["fcntl.flock", "jsonl_corruption.jsonl", "raw_sha256", "outbox-worker", "archive_selected_jsonl"],
+      "behavior": "锁所有权由内核维护，不按 mtime 抢占；JSONL 坏行保留原文证据且合法行继续服务；终态 outbox 先于回执归档，避免历史消息重新可投递。"
+    },
+    {
+      "id": "INFRA-MARKET-TURNOVER-01",
+      "title": "全市场成交额由 DataHub 单写入投影拥有",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_ingestion/market_turnover.py", "function": "build_market_turnover_projection", "line": 18},
+        {"file": "commands/factor_lab/datahub_access.py", "function": "read_market_turnover", "line": 215},
+        {"file": "commands/intraday_monitor.py", "function": "check_volume_anomaly", "line": 1220}
+      ],
+      "expected_keywords": ["CNY_thousand", "unit", "sha256", "canonical_market_turnover_unavailable", "datahub:derived/market_turnover"],
+      "behavior": "DataHub 从 canonical 日线聚合并将千元统一为 CNY 元；盘中监控验证 manifest/hash 后计算 20 日均，缺失时返回 MISSING，不联网或合成。"
+    },
+    {
+      "id": "INFRA-CANONICAL-ROOT-02",
+      "title": "日线确定性数据集路由和冲突阻断",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_access.py", "function": "_daily_kline_candidates", "line": 33},
+        {"file": "commands/factor_lab/datahub_access.py", "function": "daily_kline_path", "line": 320}
+      ],
+      "expected_keywords": ["HERMES_CANONICAL_DAILY_ROOT", "market_series", "daily conflict", "sha256"],
+      "behavior": "股票批量根固定到 normalized/market；fund/index 使用声明数据集；同代码多份 canonical 文件若哈希不同即 fail-closed，不按首个存在目录静默选取。"
+    },
+    {
+      "id": "INFRA-REFERENCE-CONTRACT-01",
+      "title": "Reference producer-consumer schema 与 lineage 对齐",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_ingestion/reference.py", "function": "fetch_stock_basic", "line": 20},
+        {"file": "commands/factor_lab/datahub_access.py", "function": "read_stock_name_map", "line": 100},
+        {"file": "commands/factor_lab/datahub_access.py", "function": "read_stock_industry_map", "line": 75}
+      ],
+      "expected_keywords": ["symbol", "ts_code", "sha256", "generated_at", "conflicts"],
+      "behavior": "生产端物化 symbol 并记录 SHA/时间/冲突；消费端规范化历史 ts_code，真实 ingestion 输出可直接被名称和行业映射读取。"
+    },
+    {
+      "id": "INFRA-FACTOR-PROMOTION-02",
+      "title": "Shadow 时间序列与人工确认不越过生产门禁",
+      "code_locations": [
+        {"file": "commands/factor_lab/shadow_observer.py", "function": "_collect_ic_history", "line": 105},
+        {"file": "commands/factor_lab/pipeline_confirm.py", "function": "cmd_confirm", "line": 70}
+      ],
+      "expected_keywords": ["validated", "human_approved_shadow", "enabled", "paper_enabled", "live_enabled"],
+      "behavior": "IC 按 validated_at 时间排序计算衰减；人工确认仅进入 Shadow 候选态，所有执行 enabled 标志保持 false，等待 Shadow/OOS/生产审批。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-12T04:00:00+08:00"
+  "generated_at": "2026-07-12T07:25:00+08:00"
 }

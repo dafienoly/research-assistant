@@ -125,6 +125,21 @@ def test_intraday_monitor_is_read_only_datahub_consumer():
     assert provider_imports(path) == []
     source = path.read_text(encoding="utf-8")
     assert "read_live_snapshot" in source
+
+
+def test_intraday_monitor_cannot_spawn_market_data_provider_scripts():
+    source = (ROOT / "commands/intraday_monitor.py").read_text(encoding="utf-8")
+    assert "subprocess.run" not in source
+    assert 'mx.py' not in source
+    assert "today_vol * 0.85" not in source
+
+
+def test_daily_kline_resolution_has_no_legacy_first_existing_root_fallback():
+    source = (ROOT / "commands/factor_lab/datahub_access.py").read_text(encoding="utf-8")
+    assert 'SHARED_DATAHUB_ROOT / "market" / "daily_kline"' not in source
+    assert 'PROJECT_ROOT / "data" / "market" / "daily_kline"' not in source
+    assert "HERMES_CANONICAL_DAILY_ROOT" in source
+    assert "daily conflict" in source
     assert "fetch_stock_prices" not in source
     assert "fetch_sina_quotes" not in source
     assert "stock_zh_a_spot_em" not in source

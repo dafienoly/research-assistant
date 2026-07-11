@@ -69,7 +69,7 @@ def cmd_pending_list() -> str:
 
 
 def cmd_confirm(alpha_id: str) -> str:
-    """确认注册：将 Alpha 状态设为 draft + 标记开始影子观察"""
+    """Human-approve a disabled candidate and start Shadow observation."""
     pending = _load_pending()
     matched = [p for p in pending if p["alpha_id"] == alpha_id]
 
@@ -79,13 +79,16 @@ def cmd_confirm(alpha_id: str) -> str:
     item = matched[0]
     name = item["name"]
 
-    # 更新 registry index: status draft → enabled
+    # Human approval is not production approval. Shadow and OOS must still pass.
     if REGISTRY_INDEX.exists():
         index = json.loads(REGISTRY_INDEX.read_text())
         for entry in index:
             if entry.get("alpha_id") == alpha_id:
-                entry["status"] = "draft"
-                entry["enabled"] = True
+                entry["status"] = "human_approved_shadow"
+                entry["enabled"] = False
+                entry["paper_enabled"] = False
+                entry["live_enabled"] = False
+                entry["human_approved_at"] = datetime.now(CST).isoformat()
                 entry["updated_at"] = datetime.now(CST).isoformat()
                 REGISTRY_INDEX.write_text(
                     json.dumps(index, indent=2, ensure_ascii=False)
@@ -97,8 +100,11 @@ def cmd_confirm(alpha_id: str) -> str:
     spec_file = alpha_dir / "alpha_spec.json"
     if spec_file.exists():
         spec = json.loads(spec_file.read_text())
-        spec["status"] = "draft"
-        spec["enabled"] = True
+        spec["status"] = "human_approved_shadow"
+        spec["enabled"] = False
+        spec["paper_enabled"] = False
+        spec["live_enabled"] = False
+        spec["human_approved_at"] = datetime.now(CST).isoformat()
         spec["updated_at"] = datetime.now(CST).isoformat()
         spec_file.write_text(json.dumps(spec, indent=2, ensure_ascii=False))
 

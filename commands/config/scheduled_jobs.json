@@ -3,6 +3,7 @@
   "dags": {
     "postmarket": [
       "datahub_daily",
+      "market_turnover_projection",
       "benchmark_projection",
       "postmarket_review",
       "realized_observations",
@@ -10,6 +11,7 @@
       "execution_certification",
       "factor_pipeline",
       "capability_status",
+      "decision_ledger_archive",
       "data_backup"
     ],
     "weekly_datahub": [
@@ -28,9 +30,20 @@
       "backoff_seconds": [120, 300]
     },
     {
+      "job_id": "market_turnover_projection",
+      "command": ["{python}", "{root}/commands/scripts/datahub_market_turnover.py"],
+      "depends_on": ["datahub_daily"],
+      "owned_datasets": ["normalized/derived/market_turnover"],
+      "writer_id": "datahub_market_turnover_projection",
+      "timeout_seconds": 1800,
+      "retry_attempts": 2,
+      "backoff_seconds": [120],
+      "environment": {"PYTHONPATH": "{root}/commands"}
+    },
+    {
       "job_id": "benchmark_projection",
       "command": ["{python}", "{root}/commands/scripts/datahub_benchmark_projection.py"],
-      "depends_on": ["datahub_daily"],
+      "depends_on": ["market_turnover_projection"],
       "owned_datasets": ["normalized/derived/benchmarks"],
       "writer_id": "datahub_benchmark_projection",
       "timeout_seconds": 1800,
@@ -95,8 +108,19 @@
       "job_id": "capability_status",
       "command": ["{python}", "{root}/commands/scripts/generate_capability_status.py"],
       "depends_on": ["datahub_daily"],
-      "owned_datasets": ["docs/generated/capabilities", "decision_loop/archive"],
+      "owned_datasets": ["docs/generated/capabilities"],
       "writer_id": "capability_status_generator",
+      "timeout_seconds": 900,
+      "retry_attempts": 2,
+      "backoff_seconds": [60],
+      "environment": {"PYTHONPATH": "{root}/commands"}
+    },
+    {
+      "job_id": "decision_ledger_archive",
+      "command": ["{python}", "{root}/commands/scripts/decision_ledger_archive.py"],
+      "depends_on": ["capability_status"],
+      "owned_datasets": ["decision_loop/archive"],
+      "writer_id": "decision_loop_archive",
       "timeout_seconds": 900,
       "retry_attempts": 2,
       "backoff_seconds": [60],

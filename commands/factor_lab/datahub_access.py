@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -20,6 +22,7 @@ SHARED_DATAHUB_ROOT = Path(
     os.environ.get("HERMES_SHARED_DATAHUB_ROOT", "/mnt/c/Users/ly/.codex/data/a-share-data-hub")
 )
 LIVE_SNAPSHOT_PATH = SHARED_DATAHUB_ROOT / "market" / "live_snapshot.csv"
+MARKET_TURNOVER_PATH = DATAHUB_ROOT / "derived" / "market_turnover" / "daily.csv"
 
 
 def _optional_number(value: object) -> float | None:
@@ -28,10 +31,11 @@ def _optional_number(value: object) -> float | None:
 
 
 def _daily_kline_candidates() -> tuple[Path, ...]:
+    equity_root = Path(
+        os.environ.get("HERMES_CANONICAL_DAILY_ROOT", DATAHUB_ROOT / "market")
+    )
     return (
-        SHARED_DATAHUB_ROOT / "market" / "daily_kline",
-        PROJECT_ROOT / "data" / "market" / "daily_kline",
-        DATAHUB_ROOT / "market",
+        equity_root,
         DATAHUB_ROOT / "market_series" / "fund",
         DATAHUB_ROOT / "market_series" / "index",
     )
@@ -60,11 +64,7 @@ def factor_input_locations() -> FactorInputLocations:
     """Resolve factor inputs once, with environment overrides owned by DataHub."""
 
     project_data = Path(os.environ.get("HERMES_FACTOR_DATA_ROOT", PROJECT_ROOT / "data"))
-    candidates = _daily_kline_candidates()
-    default_kline = next(
-        (candidate for candidate in candidates if _contains_daily_kline(candidate)),
-        candidates[0],
-    )
+    default_kline = _daily_kline_candidates()[0]
     return FactorInputLocations(
         daily_kline=Path(os.environ.get("HERMES_FACTOR_KLINE_ROOT", default_kline)),
         fundamentals=project_data / "fundamentals" / "fundamentals_timeseries.csv",
@@ -82,12 +82,16 @@ def read_stock_industry_map(path: Path | None = None) -> dict[str, str]:
     source = path or STOCK_BASIC_PATH
     if not source.exists():
         raise FileNotFoundError(f"canonical DataHub stock reference missing: {source}")
-    frame = pd.read_csv(source, encoding="utf-8-sig", dtype={"symbol": "string"})
+    frame = pd.read_csv(
+        source, encoding="utf-8-sig", dtype={"symbol": "string", "ts_code": "string"}
+    )
+    if "symbol" not in frame and "ts_code" in frame:
+        frame["symbol"] = frame["ts_code"]
     required = {"symbol", "industry"}
     if not required.issubset(frame.columns):
         raise ValueError(f"canonical stock reference missing columns: {sorted(required - set(frame.columns))}")
     usable = frame.loc[:, ["symbol", "industry"]].dropna()
-    usable["symbol"] = usable["symbol"].str.strip().str.zfill(6)
+    usable["symbol"] = usable["symbol"].str.strip().str.split(".").str[0].str.zfill(6)
     usable["industry"] = usable["industry"].astype("string").str.strip()
     usable = usable[(usable["symbol"] != "") & (usable["industry"] != "")]
     return dict(zip(usable["symbol"], usable["industry"], strict=False))
@@ -98,12 +102,18 @@ def read_stock_name_map(path: Path | None = None) -> dict[str, str]:
     source = path or STOCK_BASIC_PATH
     if not source.exists():
         raise FileNotFoundError(f"canonical DataHub stock reference missing: {source}")
-    frame = pd.read_csv(source, encoding="utf-8-sig", dtype={"symbol": "string", "name": "string"})
+    frame = pd.read_csv(
+        source,
+        encoding="utf-8-sig",
+        dtype={"symbol": "string", "ts_code": "string", "name": "string"},
+    )
+    if "symbol" not in frame and "ts_code" in frame:
+        frame["symbol"] = frame["ts_code"]
     required = {"symbol", "name"}
     if not required.issubset(frame.columns):
         raise ValueError(f"canonical stock reference missing columns: {sorted(required - set(frame.columns))}")
     usable = frame.loc[:, ["symbol", "name"]].dropna()
-    usable["symbol"] = usable["symbol"].str.strip().str.zfill(6)
+    usable["symbol"] = usable["symbol"].str.strip().str.split(".").str[0].str.zfill(6)
     usable["name"] = usable["name"].str.strip()
     usable = usable[(usable["symbol"] != "") & (usable["name"] != "")]
     return dict(zip(usable["symbol"], usable["name"], strict=False))
@@ -177,6 +187,43 @@ def read_latest_north_flow(path: Path | None = None) -> dict:
     return frame.sort_values("trade_date", kind="stable").iloc[-1].to_dict()
 
 
+def read_market_turnover(
+    path: Path | None = None,
+    *,
+    minimum_days: int = 20,
+    max_manifest_age_days: int = 7,
+    now: datetime | None = None,
+) -> pd.DataFrame:
+    """Read the governed all-market daily turnover projection."""
+    source = path or MARKET_TURNOVER_PATH
+    manifest_path = source.parent / "manifest.json"
+    if not source.exists() or not manifest_path.exists():
+        raise FileNotFoundError("canonical market turnover dataset or manifest missing")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("status") != "OK":
+        raise ValueError(f"canonical market turnover status is {manifest.get('status', 'MISSING')}")
+    expected_hash = str(manifest.get("sha256", ""))
+    actual_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+    if not expected_hash or actual_hash != expected_hash:
+        raise ValueError("canonical market turnover hash mismatch")
+    generated_at = datetime.fromisoformat(str(manifest.get("generated_at")))
+    current = now or datetime.now().astimezone()
+    if generated_at.tzinfo is None:
+        generated_at = generated_at.replace(tzinfo=current.tzinfo)
+    if current - generated_at > timedelta(days=max_manifest_age_days):
+        raise ValueError("canonical market turnover manifest stale")
+    frame = pd.read_csv(source, encoding="utf-8-sig", dtype={"trade_date": "string"})
+    required = {"trade_date", "market_amount"}
+    if not required.issubset(frame.columns):
+        raise ValueError(f"canonical market turnover missing columns: {sorted(required - set(frame.columns))}")
+    frame = frame.copy()
+    frame["market_amount"] = pd.to_numeric(frame["market_amount"], errors="coerce")
+    frame = frame.dropna(subset=["trade_date", "market_amount"]).sort_values("trade_date")
+    if len(frame) < minimum_days:
+        raise ValueError(f"canonical market turnover history too short: {len(frame)} < {minimum_days}")
+    return frame
+
+
 def read_live_snapshot(
     codes: list[str] | None = None,
     *,
@@ -188,6 +235,16 @@ def read_live_snapshot(
     source = path or LIVE_SNAPSHOT_PATH
     if not source.exists():
         raise FileNotFoundError(f"canonical DataHub live snapshot missing: {source}")
+    manifest_path = source.with_suffix(".manifest.json")
+    if not manifest_path.exists():
+        raise FileNotFoundError(f"canonical DataHub live snapshot manifest missing: {manifest_path}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("status") != "OK":
+        raise ValueError(f"canonical live snapshot status is {manifest.get('status', 'MISSING')}")
+    expected_hash = str(manifest.get("sha256", ""))
+    actual_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+    if not expected_hash or expected_hash != actual_hash:
+        raise ValueError("canonical live snapshot hash mismatch")
     frame = pd.read_csv(source, encoding="utf-8-sig", dtype={"code": "string"})
     required = {"code", "last_price", "change_pct", "update_time", "source"}
     if frame.empty or not required.issubset(frame.columns):
@@ -200,6 +257,11 @@ def read_live_snapshot(
     if current.tzinfo is None:
         current = current.tz_localize(datetime.now().astimezone().tzinfo)
     age_seconds = max(0.0, (current.tz_convert("UTC") - latest).total_seconds())
+    manifest_observed = pd.to_datetime(manifest.get("observed_at"), errors="coerce", utc=True)
+    if pd.isna(manifest_observed):
+        raise ValueError("canonical live snapshot manifest has no valid observation time")
+    manifest_age = max(0.0, (current.tz_convert("UTC") - manifest_observed).total_seconds())
+    age_seconds = max(age_seconds, manifest_age)
     if age_seconds > max_age_seconds:
         raise ValueError(f"canonical DataHub live snapshot stale: {age_seconds:.0f}s > {max_age_seconds}s")
 
@@ -207,6 +269,14 @@ def read_live_snapshot(
     normalized["bare_code"] = normalized["code"].str.lower().str.replace(r"^(sh|sz|bj)", "", regex=True)
     normalized = normalized.drop_duplicates("bare_code", keep="last").set_index("bare_code")
     requested = codes or normalized.index.astype(str).tolist()
+    conflict_codes = {
+        str(item.get("code", "")).lower()
+        .removeprefix("sh")
+        .removeprefix("sz")
+        .removeprefix("bj")
+        for item in manifest.get("conflicts", [])
+        if isinstance(item, dict)
+    }
     result: dict[str, dict] = {}
     for requested_code in requested:
         key = str(requested_code).strip()
@@ -231,21 +301,24 @@ def read_live_snapshot(
             "delay_seconds": int(age_seconds),
             "source": f"datahub:{provider or 'unknown'}",
             "observed_at": latest.isoformat(),
+            "conflict": bare in conflict_codes,
+            "manifest_sha256": expected_hash,
         }
     return result
 
 
 def daily_kline_root() -> Path:
-    for candidate in _daily_kline_candidates():
-        if _contains_daily_kline(candidate):
-            return candidate
-    raise FileNotFoundError("canonical DataHub daily kline dataset missing")
+    canonical = _daily_kline_candidates()[0]
+    if _contains_daily_kline(canonical):
+        return canonical
+    raise FileNotFoundError(f"canonical DataHub equity daily dataset missing: {canonical}")
 
 
 def daily_kline_path(symbol: str, root: Path | None = None) -> Path:
     normalized = symbol.upper()
     code = normalized.split(".")[0]
     roots = (root,) if root is not None else _daily_kline_candidates()
+    matches: list[Path] = []
     for source_root in roots:
         candidates = (
             source_root / f"{normalized}.csv",
@@ -254,11 +327,21 @@ def daily_kline_path(symbol: str, root: Path | None = None) -> Path:
         )
         for candidate in candidates:
             if candidate.exists():
-                return candidate
+                matches.append(candidate)
         if source_root.is_dir():
             exchange_qualified = sorted(source_root.glob(f"{code}.*.csv"))
             if exchange_qualified:
-                return exchange_qualified[0]
+                matches.extend(exchange_qualified)
+    unique_matches = list(dict.fromkeys(path.resolve() for path in matches))
+    if len(unique_matches) > 1:
+        hashes = {hashlib.sha256(path.read_bytes()).hexdigest() for path in unique_matches}
+        if len(hashes) > 1:
+            raise ValueError(
+                f"canonical DataHub daily conflict for {normalized}: "
+                + ", ".join(str(path) for path in unique_matches)
+            )
+    if unique_matches:
+        return unique_matches[0]
     raise FileNotFoundError(f"canonical DataHub daily kline missing for {normalized}")
 
 
