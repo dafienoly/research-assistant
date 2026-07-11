@@ -111,8 +111,8 @@
         {"file": "commands/tests/test_code_audit_system.py", "function": "test_code_audit_api_preserves_paths_scope", "line": 75},
         {"file": "scripts/generate_hashed_lock.py", "function": "generate", "line": 33}
       ],
-      "expected_keywords": ["HERMES_UI_TOKEN", "Authorization", "AuditCoordinator", "impacted-tests", "--hash=sha256", "require-hashes"],
-      "behavior": "非回环监听必须鉴权；API 测试按配置携带 token 并隔离审计协调器，避免 pre-push 审计嵌套争锁；CI 阻断 Ruff、Semgrep、GitNexus，并使用带 SHA-256 的 Python 锁。"
+      "expected_keywords": ["HERMES_UI_TOKEN", "Authorization", "AuditCoordinator", "impacted-tests", "TMPDIR", "--hash=sha256", "require-hashes"],
+      "behavior": "非回环监听必须鉴权；API 测试按配置携带 token，impacted pytest 强制使用 /tmp 并隔离审计协调器；CI 阻断 Ruff、Semgrep、GitNexus，并使用带 SHA-256 的 Python 锁。"
     },
     {
       "id": "P2-01",

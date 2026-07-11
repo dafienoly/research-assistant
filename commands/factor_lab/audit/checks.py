@@ -202,6 +202,7 @@ def full_checks(report: AuditReport, root: Path, files: list[str], scope: str, b
         commands_path = str(root / "commands")
         existing_pythonpath = test_env.get("PYTHONPATH", "")
         test_env["PYTHONPATH"] = commands_path + (os.pathsep + existing_pythonpath if existing_pythonpath else "")
+        test_env.update({"TMPDIR": "/tmp", "TEMP": "/tmp", "TMP": "/tmp"})
         # Internal TestClient suites validate contracts, not deployment auth.
         # An explicit empty value prevents a developer .env from changing test behavior.
         test_env["HERMES_UI_TOKEN"] = ""

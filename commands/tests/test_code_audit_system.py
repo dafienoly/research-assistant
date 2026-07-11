@@ -116,3 +116,11 @@ def test_code_audit_api_preserves_paths_scope(monkeypatch):
     assert response.status_code == 200
     assert response.json()["data"]["scope"] == "paths"
     assert response.json()["data"]["paths"] == ["commands/factor_lab/audit/runner.py"]
+
+
+def test_impacted_test_runner_forces_safe_linux_temp_root():
+    source = (Path(__file__).parents[1] / "factor_lab/audit/checks.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'test_env.update({"TMPDIR": "/tmp", "TEMP": "/tmp", "TMP": "/tmp"})' in source
+    assert '"--basetemp", temp_root' in source
