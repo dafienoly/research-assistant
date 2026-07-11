@@ -69,3 +69,11 @@ def test_vnext_event_truth_is_read_only_datahub_consumer():
     source = path.read_text(encoding="utf-8")
     assert "data/normalized/events/event_truth" in source
     assert "._query(" not in source
+
+
+def test_vnext_policy_dataset_is_read_only_datahub_consumer():
+    path = ROOT / "commands/factor_lab/vnext/datasets.py"
+    assert provider_imports(path) == []
+    source = path.read_text(encoding="utf-8")
+    assert "data/normalized/market_series" in source
+    assert "get_ts_client" not in source

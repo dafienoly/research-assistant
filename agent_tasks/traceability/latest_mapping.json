@@ -258,8 +258,19 @@
       ],
       "expected_keywords": ["data/normalized/events/event_truth", "EventTruthIngestion", "tushare_official_structured_gateway"],
       "behavior": "只有 DataHub ingestion 调用结构化外部 provider，并原子写 canonical 事件真值与 manifest；VNext 仅加载持久化结果。"
+    },
+    {
+      "id": "INFRA-MARKET-SERIES-01",
+      "title": "Policy Dataset 指数与 ETF 数据归属 DataHub",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_ingestion/market_series.py", "function": "fetch", "line": 20},
+        {"file": "commands/factor_lab/vnext/datasets.py", "function": "_query", "line": 175},
+        {"file": "commands/scripts/datahub_market_series_fetch.py", "line": 1}
+      ],
+      "expected_keywords": ["data/normalized/market_series", "datahub:index_daily", "MarketSeriesIngestion"],
+      "behavior": "DataHub ingestion 拉取并原子合并指数/ETF 日线；Policy Dataset 只读 canonical 文件，重复交易日去重并记录数据质量冲突。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-11T23:00:00+08:00"
+  "generated_at": "2026-07-11T23:15:00+08:00"
 }

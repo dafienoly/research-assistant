@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -53,7 +53,7 @@ class PolicyBacktestDatasetBuilder:
         if base.empty:
             return {
                 "status": DataStatus.MISSING.value,
-                "missing_evidence": ["tushare:index_daily:000001.SH"],
+                "missing_evidence": ["datahub:index_daily:000001.SH"],
                 "sources": self.sources,
             }
         sse = index_frames["sse"].set_index("trade_date").sort_index()
@@ -173,18 +173,20 @@ class PolicyBacktestDatasetBuilder:
         return {**metadata, "output": str(destination)}
 
     def _query(self, api_name: str, code: str, start: str, end: str) -> pd.DataFrame:
-        source = f"tushare:{api_name}:{code}"
+        category = "index" if api_name == "index_daily" else "fund"
+        path = self.project_root / "data/normalized/market_series" / category / f"{code}.csv"
+        source = f"datahub:{api_name}:{code}"
         try:
-            from factor_lab.data.tushare_client import get_ts_client
-
-            frame = get_ts_client()._query(api_name, ts_code=code, start_date=start, end_date=end)
+            frame = pd.read_csv(path, encoding="utf-8-sig", dtype={"trade_date": str})
             if not frame.empty and "trade_date" in frame:
-                frame["trade_date"] = pd.to_datetime(frame["trade_date"].astype(str), errors="coerce")
-                frame = frame.sort_values("trade_date")
+                frame["trade_date"] = pd.to_datetime(frame["trade_date"], format="%Y%m%d", errors="coerce")
+                frame = frame[
+                    frame["trade_date"].between(pd.Timestamp(start), pd.Timestamp(end))
+                ].sort_values("trade_date")
             self.sources.append({"source": source, "status": DataStatus.OK.value if not frame.empty else DataStatus.MISSING.value, "records": len(frame)})
             return frame
         except Exception as exc:
-            self.sources.append({"source": source, "status": DataStatus.MISSING.value, "records": 0, "error": type(exc).__name__})
+            self.sources.append({"source": source, "status": DataStatus.MISSING.value, "records": 0, "error": type(exc).__name__, "path": str(path)})
             return pd.DataFrame()
 
     @staticmethod
@@ -214,7 +216,11 @@ class PolicyBacktestDatasetBuilder:
                 frame = pd.read_csv(path, usecols=lambda column: column in {"trade_date", "pct_chg"}, encoding="utf-8-sig")
                 if not {"trade_date", "pct_chg"}.issubset(frame):
                     continue
-                frame["trade_date"] = pd.to_datetime(frame["trade_date"].astype(str), errors="coerce")
+                frame["trade_date"] = pd.to_datetime(
+                    frame["trade_date"].astype("string").str.replace(r"\.0$", "", regex=True),
+                    format="%Y%m%d",
+                    errors="coerce",
+                )
                 frame["pct_chg"] = pd.to_numeric(frame["pct_chg"], errors="coerce")
                 frame = frame[(frame["trade_date"] >= start_ts) & (frame["trade_date"] <= end_ts)].dropna()
                 if frame.empty:
@@ -244,16 +250,25 @@ class PolicyBacktestDatasetBuilder:
                 continue
             try:
                 frame = pd.read_csv(path, usecols=lambda column: column in {"trade_date", "close"}, encoding="utf-8-sig")
-                frame["trade_date"] = pd.to_datetime(frame["trade_date"].astype(str), errors="coerce")
+                frame["trade_date"] = pd.to_datetime(
+                    frame["trade_date"].astype("string").str.replace(r"\.0$", "", regex=True),
+                    format="%Y%m%d",
+                    errors="coerce",
+                )
+                before = len(frame)
+                frame = frame.dropna(subset=["trade_date"]).drop_duplicates("trade_date", keep="last")
+                duplicate_rows = before - len(frame)
                 close = pd.Series(pd.to_numeric(frame["close"], errors="coerce").values, index=frame["trade_date"])
                 series.append(close.pct_change().rename(symbol))
+                if duplicate_rows:
+                    self.sources.append({"source": f"datahub:daily:{symbol}", "status": DataStatus.PARTIAL.value, "duplicate_rows": duplicate_rows})
             except (OSError, ValueError, KeyError):
                 continue
         if not series:
-            self.sources.append({"source": "local:semiconductor_anchors", "status": DataStatus.MISSING.value, "records": 0})
+            self.sources.append({"source": "datahub:semiconductor_anchors", "status": DataStatus.MISSING.value, "records": 0})
             return pd.Series(dtype=float)
         frame = pd.concat(series, axis=1).loc[pd.Timestamp(start):pd.Timestamp(end)]
-        self.sources.append({"source": "local:semiconductor_anchors", "status": DataStatus.OK.value, "records": len(frame)})
+        self.sources.append({"source": "datahub:semiconductor_anchors", "status": DataStatus.OK.value, "records": len(frame)})
         return frame.mean(axis=1, skipna=True)
 
     @staticmethod

@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 
@@ -21,7 +19,17 @@ def test_policy_dataset_returns_missing_when_primary_index_absent(tmp_path, monk
     monkeypatch.setattr(builder, "_query", lambda *args: pd.DataFrame())
     result = builder.build("2025-01-01", "2025-05-01", tmp_path / "policy.csv")
     assert result["status"] == "MISSING"
-    assert "tushare:index_daily:000001.SH" in result["missing_evidence"]
+    assert "datahub:index_daily:000001.SH" in result["missing_evidence"]
+
+
+def test_policy_dataset_reads_market_series_from_datahub_without_provider(tmp_path):
+    root = tmp_path / "data/normalized/market_series/index"
+    root.mkdir(parents=True)
+    pd.DataFrame({"trade_date": ["20250102"], "close": [3200]}).to_csv(root / "000001.SH.csv", index=False)
+    builder = PolicyBacktestDatasetBuilder(tmp_path)
+    frame = builder._query("index_daily", "000001.SH", "20250101", "20250131")
+    assert len(frame) == 1
+    assert builder.sources[0]["source"] == "datahub:index_daily:000001.SH"
 
 
 def test_policy_dataset_marks_partial_sources_without_zero_filling_returns(tmp_path, monkeypatch):
@@ -62,3 +70,18 @@ def test_policy_breadth_vectorized_batches_count_each_stock_day(tmp_path):
     result = PolicyBacktestDatasetBuilder(tmp_path)._breadth("2025-01-01", "2025-01-31")
     assert result.loc[pd.Timestamp("2025-01-02")].to_dict() == {"advancing": 1, "declining": 1}
     assert result.loc[pd.Timestamp("2025-01-03")].to_dict() == {"advancing": 0, "declining": 2}
+
+
+def test_anchor_returns_parse_integer_dates_and_deduplicate(tmp_path):
+    root = tmp_path / "data/normalized/market"
+    root.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "trade_date": [20250102, 20250102, 20250103],
+            "close": [10, 11, 12],
+        }
+    ).to_csv(root / "002371.SZ.csv", index=False)
+    builder = PolicyBacktestDatasetBuilder(tmp_path)
+    result = builder._anchor_equal_return("2025-01-01", "2025-01-31")
+    assert list(result.index) == [pd.Timestamp("2025-01-02"), pd.Timestamp("2025-01-03")]
+    assert any(row.get("duplicate_rows") == 1 for row in builder.sources)
