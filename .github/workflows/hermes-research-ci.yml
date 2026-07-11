@@ -108,6 +108,8 @@ jobs:
           commands/tests/test_shadow_forward_hardening.py
           commands/tests/test_shadow_forward_data_integrity.py
           commands/tests/test_factor_promotion_safety.py
+          commands/tests/test_alpha_registry_concurrency.py
+          commands/tests/test_llm_alpha_discovery.py
           commands/tests/test_alpha_promotion_retirement.py
           commands/tests/test_qmt_integration.py
           commands/tests/test_miniqmt_adapter.py

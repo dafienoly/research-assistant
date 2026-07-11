@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -15,7 +16,7 @@ class RegulatoryWatchlist:
 
     CACHE_PATH: Path = DATAHUB_ROOT / "events" / "regulatory_watchlist.json"
 
-    def __init__(self, cache_path: Optional[str | Path] = None):
+    def __init__(self, cache_path: Optional[str | Path] = None, max_age_days: int = 3):
         self.CACHE_PATH = Path(cache_path) if cache_path is not None else self.CACHE_PATH
         self._events: list[dict] = []
         self._blacklist_symbols: set[str] = set()
@@ -23,6 +24,7 @@ class RegulatoryWatchlist:
         self._covered_symbols: set[str] = set()
         self._loaded = False
         self._error: str | None = None
+        self.max_age_days = max_age_days
 
     @property
     def available(self) -> bool:
@@ -64,10 +66,32 @@ class RegulatoryWatchlist:
         if not self.CACHE_PATH.exists():
             self._error = f"canonical regulatory snapshot missing: {self.CACHE_PATH}"
             return False
+        manifest_path = self.CACHE_PATH.with_suffix(".manifest.json")
         try:
             payload = json.loads(self.CACHE_PATH.read_text(encoding="utf-8"))
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as exc:
             self._error = f"canonical regulatory snapshot unreadable: {exc}"
+            return False
+        expected_hash = str(manifest.get("sha256", ""))
+        actual_hash = hashlib.sha256(self.CACHE_PATH.read_bytes()).hexdigest()
+        if not expected_hash or expected_hash != actual_hash:
+            self._error = "canonical regulatory snapshot hash mismatch"
+            return False
+        try:
+            generated_at = datetime.fromisoformat(
+                str(manifest.get("observed_at") or manifest.get("generated_at"))
+            )
+        except ValueError:
+            self._error = "canonical regulatory snapshot generated_at missing"
+            return False
+        if generated_at.tzinfo is None:
+            generated_at = generated_at.astimezone()
+        if datetime.now().astimezone() - generated_at > timedelta(days=self.max_age_days):
+            self._error = "canonical regulatory snapshot stale"
+            return False
+        if manifest.get("conflicts"):
+            self._error = "canonical regulatory snapshot has unresolved conflicts"
             return False
         records = payload.get("events")
         if not isinstance(records, list):
@@ -76,6 +100,9 @@ class RegulatoryWatchlist:
         status = str(payload.get("status", "OK")).upper()
         if status not in {"OK", "EMPTY", "PARTIAL"}:
             self._error = f"canonical regulatory snapshot status={status}"
+            return False
+        if str(manifest.get("status", "")).upper() != status:
+            self._error = "canonical regulatory snapshot status conflicts with manifest"
             return False
         covered = payload.get("covered_symbols")
         if not isinstance(covered, list):

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+import hashlib
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -17,12 +18,13 @@ class STWatchlist:
 
     CACHE_PATH: Path = STOCK_BASIC_PATH
 
-    def __init__(self, cache_path: Optional[str | Path] = None):
+    def __init__(self, cache_path: Optional[str | Path] = None, max_age_days: int = 14):
         self.CACHE_PATH = Path(cache_path) if cache_path is not None else STOCK_BASIC_PATH
         self._st_map: dict[str, dict] = {}
         self._loaded = False
         self._source_as_of: str | None = None
         self._error: str | None = None
+        self.max_age_days = max_age_days
 
     @property
     def available(self) -> bool:
@@ -97,7 +99,9 @@ class STWatchlist:
                 }
             )
         self._build_index(records)
-        self._source_as_of = datetime.fromtimestamp(self.CACHE_PATH.stat().st_mtime).astimezone().isoformat()
+        self._source_as_of = self._source_as_of or datetime.fromtimestamp(
+            self.CACHE_PATH.stat().st_mtime
+        ).astimezone().isoformat()
         return True
 
     def load_cache(self) -> bool:
@@ -105,11 +109,51 @@ class STWatchlist:
         if not self.CACHE_PATH.exists():
             self._error = f"canonical ST truth missing: {self.CACHE_PATH}"
             return False
+        if not self._validate_manifest():
+            self._loaded = False
+            return False
         loaded = self._load_json_snapshot() if self.CACHE_PATH.suffix.lower() == ".json" else self._load_stock_reference()
         self._loaded = loaded
         if loaded:
             self._error = None
         return loaded
+
+    def _validate_manifest(self) -> bool:
+        manifest_path = (
+            self.CACHE_PATH.with_suffix(".manifest.json")
+            if self.CACHE_PATH.suffix.lower() == ".json"
+            else self.CACHE_PATH.parent / "manifest.json"
+        )
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            self._error = f"canonical stock reference manifest unavailable: {exc}"
+            return False
+        if str(manifest.get("status", "")).upper() != "OK":
+            self._error = f"canonical stock reference status={manifest.get('status', 'MISSING')}"
+            return False
+        expected_hash = str(manifest.get("sha256", ""))
+        actual_hash = hashlib.sha256(self.CACHE_PATH.read_bytes()).hexdigest()
+        if not expected_hash or expected_hash != actual_hash:
+            self._error = "canonical stock reference hash mismatch"
+            return False
+        try:
+            generated_at = datetime.fromisoformat(
+                str(manifest.get("observed_at") or manifest.get("generated_at"))
+            )
+        except ValueError:
+            self._error = "canonical stock reference generated_at missing"
+            return False
+        if generated_at.tzinfo is None:
+            generated_at = generated_at.astimezone()
+        if datetime.now().astimezone() - generated_at > timedelta(days=self.max_age_days):
+            self._error = "canonical stock reference stale"
+            return False
+        if manifest.get("conflicts"):
+            self._error = "canonical stock reference has unresolved conflicts"
+            return False
+        self._source_as_of = generated_at.isoformat()
+        return True
 
     def ensure_fresh(self) -> int:
         return self.refresh()

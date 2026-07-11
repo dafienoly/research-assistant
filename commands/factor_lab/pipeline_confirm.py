@@ -3,11 +3,10 @@
 注册后推送待确认消息，用户通过 CLI 确认或拒绝。
 """
 from __future__ import annotations
-import json
 import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Optional
+from factor_lab.alpha.storage import read_json, update_json, write_json
 
 CST = timezone(timedelta(hours=8))
 
@@ -17,23 +16,18 @@ PENDING_FILE = ALPHA_REGISTRY_ROOT / "pending_confirmations.json"
 
 
 def _load_pending() -> list[dict]:
-    if PENDING_FILE.exists():
-        return json.loads(PENDING_FILE.read_text())
-    return []
+    return read_json(PENDING_FILE, [])
 
 
 def _save_pending(data: list[dict]):
     PENDING_FILE.parent.mkdir(parents=True, exist_ok=True)
-    PENDING_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+    write_json(PENDING_FILE, data)
 
 
 def add_pending(alpha_id: str, name: str, ic_mean: float, sharpe: float,
                 max_dd: float, summary: str):
     """添加待确认项"""
-    pending = _load_pending()
-    # 去重
-    pending = [p for p in pending if p["alpha_id"] != alpha_id]
-    pending.append({
+    record = {
         "alpha_id": alpha_id,
         "name": name,
         "ic_mean": ic_mean,
@@ -42,8 +36,12 @@ def add_pending(alpha_id: str, name: str, ic_mean: float, sharpe: float,
         "summary": summary,
         "created_at": datetime.now(CST).isoformat(),
         "status": "pending",
-    })
-    _save_pending(pending)
+    }
+    update_json(
+        PENDING_FILE,
+        [],
+        lambda pending: [p for p in pending if p["alpha_id"] != alpha_id] + [record],
+    )
 
 
 def cmd_pending_list() -> str:
@@ -81,44 +79,45 @@ def cmd_confirm(alpha_id: str) -> str:
 
     # Human approval is not production approval. Shadow and OOS must still pass.
     if REGISTRY_INDEX.exists():
-        index = json.loads(REGISTRY_INDEX.read_text())
-        for entry in index:
-            if entry.get("alpha_id") == alpha_id:
+        def approve_index(index):
+            for entry in index:
+                if entry.get("alpha_id") != alpha_id:
+                    continue
                 entry["status"] = "human_approved_shadow"
                 entry["enabled"] = False
                 entry["paper_enabled"] = False
                 entry["live_enabled"] = False
                 entry["human_approved_at"] = datetime.now(CST).isoformat()
                 entry["updated_at"] = datetime.now(CST).isoformat()
-                REGISTRY_INDEX.write_text(
-                    json.dumps(index, indent=2, ensure_ascii=False)
-                )
-                break
+            return index
+
+        update_json(REGISTRY_INDEX, [], approve_index)
 
     # 更新 alpha_spec.json
     alpha_dir = ALPHA_REGISTRY_ROOT / alpha_id
     spec_file = alpha_dir / "alpha_spec.json"
     if spec_file.exists():
-        spec = json.loads(spec_file.read_text())
-        spec["status"] = "human_approved_shadow"
-        spec["enabled"] = False
-        spec["paper_enabled"] = False
-        spec["live_enabled"] = False
-        spec["human_approved_at"] = datetime.now(CST).isoformat()
-        spec["updated_at"] = datetime.now(CST).isoformat()
-        spec_file.write_text(json.dumps(spec, indent=2, ensure_ascii=False))
+        def approve_spec(spec):
+            spec.update({
+                "status": "human_approved_shadow", "enabled": False,
+                "paper_enabled": False, "live_enabled": False,
+                "human_approved_at": datetime.now(CST).isoformat(),
+                "updated_at": datetime.now(CST).isoformat(),
+            })
+            return spec
+
+        update_json(spec_file, {}, approve_spec)
 
     # 进入影子观察
     try:
         sys.path.insert(0, str(Path(__file__).parent.resolve()))
         from shadow_observer import ShadowObserver
         ShadowObserver().mark_observing(alpha_id)
-    except Exception as e:
+    except Exception:
         pass  # 非阻塞
 
     # 移除待确认
-    pending = [p for p in pending if p["alpha_id"] != alpha_id]
-    _save_pending(pending)
+    update_json(PENDING_FILE, [], lambda rows: [p for p in rows if p["alpha_id"] != alpha_id])
 
     # 企微通知
     try:
@@ -145,19 +144,17 @@ def cmd_reject(alpha_id: str, reason: str = "") -> str:
 
     # 标记 registry 为 rejected
     if REGISTRY_INDEX.exists():
-        index = json.loads(REGISTRY_INDEX.read_text())
-        for entry in index:
-            if entry.get("alpha_id") == alpha_id:
-                entry["status"] = "rejected"
-                entry["updated_at"] = datetime.now(CST).isoformat()
-                REGISTRY_INDEX.write_text(
-                    json.dumps(index, indent=2, ensure_ascii=False)
-                )
-                break
+        def reject_index(index):
+            for entry in index:
+                if entry.get("alpha_id") == alpha_id:
+                    entry["status"] = "rejected"
+                    entry["updated_at"] = datetime.now(CST).isoformat()
+            return index
+
+        update_json(REGISTRY_INDEX, [], reject_index)
 
     # 从 pending 移除
-    pending = [p for p in pending if p["alpha_id"] != alpha_id]
-    _save_pending(pending)
+    update_json(PENDING_FILE, [], lambda rows: [p for p in rows if p["alpha_id"] != alpha_id])
 
     msg = f"因子 {name} ({alpha_id}) 已拒绝"
     if reason:

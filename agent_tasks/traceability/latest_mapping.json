@@ -1116,6 +1116,29 @@
       ],
       "expected_keywords": ["validated", "human_approved_shadow", "enabled", "paper_enabled", "live_enabled"],
       "behavior": "IC 按 validated_at 时间排序计算衰减；人工确认仅进入 Shadow 候选态，所有执行 enabled 标志保持 false，等待 Shadow/OOS/生产审批。"
+    },
+    {
+      "id": "INFRA-RISK-TRUTH-01",
+      "title": "ST 与监管风险真值 freshness/hash 门禁",
+      "code_locations": [
+        {"file": "commands/factor_lab/risk/st_watchlist.py", "function": "load_cache", "line": 110},
+        {"file": "commands/factor_lab/risk/regulatory_watchlist.py", "function": "load_cache", "line": 65},
+        {"file": "commands/factor_lab/datahub_ingestion/regulatory_events.py", "function": "fetch", "line": 25}
+      ],
+      "expected_keywords": ["sha256", "generated_at", "stale", "conflicts", "covered_symbols"],
+      "behavior": "风险消费者只接受带 sidecar SHA、观测时间和无未解决冲突的 canonical 真值；过期、篡改或未覆盖标的在 PreTrade 中 fail-closed。"
+    },
+    {
+      "id": "INFRA-ALPHA-REGISTRY-LOCK-01",
+      "title": "Alpha Registry 原子多写者存储",
+      "code_locations": [
+        {"file": "commands/factor_lab/alpha/storage.py", "function": "update_json", "line": 20},
+        {"file": "commands/factor_lab/alpha/registry.py", "function": "register_alpha", "line": 30},
+        {"file": "commands/factor_lab/pipeline_confirm.py", "function": "cmd_confirm", "line": 65},
+        {"file": "commands/factor_lab/shadow_observer.py", "function": "mark_observing", "line": 85}
+      ],
+      "expected_keywords": ["fcntl.flock", "os.replace", "fsync", "update_json", "human_approved_shadow"],
+      "behavior": "注册、人工确认、Shadow 与 pending 队列共享 flock+atomic replace 的完整读改写事务；并发注册不会丢 index 条目，现有 D 盘格式不迁移不删除。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

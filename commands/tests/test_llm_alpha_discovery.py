@@ -1,13 +1,15 @@
 """测试: V3.7 LLM Alpha Discovery"""
-import sys, os, json
+import json
+import os
+import sys
+import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
 CST = timezone(timedelta(hours=8))
 
-from factor_lab.alpha.llm_alpha_discovery import (
+from factor_lab.alpha.llm_alpha_discovery import (  # noqa: E402
     AlphaSpecValidator,
     submit_candidate,
     list_candidates,
@@ -18,6 +20,8 @@ from factor_lab.alpha.llm_alpha_discovery import (
     CANDIDATES_ROOT,
     CANDIDATES_INDEX,
 )
+import factor_lab.alpha.llm_alpha_discovery as discovery_module  # noqa: E402
+import factor_lab.alpha.registry as registry_module  # noqa: E402
 
 
 # ─── 辅助函数 ─────────────────────────────────────────────
@@ -33,10 +37,28 @@ def _unique_name(prefix="test"):
     return f"{prefix}_{ts}_{_COUNTER}"
 
 
+@pytest.fixture(autouse=True)
+def isolate_candidate_storage(tmp_path, monkeypatch):
+    """Keep every discovery test away from the protected D-drive registry."""
+    global CANDIDATES_ROOT, CANDIDATES_INDEX
+    root = tmp_path / "alpha_candidates"
+    index = root / "candidates_index.json"
+    monkeypatch.setattr(discovery_module, "CANDIDATES_ROOT", root)
+    monkeypatch.setattr(discovery_module, "CANDIDATES_INDEX", index)
+    monkeypatch.setattr(discovery_module, "BASE", tmp_path / "reports")
+    registry_root = tmp_path / "alpha_registry"
+    monkeypatch.setattr(registry_module, "REGISTRY_ROOT", registry_root)
+    monkeypatch.setattr(registry_module, "REGISTRY_INDEX", registry_root / "registry_index.json")
+    CANDIDATES_ROOT = root
+    CANDIDATES_INDEX = index
+    yield
+
+
 def _clean_candidates():
-    """清理测试产生的候选目录"""
+    """Reset only the pytest-owned candidate directory."""
     if CANDIDATES_ROOT.exists():
         import shutil
+
         shutil.rmtree(CANDIDATES_ROOT)
 
 
@@ -46,14 +68,15 @@ def _make_valid_candidate():
         "name": _unique_name("alpha"),
         "description": "基于动量的测试因子",
         "hypothesis": "过去20日收益高的股票未来5日继续跑赢",
-        "factor_expression": "rank(ts_mean(close, 20) / ts_mean(close, 60) - 1)",
+        "factor_expression": "rank((ts_mean(close, 20) / ts_mean(close, 60) - 1) / (pe_ttm + 1))",
         "universe": "all_watchlist",
-        "data_requirements": ["close", "volume"],
+        "data_requirements": ["close", "volume", "pe_ttm"],
         "signal_direction": "long",
         "rebalance_frequency": "weekly",
         "risk_constraints": {"max_position_weight": 0.25, "max_drawdown": 0.15},
         "risk_notes": "动量因子在震荡市中可能失效",
         "evidence": "A股市场动量效应在20日窗口显著",
+        "industry_hypothesis": "适用于趋势较强且成交活跃的科技制造行业",
     }
 
 
@@ -87,6 +110,7 @@ def _make_future_function_candidate():
         "risk_constraints": {"max_position_weight": 0.25, "max_drawdown": 0.15},
         "risk_notes": "含未来函数",
         "evidence": "测试用例",
+        "industry_hypothesis": "测试行业假设",
     }
 
 
@@ -104,17 +128,8 @@ def _make_uncomputable_candidate():
         "risk_constraints": {"max_position_weight": 0.25, "max_drawdown": 0.15},
         "risk_notes": "语法错误",
         "evidence": "测试用例",
+        "industry_hypothesis": "测试行业假设",
     }
-
-
-def setup_function():
-    """每个测试前清理候选目录"""
-    _clean_candidates()
-
-
-def teardown_function():
-    """每个测试后清理候选目录"""
-    _clean_candidates()
 
 
 # ─── Test: AlphaSpecValidator ─────────────────────────────
@@ -201,7 +216,7 @@ def test_validator_passes_minimum_window():
     """window=2 应通过（最小值）"""
     validator = AlphaSpecValidator()
     candidate = _make_valid_candidate()
-    candidate["factor_expression"] = "rank(ts_mean(close, 2))"
+    candidate["factor_expression"] = "rank(ts_mean(close, 2) / (pe_ttm + 1))"
     ok = validator.validate(candidate)
     assert ok, f"window=2 应通过: {validator.errors}"
 
@@ -264,9 +279,9 @@ def test_submit_validates_safety():
     cid = result["candidate_id"]
     record = json.loads((CANDIDATES_ROOT / cid / "candidate.json").read_text())
     spec = record.get("spec", {})
-    assert spec.get("enabled") == False
-    assert spec.get("paper_enabled") == False
-    assert spec.get("live_enabled") == False
+    assert spec.get("enabled") is False
+    assert spec.get("paper_enabled") is False
+    assert spec.get("live_enabled") is False
 
 
 # ─── Test: list_candidates / get_candidate ─────────────────
@@ -439,6 +454,6 @@ def test_llm_discovery_default_disabled():
     # 验证注册后的 Alpha 全部 disabled
     from factor_lab.alpha.registry import get_alpha
     spec = get_alpha(approved["alpha_id"])
-    assert spec.get("enabled") == False
-    assert spec.get("paper_enabled") == False
-    assert spec.get("live_enabled") == False
+    assert spec.get("enabled") is False
+    assert spec.get("paper_enabled") is False
+    assert spec.get("live_enabled") is False

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
@@ -73,6 +74,19 @@ class RegulatoryEventIngestion:
             "coverage_policy": "symbols absent from covered_symbols remain fail-closed",
         }
         EventTruthIngestion._atomic_json(self.output, payload)
+        manifest = {
+            "status": status,
+            "dataset": "events/regulatory_watchlist",
+            "generated_at": payload["generated_at"],
+            "observed_at": payload["generated_at"],
+            "source": payload["source"],
+            "path": self.output.name,
+            "sha256": hashlib.sha256(self.output.read_bytes()).hexdigest(),
+            "covered_symbols": covered,
+            "failed_symbols": failed,
+            "conflicts": [],
+        }
+        EventTruthIngestion._atomic_json(self.output.with_suffix(".manifest.json"), manifest)
         return payload
 
     @staticmethod

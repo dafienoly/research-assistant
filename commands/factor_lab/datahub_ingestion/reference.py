@@ -38,10 +38,12 @@ class ReferenceIngestion:
         combined["symbol"] = combined["ts_code"].astype("string").str.strip()
         destination = self.output_root / "stock_basic.csv"
         EventTruthIngestion._atomic_frame(destination, combined)
+        observed_at = datetime.now().astimezone().isoformat()
         manifest = {
             "status": "OK" if statuses["L"]["rows"] > 0 else "PARTIAL",
             "source": "tushare:stock_basic",
-            "generated_at": datetime.now().astimezone().isoformat(),
+            "generated_at": observed_at,
+            "observed_at": observed_at,
             "active_stocks": int((combined["list_status"] == "L").sum()),
             "total_records": len(combined),
             "datasets": statuses,

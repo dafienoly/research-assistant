@@ -20,7 +20,11 @@ _SCRIPT_DIR = Path(__file__).parent.resolve()
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
-from factor_lab.pipeline_config import PipelineConfig
+from factor_lab.pipeline_config import PipelineConfig  # noqa: E402
+from factor_lab.alpha.storage import read_json, update_json, write_json  # noqa: E402
+
+
+REGISTRY_INDEX = Path("/mnt/d/HermesData/alpha_registry/registry_index.json")
 
 
 class ShadowObserver:
@@ -91,15 +95,23 @@ class ShadowObserver:
 
     def mark_observing(self, alpha_id: str, holding_period: int = 5):
         """将刚注册的 Alpha 设为观察中"""
-        registry = self._load_registry()
-        for alpha in registry:
-            if alpha["alpha_id"] == alpha_id:
+        found = False
+
+        def mark(registry):
+            nonlocal found
+            for alpha in registry:
+                if alpha["alpha_id"] != alpha_id:
+                    continue
                 alpha["shadow_status"] = "observing"
                 alpha["shadow_start"] = datetime.now(CST).strftime("%Y-%m-%d")
                 alpha["holding_period"] = holding_period
-                self._save_registry(registry)
-                print(f"  🔭 {alpha.get('name','?')} 进入影子观察期")
-                return
+                found = True
+            return registry
+
+        updated = update_json(REGISTRY_INDEX, [], mark)
+        if found:
+            alpha = next(item for item in updated if item["alpha_id"] == alpha_id)
+            print(f"  🔭 {alpha.get('name','?')} 进入影子观察期")
 
     # ── IC 历史采集 ─────────────────────────────────
 
@@ -154,50 +166,43 @@ class ShadowObserver:
 
     def _load_registry(self) -> list[dict]:
         """加载 Alpha Registry index"""
-        index_path = Path(
-            "/mnt/d/HermesData/alpha_registry/registry_index.json"
-        )
-        if index_path.exists():
-            return json.loads(index_path.read_text())
-        return []
+        return read_json(REGISTRY_INDEX, [])
 
     def _save_registry(self, registry: list[dict]):
-        index_path = Path(
-            "/mnt/d/HermesData/alpha_registry/registry_index.json"
-        )
-        index_path.write_text(
-            json.dumps(registry, indent=2, ensure_ascii=False)
-        )
+        write_json(REGISTRY_INDEX, registry)
 
     def _update_alpha_status(self, alpha_id: str, status: str,
                              decay_rate: float):
         """更新 Alpha 状态"""
-        registry = self._load_registry()
-        for alpha in registry:
-            if alpha["alpha_id"] == alpha_id:
+        updated_alpha = None
+
+        def update_registry(registry):
+            nonlocal updated_alpha
+            for alpha in registry:
+                if alpha["alpha_id"] != alpha_id:
+                    continue
                 alpha["shadow_status"] = status
                 alpha["shadow_end"] = datetime.now(CST).strftime("%Y-%m-%d")
                 alpha["ic_decay_rate"] = round(decay_rate, 4)
                 alpha["updated_at"] = datetime.now(CST).isoformat()
-                self._save_registry(registry)
+                updated_alpha = dict(alpha)
+            return registry
 
-                # 也更新 alpha_dir 中的 spec
-                alpha_dir = Path(
-                    "/mnt/d/HermesData/alpha_registry"
-                ) / alpha_id
-                spec_file = alpha_dir / "alpha_spec.json"
-                if spec_file.exists():
-                    spec = json.loads(spec_file.read_text())
-                    spec.update({
-                        "shadow_status": status,
-                        "shadow_end": alpha["shadow_end"],
-                        "ic_decay_rate": round(decay_rate, 4),
-                        "updated_at": alpha["updated_at"],
-                    })
-                    spec_file.write_text(
-                        json.dumps(spec, indent=2, ensure_ascii=False)
-                    )
-                return
+        update_json(REGISTRY_INDEX, [], update_registry)
+        if updated_alpha is None:
+            return
+        spec_file = REGISTRY_INDEX.parent / alpha_id / "alpha_spec.json"
+        if spec_file.exists():
+            def update_spec(spec):
+                spec.update({
+                    "shadow_status": status,
+                    "shadow_end": updated_alpha["shadow_end"],
+                    "ic_decay_rate": round(decay_rate, 4),
+                    "updated_at": updated_alpha["updated_at"],
+                })
+                return spec
+
+            update_json(spec_file, {}, update_spec)
 
     # ── 通知 ────────────────────────────────────────
 
