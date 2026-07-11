@@ -89,7 +89,10 @@ class CorporateEventIngestion:
                 content_hash = atomic_write_frame(merged, destination)
             else:
                 content_hash = None
-            status = "OK" if rows and not errors else ("PARTIAL" if rows or destination.exists() else "MISSING")
+            if errors:
+                status = "PARTIAL" if rows or destination.exists() else "MISSING"
+            else:
+                status = "OK" if rows or destination.exists() else "EMPTY"
             results.append({
                 "symbol": symbol,
                 "path": destination.name,
@@ -121,7 +124,11 @@ class CorporateEventIngestion:
             "status": (
                 "IN_PROGRESS"
                 if run_status == "IN_PROGRESS"
-                else ("OK" if results and all(row["status"] == "OK" for row in results) else "PARTIAL")
+                else (
+                    "OK"
+                    if results and all(row["status"] in {"OK", "EMPTY"} for row in results)
+                    else "PARTIAL"
+                )
             ),
             "run_status": run_status,
             "dataset": "normalized/events/corporate_events",

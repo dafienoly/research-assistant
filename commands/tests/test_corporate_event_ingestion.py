@@ -80,6 +80,19 @@ def test_corporate_circuit_counts_intermittent_failures_across_empty_successes(t
     assert "cumulative" in manifest["circuits"]["forecast"]["reason"]
 
 
+def test_corporate_ingestion_distinguishes_verified_empty_from_missing(tmp_path):
+    class EmptyClient:
+        def _query(self, _api_name, **_params):
+            return pd.DataFrame()
+
+    manifest = CorporateEventIngestion(tmp_path, EmptyClient()).fetch(
+        ["688012.SH"], "20260701", "20260711",
+    )
+
+    assert manifest["status"] == "OK"
+    assert manifest["results"][0]["status"] == "EMPTY"
+
+
 def test_semiconductor_engine_reads_canonical_corporate_events(tmp_path, monkeypatch):
     root = tmp_path / "normalized/events/corporate_events"
     root.mkdir(parents=True)
