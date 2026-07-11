@@ -12,6 +12,18 @@ sys.path.insert(0, str(ROOT / "commands"))
 
 from factor_lab.scheduling import ScheduleRegistry, ScheduledDagRunner  # noqa: E402
 from factor_lab.decision_loop.storage import DecisionLoopStore  # noqa: E402
+from factor_lab.datahub_access import calendar_row  # noqa: E402
+
+
+def trading_day_gate(dag_id: str, trading_date: str) -> dict:
+    if dag_id != "postmarket":
+        return {"status": "NOT_REQUIRED"}
+    try:
+        day = datetime.fromisoformat(trading_date).date()
+        row = calendar_row(day)
+    except (FileNotFoundError, ValueError) as exc:
+        return {"status": "FAILED", "reason": f"trade_calendar_unavailable:{type(exc).__name__}"}
+    return {"status": "OPEN" if int(row["is_open"]) == 1 else "CLOSED", "source": "canonical_datahub"}
 
 
 def enqueue_failure_alert(result: dict, store: DecisionLoopStore | None = None) -> dict:
@@ -67,6 +79,22 @@ def main() -> int:
         return 0
     if not args.dag_id:
         parser.error("dag_id is required unless --validate is used")
+    calendar_gate = trading_day_gate(args.dag_id, args.date)
+    if calendar_gate["status"] == "CLOSED":
+        print(json.dumps({
+            "status": "SKIPPED", "dag_id": args.dag_id, "trading_date": args.date,
+            "skip_reason": "non_trading_day", "calendar_gate": calendar_gate,
+        }, ensure_ascii=False, indent=2))
+        return 0
+    if calendar_gate["status"] == "FAILED":
+        result = {
+            "status": "FAILED", "dag_id": args.dag_id, "trading_date": args.date,
+            "jobs": {"trade_calendar_gate": {"status": "FAILED", "reason": calendar_gate["reason"]}},
+            "calendar_gate": calendar_gate,
+        }
+        result["operational_alert"] = enqueue_failure_alert(result)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 1
     runner = ScheduledDagRunner(ROOT, registry, state_root=args.state_root)
     if args.dry_run:
         print(json.dumps(runner.describe(args.dag_id, args.date), ensure_ascii=False, indent=2))

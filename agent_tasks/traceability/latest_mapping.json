@@ -474,12 +474,13 @@
       "id": "P0-SCHEDULER-OPS-ALERT-01",
       "title": "调度失败进入 Telegram 与企业微信 durable outbox",
       "code_locations": [
-        {"file": "commands/scripts/run_scheduled_dag.py", "function": "enqueue_failure_alert", "line": 17},
+        {"file": "commands/scripts/run_scheduled_dag.py", "function": "trading_day_gate", "line": 17},
+        {"file": "commands/scripts/run_scheduled_dag.py", "function": "enqueue_failure_alert", "line": 30},
         {"file": "commands/tests/test_scheduling.py", "function": "test_failed_dag_alert_is_durable_dual_channel_and_idempotent", "line": 145},
         {"file": "commands/scripts/generate_capability_status.py", "function": "main", "line": 25}
       ],
-      "expected_keywords": ["scheduler/alerts.jsonl", "notifications/outbox.jsonl", "telegram", "enterprise_wechat", "max_attempts"],
-      "behavior": "DAG 最终失败以 dag+date 幂等落入运维账本和双通道 outbox；调度线程不做网络 I/O，由通知 worker 重试并 dead-letter。"
+      "expected_keywords": ["calendar_row", "non_trading_day", "scheduler/alerts.jsonl", "notifications/outbox.jsonl", "telegram", "enterprise_wechat", "max_attempts"],
+      "behavior": "postmarket 只在 canonical 开市日运行，休市 SKIPPED，日历缺失 fail-closed；DAG 失败以 dag+date 幂等落入运维账本和双通道 outbox，由通知 worker 重试。"
     },
     {
       "id": "P0-TAG-AVAILABILITY-AUDIT-01",

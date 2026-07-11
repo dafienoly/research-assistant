@@ -7,7 +7,7 @@ import pytest
 
 from factor_lab.scheduling import ScheduleRegistry, ScheduledDagRunner, ScheduledJob
 from factor_lab.decision_loop.storage import DecisionLoopStore
-from scripts.run_scheduled_dag import enqueue_failure_alert
+from scripts.run_scheduled_dag import enqueue_failure_alert, trading_day_gate
 
 
 def job(job_id: str, *, depends_on: tuple[str, ...] = (), dataset: str | None = None, attempts: int = 1) -> ScheduledJob:
@@ -158,3 +158,16 @@ def test_failed_dag_alert_is_durable_dual_channel_and_idempotent(tmp_path: Path)
     assert len(store.read_jsonl("scheduler/alerts.jsonl")) == 1
     outbox = store.read_jsonl("notifications/outbox.jsonl")
     assert {row["channel"] for row in outbox} == {"telegram", "enterprise_wechat"}
+
+
+def test_postmarket_trading_day_gate_uses_canonical_calendar(tmp_path: Path, monkeypatch) -> None:
+    calendar = tmp_path / "trade_calendar.csv"
+    calendar.write_text("cal_date,is_open\n20260710,1\n20260711,0\n", encoding="utf-8")
+    import scripts.run_scheduled_dag as module
+    monkeypatch.setattr(module, "calendar_row", lambda day: {
+        "cal_date": day.strftime("%Y%m%d"), "is_open": 1 if day.isoformat() == "2026-07-10" else 0,
+    })
+
+    assert trading_day_gate("postmarket", "2026-07-10")["status"] == "OPEN"
+    assert trading_day_gate("postmarket", "2026-07-11")["status"] == "CLOSED"
+    assert trading_day_gate("weekly_datahub", "2026-07-12")["status"] == "NOT_REQUIRED"

@@ -80,6 +80,8 @@ raw → staging → normalized → manifest/conflict/freshness
 
 第一轮曾用 15:45、16:05、16:15 等时间槽表达依赖，但 DataHub 延迟时仍会重叠。现已替换为声明式 `postmarket` DAG：任务注册表明确 `job_id/trading_date/idempotency_key/depends_on/owned_datasets/writer_id/timeout/retry/backoff`；检查点原子落盘，损坏文件保留后恢复；数据集写锁阻止跨 DAG 双写。`benchmark_projection` 显式依赖 `datahub_daily`，盘后 review 再依赖 benchmark；备份显式依赖数据更新成功。能力状态保持可在研究失败时报告，但至少依赖数据任务完成。周度 DataHub 维护也通过同一 runner 执行；旧 `closing_pipeline.sh` 仅保留为兼容入口，不再维护第二套编排。
 
+`postmarket` 入口现先读取 canonical DataHub 交易日历：休市日输出 `SKIPPED/non_trading_day`，不启动任何写任务；日历缺失或无对应日期时 fail-closed，并进入双通道运维 outbox。`weekly_datahub` 属于维护任务，不受交易日门禁影响。
+
 ## 通知初步发现
 
 - Decision Loop 已统一 Telegram/企业微信回执和共享确认。
