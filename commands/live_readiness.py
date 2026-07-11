@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Optional
 
 from factor_lab.core.gate import GateEngine, GateCheck, GateResult
+from factor_lab.datahub_access import PROJECT_ROOT
 from factor_lab.risk.kill_switch import KillSwitch
 from factor_lab.notify import notify_goal_done, notify_risk_event
 
@@ -161,37 +162,54 @@ class LiveReadinessChecker:
         """
         gate = GateOutput(gate_name="DataHealthGate", severity="blocker")
 
-        # 检查数据目录是否存在
-        data_dir = BASE / ".." / "data" / "market" / "daily_kline"
-        if not data_dir.exists():
-            data_dir = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline")
+        health_dir = PROJECT_ROOT / "data" / "audit" / "health"
+        required = {
+            "coverage": health_dir / "coverage.json",
+            "freshness": health_dir / "freshness.json",
+            "integrity": health_dir / "integrity.json",
+        }
+        reports: dict[str, dict] = {}
+        errors: list[str] = []
+        for name, path in required.items():
+            try:
+                report = json.loads(path.read_text(encoding="utf-8"))
+                generated = datetime.fromisoformat(str(report["generated_at"]))
+                age_hours = (datetime.now(CST) - generated.astimezone(CST)).total_seconds() / 3600
+                if age_hours > 24:
+                    errors.append(f"{name} audit stale ({age_hours:.1f}h)")
+                reports[name] = report
+            except (FileNotFoundError, KeyError, ValueError, json.JSONDecodeError) as exc:
+                errors.append(f"{name} audit unavailable: {exc}")
 
-        evidence_parts = []
+        coverage = reports.get("coverage", {})
+        freshness = reports.get("freshness", {})
+        integrity = reports.get("integrity", {})
+        coverage_ok = (
+            coverage.get("universe_status") == "OK"
+            and coverage.get("active_missing_files") == 0
+            and coverage.get("empty_files") == 0
+            and coverage.get("stocks_with_data") == coverage.get("total_stocks")
+        )
+        freshness_ok = freshness.get("status") == "OK" and freshness.get("blocking_stock_count") == 0
+        integrity_ok = integrity.get("status") == "OK" and integrity.get("problematic_file_count") == 0
+        gate.evidence = (
+            f"coverage={coverage.get('stocks_with_data')}/{coverage.get('total_stocks')}; "
+            f"freshness={freshness.get('status')}; integrity={integrity.get('status')}; "
+            f"audit_errors={errors}"
+        )
 
-        # 检查数据文件数量
-        if data_dir.exists():
-            csv_files = list(data_dir.glob("*.csv"))
-            n_files = len(csv_files)
-            evidence_parts.append(f"{data_dir}: {n_files} 个 CSV 文件")
-        else:
-            evidence_parts.append("daily_kline 目录不存在")
-
-        # 模拟数据新鲜度检查（生产环境应连接实际数据源）
-        # 这里只做目录存在性校验，实际生产需要运行 data:freshness-check
-        gate.evidence = "; ".join(evidence_parts)
-
-        if data_dir.exists() and len(list(data_dir.glob("*.csv"))) > 0:
+        if coverage_ok and freshness_ok and integrity_ok and not errors:
             gate.passed = True
             gate.severity = "info"
-            gate.message = "数据目录存在且有 CSV 文件"
+            gate.message = "DataHub coverage、freshness、integrity 审计均通过"
             gate.fix_suggestion = ""
         else:
             gate.passed = False
             gate.severity = "blocker"
-            gate.message = "数据目录不存在或无 CSV 数据文件"
+            gate.message = "DataHub 数据健康审计缺失、过期或未通过"
             gate.fix_suggestion = (
-                "运行 python3 hermes_cli.py data:pull-daily --start 20250101 --end TODAY 拉取日线数据, "
-                "然后运行 python3 hermes_cli.py data:freshness-check 验证新鲜度"
+                "先从 D 盘最近 FINAL_COMPLETE 备份恢复，再运行 canonical DataHub 增量任务，"
+                "最后重跑 coverage、freshness 和 integrity 审计"
             )
 
         return gate

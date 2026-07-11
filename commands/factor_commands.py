@@ -8,6 +8,7 @@ _CONFIG_DIR = _BASE
 sys.path.insert(0, str(_BASE))
 
 from config import VENV_PYTHON
+from factor_lab.datahub_access import daily_kline_index
 
 
 def _arg_value(args, name, default=""):
@@ -39,6 +40,7 @@ from reports.top_group_backtest import run_top_group_backtest
 from factor_lab.factor_engine import load_stock_kline, compute_all
 from factor_lab.pipeline import load_universe
 from factor_lab.factor_base import list_factors
+from factor_lab.datahub_access import daily_kline_path
 import pandas as pd
 
 symbols = load_universe()
@@ -68,8 +70,9 @@ else:
 pivot = df.pivot_table(index='date', columns='symbol', values='f')
 close_pivot = df.pivot_table(index='date', columns='symbol', values='close')
 
-bench = pd.read_csv('/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline/000001.csv', encoding='utf-8-sig')
-bench['date'] = pd.to_datetime(bench['date'])
+bench = pd.read_csv(daily_kline_path('000300.SH'), encoding='utf-8-sig')
+date_col = 'date' if 'date' in bench.columns else 'trade_date'
+bench['date'] = pd.to_datetime(bench[date_col].astype(str), errors='coerce')
 bench = bench[(bench['date']>='2025-01-01') & (bench['date']<='2026-06-30')]
 bench_ret = bench.set_index('date')['close'].pct_change().dropna()
 
@@ -141,13 +144,11 @@ else:
     elif command == "factor:mine":
         from factor_lab.factor_mining import FactorMiningEngine, MiningConfig
         from factor_lab.factor_engine import load_stock_kline
-        from pathlib import Path
         start = _arg_value(args, "--start", "2025-01-02")
         end = _arg_value(args, "--end", "2026-06-30")
         top_n = int(_arg_value(args, "--top-n", "5"))
         # 加载 K 线数据（限制数量控制内存）
-        kline_dir = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline")
-        all_symbols = sorted([f.stem for f in kline_dir.glob("*.csv")])
+        all_symbols = sorted(daily_kline_index())
         symbols = all_symbols[:500]
         print(f"  加载 {len(symbols)} 只股票/共 {len(all_symbols)} 只 K线数据 ({start} ~ {end})...")
         df = load_stock_kline(symbols, start_date=start, end_date=end)

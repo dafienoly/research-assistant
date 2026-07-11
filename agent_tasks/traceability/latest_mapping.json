@@ -854,6 +854,17 @@
       "behavior": "股票研究上下文仅读取 DataHub canonical 行情、参考数据、基本面、资金流和监管事件；不在消费路径调用 Baostock、Tavily 或其他网络来源，也不回写行情缓存。"
     },
     {
+      "id": "INFRA-LIVE-READINESS-DATAHUB-01",
+      "title": "实盘就绪门禁和因子 CLI 使用 canonical DataHub 证据",
+      "code_locations": [
+        {"file": "commands/live_readiness.py", "function": "check_data_health", "line": 153},
+        {"file": "commands/factor_commands.py", "function": "handle", "line": 19},
+        {"file": "commands/tests/test_cli_datahub_contract.py", "line": 1}
+      ],
+      "expected_keywords": ["coverage.json", "freshness.json", "integrity.json", "audit stale", "daily_kline_path", "daily_kline_index"],
+      "behavior": "Live readiness 只接受 24 小时内且全部通过的 canonical coverage/freshness/integrity 审计；因子基准和批量股票枚举通过 DataHub facade，缺失或过期时 fail-closed。"
+    },
+    {
       "id": "P1-REGULATORY-COVERAGE-01",
       "title": "监管公告 ingestion 与逐标的覆盖感知门禁",
       "code_locations": [
