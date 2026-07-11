@@ -247,8 +247,19 @@
       ],
       "expected_keywords": ["daily_kline_path", "incomplete_real_market_returns", "missing_symbols", "BLOCKED"],
       "behavior": "因子验证和 Standing Shadow 通过 DataHub facade 读取日线；缺少标的或基准真实收益时不再填零，而是阻断并输出 null 指标。"
+    },
+    {
+      "id": "INFRA-EVENT-TRUTH-01",
+      "title": "Event Truth 外部读取归属 DataHub ingestion",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_ingestion/event_truth.py", "function": "fetch", "line": 24},
+        {"file": "commands/factor_lab/vnext/event_truth_sources.py", "function": "load_event_truth", "line": 17},
+        {"file": "commands/scripts/vnext_event_truth_fetch.py", "line": 1}
+      ],
+      "expected_keywords": ["data/normalized/events/event_truth", "EventTruthIngestion", "tushare_official_structured_gateway"],
+      "behavior": "只有 DataHub ingestion 调用结构化外部 provider，并原子写 canonical 事件真值与 manifest；VNext 仅加载持久化结果。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-11T22:48:00+08:00"
+  "generated_at": "2026-07-11T23:00:00+08:00"
 }

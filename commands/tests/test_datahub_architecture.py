@@ -61,3 +61,11 @@ def test_vnext_and_decision_loop_do_not_implement_notification_networking():
                 if any(name.startswith(("urllib", "requests", "httpx")) for name in names):
                     violations.append(f"{path.relative_to(ROOT)}:{node.lineno}:{','.join(names)}")
     assert violations == [], "notification transport bypasses:\n" + "\n".join(violations)
+
+
+def test_vnext_event_truth_is_read_only_datahub_consumer():
+    path = ROOT / "commands/factor_lab/vnext/event_truth_sources.py"
+    assert provider_imports(path) == []
+    source = path.read_text(encoding="utf-8")
+    assert "data/normalized/events/event_truth" in source
+    assert "._query(" not in source

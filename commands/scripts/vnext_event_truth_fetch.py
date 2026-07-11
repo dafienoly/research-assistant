@@ -14,7 +14,7 @@ try:
 except ImportError:
     pass
 
-from factor_lab.vnext.event_truth_sources import EventTruthSourceBuilder  # noqa: E402
+from factor_lab.datahub_ingestion.event_truth import EventTruthIngestion  # noqa: E402
 from factor_lab.vnext.snapshot import ASSET_PROXIES  # noqa: E402
 
 
@@ -22,4 +22,4 @@ if __name__ == "__main__":
     end = sys.argv[1] if len(sys.argv) > 1 else datetime.now(timezone(timedelta(hours=8))).strftime("%Y%m%d")
     start = sys.argv[2] if len(sys.argv) > 2 else "20200101"
     symbols = sorted({symbol for symbol, _ in ASSET_PROXIES.values()})
-    print(json.dumps(EventTruthSourceBuilder(ROOT).fetch(symbols, start, end), ensure_ascii=False, indent=2))
+    print(json.dumps(EventTruthIngestion(ROOT).fetch(symbols, start, end), ensure_ascii=False, indent=2))
