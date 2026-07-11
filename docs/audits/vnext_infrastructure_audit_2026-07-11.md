@@ -130,6 +130,10 @@ VNext `TelegramApprovalGate` 原来默认同步单发 Telegram，与用户要求
 
 已完成核心整改：`factor_engine.load_stock_kline` 虽影响 18 个直接调用方和 9 条流程，但在保持函数签名、返回 schema 和过滤语义不变的前提下迁入 DataHub facade，并通过 121 项因子、验证、Paper、组合、Live 和 Shadow 专项测试。真实 `000001` 烟测从 canonical `data/normalized/market` 读取 8 行 2026-07-01 至 2026-07-10 数据。行业映射只读 canonical `stock_basic`，不再调用业务层外部 provider。Standing Shadow 缺少真实收益时继续输出 `BLOCKED/null`。
 
+一次性 `scripts/register_strategy_alpha.py` 原来能直接把固定策略标为 `backtested`，写入硬编码的 272.1% 收益、49.31% 回撤和 IC 历史，完全绕过 OOS、Paper/Shadow 与人工批准。该入口已退役并 fail-loud；自动版本推荐/Agent 自动开发系统不通过旧脚本复活，策略只能走受治理晋级状态机。
+
+扩大测试时发现 `test_alpha_governance.py` 直接把候选和报告写入 D 盘真实目录，并在 teardown 递归删除；删除保护成功阻止了清理，但首个测试已产生一份真实候选残留，按“严禁删除”要求保留现场。测试现通过 autouse fixture 将 discovery/governance 的候选、索引和报告根全部重定向到 pytest 临时目录，31 项治理/退役专项通过，后续不再触碰 D 盘生产研究数据。
+
 ## 前端基础设施
 
 Vite/Rolldown 生产构建原有 1.14 MB 与 550 KB 大块。现按 charts、Ant Design、Markdown 和 React platform 分组，最大块降至约 175 KB，构建不再产生 500 KB 告警；lint、TypeScript、14 个文件 28 项测试及生产构建通过。应用内浏览器发现仍返回空列表，因此 console、点击和截图验收保持外部运行时阻断，不用 DOM 单测冒充浏览器证据。

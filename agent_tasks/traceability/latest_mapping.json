@@ -928,6 +928,17 @@
       "behavior": "相同 change-set 只复用通过的审计；失败或环境异常必须生成新 run 并重新执行门禁，避免临时盘等瞬态故障永久阻断。"
     },
     {
+      "id": "P2-RETIRED-STRATEGY-PROMOTION-01",
+      "title": "硬编码策略晋级脚本退役并隔离治理测试数据",
+      "code_locations": [
+        {"file": "scripts/register_strategy_alpha.py", "function": "main", "line": 12},
+        {"file": "commands/tests/test_retired_strategy_registration.py", "line": 1},
+        {"file": "commands/tests/test_alpha_governance.py", "function": "isolated_alpha_state", "line": 40}
+      ],
+      "expected_keywords": ["retired", "governed alpha candidate", "isolated_alpha_state", "CANDIDATES_ROOT", "GOVERNANCE_ROOT", "tmp_path"],
+      "behavior": "旧脚本不能写入硬编码 backtested 状态或伪造收益/IC；运行时 fail-loud。治理测试的候选、索引和报告全部位于 pytest 临时根，不写入或删除 D 盘生产数据。"
+    },
+    {
       "id": "P1-WECHAT-PUSH-OUTBOX-01",
       "title": "旧 WeChatPusher 业务事件迁入双通道 outbox",
       "code_locations": [

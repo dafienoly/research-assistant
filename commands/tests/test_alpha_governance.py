@@ -7,14 +7,13 @@
   4. 报告生成
   5. 安全不变性
 """
-import sys, os, json, shutil
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-from pathlib import Path
+import json
+import os
 from datetime import datetime, timezone, timedelta
+import pytest
 
-CST = timezone(timedelta(hours=8))
-
+import factor_lab.alpha.governance as governance_module
+import factor_lab.alpha.llm_alpha_discovery as discovery_module
 from factor_lab.alpha.governance import (
     EvidenceScorer,
     RiskAssessor,
@@ -24,12 +23,10 @@ from factor_lab.alpha.governance import (
     list_governance_status,
 )
 from factor_lab.alpha.llm_alpha_discovery import (
-    CANDIDATES_ROOT,
-    CANDIDATES_INDEX,
     submit_candidate,
-    get_candidate,
-    AlphaSpecValidator,
 )
+
+CST = timezone(timedelta(hours=8))
 
 
 # ─── 辅助函数 ─────────────────────────────────────────────
@@ -44,11 +41,18 @@ def _unique_name(prefix="gov_test"):
     return f"{prefix}_{ts}_{_COUNTER}"
 
 
-def _cleanup():
-    """清理测试残留"""
-    for p in [CANDIDATES_ROOT]:
-        if p.exists():
-            shutil.rmtree(str(p))
+@pytest.fixture(autouse=True)
+def isolated_alpha_state(monkeypatch, tmp_path):
+    candidates = tmp_path / "alpha_candidates"
+    reports = tmp_path / "reports"
+    governance = reports / "alpha_governance"
+    governance.mkdir(parents=True)
+    monkeypatch.setattr(discovery_module, "BASE", reports)
+    monkeypatch.setattr(discovery_module, "CANDIDATES_ROOT", candidates)
+    monkeypatch.setattr(discovery_module, "CANDIDATES_INDEX", candidates / "candidates_index.json")
+    monkeypatch.setattr(governance_module, "BASE", reports)
+    monkeypatch.setattr(governance_module, "GOVERNANCE_ROOT", governance)
+    yield
 
 
 def _make_valid_candidate():
@@ -56,13 +60,14 @@ def _make_valid_candidate():
         "name": _unique_name("alpha_gov"),
         "description": "基于动量的治理测试因子",
         "hypothesis": "过去20日收益高的股票未来5日继续跑赢，尤其是在上涨市场中趋势延续性强",
-        "factor_expression": "rank(ts_mean(close, 20) / ts_mean(close, 60) - 1)",
+        "factor_expression": "rank(ts_mean(close, 20) / ts_mean(close, 60) - 1) + rank(roe)",
         "universe": "all_watchlist",
-        "data_requirements": ["close", "volume"],
+        "data_requirements": ["close", "volume", "roe"],
         "signal_direction": "long",
         "rebalance_frequency": "weekly",
         "risk_constraints": {"max_position_weight": 0.25, "max_drawdown": 0.15},
         "risk_notes": "动量因子在震荡市中可能失效，高换手率增加交易成本",
+        "industry_hypothesis": "半导体等高景气、趋势延续较强的成长行业可能更适合该动量信号",
         "evidence": "根据学术研究 (Jegadeesh & Titman 1993)，过去3-12个月收益最高的股票在未来3-12个月继续跑赢。A股市场实证显示20日动量窗口在2010-2023年间年化超额收益约8%。数据来源：Wind数据库回测结果。例如，沪深300成分股中过去20日涨幅前20%的股票组合，未来5日平均超额收益0.5%。",
     }
 
@@ -97,14 +102,6 @@ def _make_high_risk_candidate():
         "risk_notes": "策略在低流动性小盘股中表现最佳，但交易成本可能侵蚀收益。模型参数较多，存在过拟合风险。市场体制切换时有效性下降。",
         "evidence": "实证观察发现此模式在某些市场条件下有效。",
     }
-
-
-def setup_function():
-    _cleanup()
-
-
-def teardown_function():
-    _cleanup()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -304,12 +301,12 @@ def test_governance_review_persists():
     run_governance_review(cid)
 
     # 检查审核记录文件
-    review_path = CANDIDATES_ROOT / cid / "governance_review.json"
+    review_path = discovery_module.CANDIDATES_ROOT / cid / "governance_review.json"
     assert review_path.exists(), "审核记录文件不存在"
     data = json.loads(review_path.read_text())
     assert data["candidate_id"] == cid
-    assert data["auto_apply"] == False
-    assert data["no_live_trade"] == True
+    assert data["auto_apply"] is False
+    assert data["no_live_trade"] is True
 
 
 def test_governance_review_get_existing():
@@ -418,7 +415,7 @@ def test_list_governance_status():
 def test_list_governance_status_unreviewed():
     """未审核候选状态不报错"""
     candidate = _make_valid_candidate()
-    submit_result = submit_candidate(candidate, source="test")
+    submit_candidate(candidate, source="test")
 
     status_list = list_governance_status()
     unreviewed = [s for s in status_list if s["governance_verdict"] == "not_reviewed"]
@@ -451,8 +448,8 @@ def test_governance_review_safety_defaults():
     cid = submit_result["candidate_id"]
 
     result = run_governance_review(cid)
-    assert result.get("auto_apply") == False
-    assert result.get("no_live_trade") == True
+    assert result.get("auto_apply") is False
+    assert result.get("no_live_trade") is True
 
 
 def test_governance_report_safety():
@@ -464,9 +461,9 @@ def test_governance_report_safety():
 
     report = generate_governance_report(candidate_id=cid)
     safety = report.get("safety", {})
-    assert safety.get("auto_apply") == False
-    assert safety.get("no_live_trade") == True
-    assert safety.get("all_disabled") == True
+    assert safety.get("auto_apply") is False
+    assert safety.get("no_live_trade") is True
+    assert safety.get("all_disabled") is True
 
 
 # ═══════════════════════════════════════════════════════════════════
