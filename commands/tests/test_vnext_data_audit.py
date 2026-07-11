@@ -71,3 +71,32 @@ def test_data_audit_export_blocks_production_when_gaps_or_stale_data_remain(tmp_
     assert valuation["coverage_ratio"] == 0.5
     assert freshness["production_signal_eligible"] is False
     assert result["no_mock_or_fallback"] is True
+
+
+def test_auxiliary_gaps_are_watch_only_for_historical_ml_but_block_execution(tmp_path):
+    data = tmp_path / "data"
+    market = data / "normalized/market"
+    reference = data / "normalized/reference"
+    market.mkdir(parents=True)
+    reference.mkdir(parents=True)
+    (market / "000001.SZ.csv").write_text("trade_date,close\n20260710,10\n", encoding="utf-8")
+    (market / "valuation_000001.SZ.csv").write_text("trade_date,pb\n20260710,1.2\n", encoding="utf-8")
+    (reference / "stock_basic.csv").write_text("ts_code,list_status\n000001.SZ,L\n", encoding="utf-8")
+    audit = data / "audit"
+    audit.mkdir()
+    (audit / "data_gap_report.json").write_text('{"gaps": []}', encoding="utf-8")
+    (audit / "data_freshness_report.json").write_text(
+        '{"overall_status":"stale","blocking":true,"files":[]}', encoding="utf-8"
+    )
+    output = tmp_path / "artifacts/vnext"
+    output.mkdir(parents=True)
+    (output / "snapshot_manifest.json").write_text('{"status":"OK"}', encoding="utf-8")
+
+    result = export_vnext_data_audit(tmp_path, as_of="2026-07-10", output_root=output)
+
+    assert result["historical_research_eligible"] is True
+    assert result["formal_ml_status"] == "OK"
+    assert result["auxiliary_gate_mode"] == "watch_only"
+    assert result["warnings"] == ["auxiliary_data_gaps_watch_only"]
+    assert result["shadow_status"] == "BLOCKED"
+    assert result["order_draft_status"] == "BLOCKED"

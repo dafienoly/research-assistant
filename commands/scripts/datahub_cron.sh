@@ -34,6 +34,7 @@ case "$CMD" in
     [ -n "$DATE" ] && DATE_ARG="--date $DATE"
     # shellcheck disable=SC2086
     python3 hermes_cli.py data:incremental-update $DATE_ARG 2>&1 | tee -a "$LOG"
+    PYTHONPATH=. python3 scripts/datahub_reference_fetch.py 2>&1 | tee -a "$LOG"
     PYTHONPATH=. python3 scripts/datahub_market_series_fetch.py 2>&1 | tee -a "$LOG"
     log "=== DataHub 每日增量更新完成 ==="
     ;;
@@ -64,6 +65,7 @@ case "$CMD" in
     [ -n "$DATE" ] && DATE_ARG="--date $DATE"
     # shellcheck disable=SC2086
     python3 hermes_cli.py data:incremental-update $DATE_ARG 2>&1 | tee -a "$LOG"
+    PYTHONPATH=. python3 scripts/datahub_reference_fetch.py 2>&1 | tee -a "$LOG"
     PYTHONPATH=. python3 scripts/datahub_market_series_fetch.py 2>&1 | tee -a "$LOG"
     # DataHub 聚合重建
     python3 hermes_cli.py data:hub-rebuild fundamentals 2>&1 | tee -a "$LOG"

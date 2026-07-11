@@ -49,6 +49,15 @@ def _row_count(path: Path) -> int:
 
 
 def _expected_stock_count(project_root: Path) -> tuple[int, str]:
+    reference = project_root / "data/normalized/reference/stock_basic.csv"
+    if reference.exists():
+        try:
+            frame = pd.read_csv(reference, encoding="utf-8-sig", dtype={"ts_code": str, "list_status": str})
+            active = frame[frame["list_status"] == "L"] if "list_status" in frame else frame
+            if not active.empty and "ts_code" in active:
+                return len(active.drop_duplicates("ts_code")), "data/normalized/reference/stock_basic.csv:list_status=L"
+        except (OSError, UnicodeError, pd.errors.ParserError):
+            pass
     universes = _load_json(project_root / "data" / "universes.json")
     u0 = universes.get("universes", {}).get("U0", {})
     stocks = u0.get("stocks", []) if isinstance(u0, dict) else []
@@ -218,15 +227,25 @@ def export_vnext_data_audit(
     source_gap = _load_json(source_gap_path)
     source_freshness = _load_json(source_freshness_path)
     expected_stocks, expected_source = _expected_stock_count(root)
-    universes = _load_json(root / "data" / "universes.json")
-    u0 = universes.get("universes", {}).get("U0", {})
-    expected_symbols = {
-        str(item.get("ts_code", "")).strip()
-        for item in u0.get("stocks", [])
-        if isinstance(item, dict) and str(item.get("ts_code", "")).strip()
-    }
+    reference = root / "data/normalized/reference/stock_basic.csv"
+    if reference.exists():
+        frame = pd.read_csv(reference, encoding="utf-8-sig", dtype={"ts_code": str, "list_status": str})
+        if "list_status" in frame:
+            frame = frame[frame["list_status"] == "L"]
+        expected_symbols = set(frame.get("ts_code", pd.Series(dtype=str)).dropna().astype(str))
+    else:
+        universes = _load_json(root / "data" / "universes.json")
+        u0 = universes.get("universes", {}).get("U0", {})
+        expected_symbols = {
+            str(item.get("ts_code", "")).strip()
+            for item in u0.get("stocks", [])
+            if isinstance(item, dict) and str(item.get("ts_code", "")).strip()
+        }
     coverage = _dataset_coverage(root, expected_stocks, expected_symbols)
     partial_datasets = [item["dataset"] for item in coverage if item["status"] != DataStatus.OK.value]
+    core_datasets = {"daily_kline", "daily_valuation"}
+    core_partial_datasets = [item for item in partial_datasets if item in core_datasets]
+    auxiliary_partial_datasets = [item for item in partial_datasets if item not in core_datasets]
     structural_gaps = list(source_gap.get("gaps", []))
     gap_payload = {
         "schema_version": "1.0",
@@ -237,6 +256,9 @@ def export_vnext_data_audit(
         "expected_stock_source": expected_source,
         "coverage": coverage,
         "partial_datasets": partial_datasets,
+        "core_partial_datasets": core_partial_datasets,
+        "auxiliary_partial_datasets": auxiliary_partial_datasets,
+        "auxiliary_gate_mode": "watch_only" if auxiliary_partial_datasets and not core_partial_datasets else "normal",
         "structural_gaps": structural_gaps,
         "source_report": str(source_gap_path),
         "source_report_sha256": _sha256(source_gap_path),
@@ -262,14 +284,12 @@ def export_vnext_data_audit(
     recovery = _recovery_runs(root)
     snapshot_path = destination / "snapshot_manifest.json"
     snapshot = _load_json(snapshot_path)
-    audit_ok = (
-        gap_payload["status"] == DataStatus.OK.value
-        and freshness_payload["status"] == DataStatus.OK.value
-        and snapshot.get("status") == DataStatus.OK.value
-    )
+    snapshot_ok = snapshot.get("status") == DataStatus.OK.value
+    historical_research_ok = not core_partial_datasets and snapshot_ok
+    production_ready = not partial_datasets and freshness_payload["status"] == DataStatus.OK.value and snapshot_ok
     audit_payload = {
         "schema_version": "1.0",
-        "status": DataStatus.OK.value if audit_ok else DataStatus.PARTIAL.value,
+        "status": DataStatus.OK.value if production_ready else DataStatus.PARTIAL.value,
         "as_of": as_of,
         "generated_at": now_iso(),
         "data_gap_status": gap_payload["status"],
@@ -277,18 +297,21 @@ def export_vnext_data_audit(
         "immutable_snapshot_status": snapshot.get("status", DataStatus.MISSING.value),
         "immutable_snapshot_sha256": _sha256(snapshot_path),
         "recovery": recovery,
-        "formal_ml_status": DataStatus.OK.value if audit_ok else DataStatus.BLOCKED.value,
-        "shadow_status": DataStatus.OK.value if audit_ok else DataStatus.BLOCKED.value,
-        "order_draft_status": DataStatus.OK.value if audit_ok else DataStatus.BLOCKED.value,
+        "historical_research_eligible": historical_research_ok,
+        "auxiliary_gate_mode": gap_payload["auxiliary_gate_mode"],
+        "formal_ml_status": DataStatus.OK.value if historical_research_ok else DataStatus.BLOCKED.value,
+        "shadow_status": DataStatus.OK.value if production_ready else DataStatus.BLOCKED.value,
+        "order_draft_status": DataStatus.OK.value if production_ready else DataStatus.BLOCKED.value,
         "blocking_reasons": [
             reason
             for condition, reason in (
-                (gap_payload["status"] != DataStatus.OK.value, "data_gaps_remain"),
+                (bool(core_partial_datasets), "core_data_gaps_remain"),
                 (freshness_payload["status"] != DataStatus.OK.value, "critical_freshness_check_failed"),
-                (snapshot.get("status") != DataStatus.OK.value, "immutable_snapshot_not_verified"),
+                (not snapshot_ok, "immutable_snapshot_not_verified"),
             )
             if condition
         ],
+        "warnings": ["auxiliary_data_gaps_watch_only"] if auxiliary_partial_datasets and not core_partial_datasets else [],
         "no_mock_or_fallback": True,
         "no_live_trade": True,
     }

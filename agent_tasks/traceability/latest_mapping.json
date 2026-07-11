@@ -291,8 +291,19 @@
       ],
       "expected_keywords": ["archive_jsonl", "mkstemp", "os.replace", "timedelta(days=90)"],
       "behavior": "每日调度归档关键 JSONL；archive 与当前账本均原子替换，崩溃时允许保守重复但禁止数据截断或丢失。"
+    },
+    {
+      "id": "INFRA-REFERENCE-GATE-01",
+      "title": "Canonical stock_basic 与核心/辅助门禁分层",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_ingestion/reference.py", "function": "fetch_stock_basic", "line": 19},
+        {"file": "commands/factor_lab/vnext/data_audit.py", "function": "_expected_stock_count", "line": 51},
+        {"file": "commands/factor_lab/vnext/data_audit.py", "function": "export_vnext_data_audit", "line": 215}
+      ],
+      "expected_keywords": ["stock_basic.csv", "core_partial_datasets", "auxiliary_gate_mode", "historical_research_eligible"],
+      "behavior": "DataHub 持久化上市/暂停/退市证券主表；VNext 精确按 active 5530 计算覆盖，核心行情缺口阻断 ML，辅助缺口降为 watch-only，执行仍要求 freshness。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-11T23:45:00+08:00"
+  "generated_at": "2026-07-11T23:58:00+08:00"
 }

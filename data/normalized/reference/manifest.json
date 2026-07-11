@@ -1,0 +1,21 @@
+{
+  "status": "OK",
+  "source": "tushare:stock_basic",
+  "active_stocks": 5530,
+  "total_records": 5865,
+  "datasets": {
+    "L": {
+      "status": "OK",
+      "rows": 5530
+    },
+    "P": {
+      "status": "OK",
+      "rows": 0
+    },
+    "D": {
+      "status": "OK",
+      "rows": 335
+    }
+  },
+  "path": "/home/ly/.hermes/research-assistant/data/normalized/reference/stock_basic.csv"
+}
