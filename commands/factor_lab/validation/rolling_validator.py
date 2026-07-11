@@ -20,8 +20,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))  # → commands/
 from reports.report_schema import compute_equity_curve, compute_drawdown
 
 CST = timezone(timedelta(hours=8))
-BASE = Path("/home/ly/.hermes/research-assistant")
-OUTPUT = Path("/mnt/d/HermesReports/rolling_validation")
+BASE = Path(__file__).resolve().parents[3]
+OUTPUT = Path(os.environ.get("HERMES_ROLLING_VALIDATION_REPORT_ROOT", "/mnt/d/HermesReports/rolling_validation"))
 
 
 # ═══════════════════════════════════════════════════════════════════

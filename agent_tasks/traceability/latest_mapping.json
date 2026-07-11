@@ -629,6 +629,18 @@
       "behavior": "Strategy Lab 回测和 regime 通过 DataHub facade 读取 canonical 日线并规范日期/schema；半导体 universe 使用 canonical stock_basic 行业和版本控制标签；策略、performance、research_outputs 和跨系统 handoff 路径全部由单一 paths 模块推导；发布包使用 UUID 唯一暂存目录并拒绝覆盖，绝不删除既有包。"
     },
     {
+      "id": "INFRA-FACTOR-PATH-POLICY-01",
+      "title": "因子研究模块移除开发机绝对路径",
+      "code_locations": [
+        {"file": "commands/factor_lab/pipeline.py", "line": 1},
+        {"file": "commands/factor_lab/validation/rolling_validator.py", "line": 1},
+        {"file": "commands/factor_lab/alpha/industry_mapper.py", "line": 1},
+        {"file": "commands/tests/test_factor_path_policy.py", "line": 1}
+      ],
+      "expected_keywords": ["Path(__file__).resolve()", "HERMES_FACTOR_REPORT_ROOT", "HERMES_WALK_FORWARD_REPORT_ROOT", "HERMES_ROLLING_VALIDATION_REPORT_ROOT", "SHARED_DATAHUB_ROOT", "PROJECT_ROOT"],
+      "behavior": "pipeline、walk-forward、rolling、正交性、验证、事件与行业模块从文件位置或 DataHub facade 推导项目/数据根；报告位置可配置，不绑定开发机 home。"
+    },
+    {
       "id": "INFRA-BATCH-FACTOR-DATAHUB-01",
       "title": "批量因子计算只读取 canonical 日线索引",
       "code_locations": [

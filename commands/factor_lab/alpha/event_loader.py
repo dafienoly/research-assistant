@@ -27,7 +27,7 @@ import pandas as pd
 CST = timezone(timedelta(hours=8))
 
 # ─── 路径 ─────────────────────────────────────────────────────────
-HERMES_DATA = Path("/home/ly/.hermes/research-assistant/data")
+HERMES_DATA = Path(__file__).resolve().parents[3] / "data"
 ANNOUNCEMENTS_PATH = HERMES_DATA / "fundamentals" / "announcements_extracted.csv"
 ADJUST_FACTOR_PATH = HERMES_DATA / "market" / "adjust_factor.csv"
 FORECAST_REPORT_PATH = HERMES_DATA / "fundamentals" / "forecast_report.csv"

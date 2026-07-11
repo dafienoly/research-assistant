@@ -20,11 +20,11 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from factor_lab.datahub_access import read_stock_industry_map
+from factor_lab.datahub_access import PROJECT_ROOT, SHARED_DATAHUB_ROOT, read_stock_industry_map
 
 # ─── 路径常量 ──────────────────────────────────────────────
-DATA_HUB = Path(os.environ.get("DATA_HUB", "/mnt/c/Users/ly/.codex/data/a-share-data-hub"))
-HERMES_DATA = Path("/home/ly/.hermes/research-assistant/data")
+DATA_HUB = Path(os.environ.get("DATA_HUB", SHARED_DATAHUB_ROOT))
+HERMES_DATA = PROJECT_ROOT / "data"
 
 STOCK_INDUSTRY_CSV = HERMES_DATA / "tags" / "stock_industry.csv"
 POOL_CSV = DATA_HUB / "market" / "pool.csv"

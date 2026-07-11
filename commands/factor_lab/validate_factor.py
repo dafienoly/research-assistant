@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-BASE = Path("/home/ly/.hermes/research-assistant")
+BASE = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(BASE / "commands"))
 
 CST = timezone(timedelta(hours=8))

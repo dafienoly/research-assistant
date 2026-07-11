@@ -37,8 +37,8 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 CST = timezone(timedelta(hours=8))
-BASE = Path("/home/ly/.hermes/research-assistant")
-OUTPUT = Path("/mnt/d/HermesReports/factor_lab")
+BASE = Path(__file__).resolve().parents[3]
+OUTPUT = Path(os.environ.get("HERMES_FACTOR_REPORT_ROOT", "/mnt/d/HermesReports/factor_lab"))
 
 # ─── 共享工具 ─────────────────────────────────────────────────────────
 

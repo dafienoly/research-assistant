@@ -24,8 +24,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from scipy import stats as scipy_stats
 
 CST = timezone(timedelta(hours=8))
-BASE = Path("/home/ly/.hermes/research-assistant")
-OUTPUT = Path("/mnt/d/HermesReports/walk_forward")
+BASE = Path(__file__).resolve().parents[2]
+OUTPUT = Path(os.environ.get("HERMES_WALK_FORWARD_REPORT_ROOT", "/mnt/d/HermesReports/walk_forward"))
 
 # ─── Window Definitions ────────────────────────────────────────────
 # 2025-01-02 ~ 2026-06-30, 约 18 个月

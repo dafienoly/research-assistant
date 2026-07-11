@@ -5,8 +5,8 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
 CST = timezone(timedelta(hours=8))
-BASE = Path("/home/ly/.hermes/research-assistant")
-OUTPUT = Path("/mnt/d/HermesReports/factor_lab")
+BASE = Path(__file__).resolve().parents[2]
+OUTPUT = Path(os.environ.get("HERMES_FACTOR_REPORT_ROOT", "/mnt/d/HermesReports/factor_lab"))
 
 def load_universe() -> list:
     """从 universe 加载股票池"""
