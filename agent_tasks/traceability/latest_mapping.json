@@ -152,8 +152,29 @@
       ],
       "expected_keywords": ["current_capabilities.md", "QMT_LIVE_TRADING_ENABLED", "xttrader_connected", "archive_jsonl"],
       "behavior": "从真实运行状态生成当前能力和阻断文档；vectorbt 仅内部研究，vn.py/OpenBB/FinRL/Qbot 不进入 Core。"
+    },
+    {
+      "id": "DATA-SAFETY-01",
+      "title": "测试数据隔离与生产目录删除保护",
+      "code_locations": [
+        {"file": "commands/tests/conftest.py", "function": "prevent_production_data_deletion", "line": 33},
+        {"file": "commands/factor_lab/audit/checks.py", "function": "_selected_tests", "line": 130}
+      ],
+      "expected_keywords": ["PROTECTED_DATA_ROOTS", "test attempted destructive access", "test_test_data_isolation.py"],
+      "behavior": "所有 pytest 测试禁止删除项目数据、共享 DataHub 和 D 盘 Hermes 数据；数据相关变更自动选择隔离回归并由 CI 阻断。"
+    },
+    {
+      "id": "DATA-SAFETY-02",
+      "title": "D 盘优先恢复与恢复后增量拉取",
+      "code_locations": [
+        {"file": "scripts/backup_data_to_d.sh", "function": "sync_tree", "line": 28},
+        {"file": "scripts/restore_data_from_d.sh", "line": 1},
+        {"file": "scripts/data_recovery_guard.sh", "line": 1}
+      ],
+      "expected_keywords": ["FINAL_COMPLETE", "sha256sum -c", "data:incremental-update", "data writer is active"],
+      "behavior": "备份只在无写入进程时定稿并生成全量 SHA-256；缺口触发时先验证和恢复 D 盘快照，再执行增量拉取。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-11T17:10:00+08:00"
+  "generated_at": "2026-07-11T18:33:00+08:00"
 }

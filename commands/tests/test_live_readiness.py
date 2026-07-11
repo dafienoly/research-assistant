@@ -12,7 +12,8 @@ Tests cover:
   - Integration: Full assessment cycle
 """
 
-import sys, os, json, tempfile, shutil
+import sys, os, json, re, tempfile, shutil
+import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from pathlib import Path
@@ -45,6 +46,17 @@ from factor_lab.adaptive.live_readiness import (
 
 CST = timezone(timedelta(hours=8))
 TEST_RUN_ID = "test_v49_001"
+
+
+@pytest.fixture(autouse=True)
+def isolated_live_readiness_reports(tmp_path, monkeypatch):
+    """Keep readiness tests away from persistent D-drive report storage."""
+    import factor_lab.adaptive.live_readiness as adaptive_live_readiness
+
+    test_base = tmp_path / "HermesReports"
+    test_base.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(adaptive_live_readiness, "BASE", test_base)
+    monkeypatch.setitem(globals(), "BASE", test_base)
 
 
 # =========================================================================
@@ -1523,7 +1535,12 @@ class TestReadinessGateTypes:
         """所有 Gate 不崩溃"""
         checker = LiveReadinessChecker()
         for gname in checker.GATE_NAMES:
-            method_name = f"check_{gname[0].lower()}{gname[1:]}"
+            snake_name = re.sub(r"(?<!^)(?=[A-Z])", "_", gname).lower()
+            method_name = f"check_{snake_name.removesuffix('_gate')}"
+            method_name = {
+                "check_trade_constraint": "check_trade_constraints",
+                "check_we_chat_notify": "check_wechat_notify",
+            }.get(method_name, method_name)
             gate_method = getattr(checker, method_name, None)
             if gate_method:
                 try:

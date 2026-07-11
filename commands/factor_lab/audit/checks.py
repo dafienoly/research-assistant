@@ -158,6 +158,23 @@ def _selected_tests(root: Path, files: list[str]) -> list[str]:
                 candidate = root / "commands/tests" / test_name
                 if candidate.exists():
                     tests.add(str(candidate.relative_to(root)))
+        if (
+            "data_audit" in relative
+            or "data_manager" in relative
+            or "data_pipeline" in relative
+            or relative.startswith("scripts/backup_data_to_d")
+            or relative.startswith("scripts/restore_data_from_d")
+            or relative.startswith("scripts/data_recovery_guard")
+        ):
+            for test_name in (
+                "test_data_audit.py",
+                "test_data_manager.py",
+                "test_data_pipeline.py",
+                "test_test_data_isolation.py",
+            ):
+                candidate = root / "commands/tests" / test_name
+                if candidate.exists():
+                    tests.add(str(candidate.relative_to(root)))
     return sorted(tests)
 
 

@@ -15,6 +15,8 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 20 15 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 commands/scripts/decision_postmarket.py >> ~/.hermes/logs/decision_review.log 2>&1
 30 15 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 commands/scripts/decision_certify.py >> ~/.hermes/logs/decision_certification.log 2>&1
 20 16 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 commands/scripts/generate_capability_status.py >> ~/.hermes/logs/capability_status.log 2>&1
+30 17 * * 1-5 cd /home/ly/.hermes/research-assistant && scripts/backup_data_to_d.sh >> ~/.hermes/logs/data_backup.log 2>&1
+*/30 8-18 * * 1-5 cd /home/ly/.hermes/research-assistant && scripts/data_recovery_guard.sh >> ~/.hermes/logs/data_recovery_guard.log 2>&1
 10 16 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 commands/scripts/vnext_event_truth_fetch.py >> ~/.hermes/logs/vnext_event_truth.log 2>&1
 40 15 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 commands/scripts/vnext_realized_collect.py >> ~/.hermes/logs/vnext_realized.log 2>&1
 

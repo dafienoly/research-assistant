@@ -114,14 +114,15 @@ def _mock_trade_cal_df() -> pd.DataFrame:
 
 
 @pytest.fixture(autouse=True)
-def clear_universe_output():
-    """清除缓存的 universes.json 保证每次测试重新构建"""
-    if OUTPUT_FILE.exists():
-        OUTPUT_FILE.unlink()
+def clear_universe_output(tmp_path, monkeypatch):
+    """将股票池输出重定向到临时目录，禁止接触真实 universes.json。"""
+    import universes
+
+    output_file = tmp_path / "universes.json"
+    global OUTPUT_FILE
+    OUTPUT_FILE = output_file
+    monkeypatch.setattr(universes, "OUTPUT_FILE", output_file)
     yield
-    # 清理
-    if OUTPUT_FILE.exists():
-        OUTPUT_FILE.unlink()
 
 
 @pytest.fixture()
@@ -472,12 +473,15 @@ class TestU4:
         mock_ts_client_minimal.stock_basic.return_value = _mock_stock_basic_df(20)
 
         result = build_u4(min_matches=1, max_matches=2)
-        if result["stocks"]:
-            s = result["stocks"][0]
+        matched = [row for row in result["stocks"] if row.get("matched")]
+        if matched:
+            s = matched[0]
             assert "u3_ts_code" in s
             assert "u3_symbol" in s
             assert "matched_stocks" in s
             assert "match_count" in s
+        else:
+            assert all(row.get("matched") is False for row in result["stocks"])
 
 
 # =========================================================================

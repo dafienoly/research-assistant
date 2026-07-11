@@ -47,13 +47,19 @@ CST = timezone(timedelta(hours=8))
 
 
 @pytest.fixture(autouse=True)
-def clean_audit_dirs():
-    """Ensure clean audit dirs before each test."""
-    for d in [MANIFEST_DIR, HEALTH_DIR]:
-        d.mkdir(parents=True, exist_ok=True)
-        for f in d.iterdir():
-            if f.is_file():
-                f.unlink()
+def clean_audit_dirs(tmp_path, monkeypatch):
+    """Redirect every audit write to a per-test directory."""
+    import commands.data_manager as data_manager
+
+    manifest_dir = tmp_path / "audit" / "manifests"
+    health_dir = tmp_path / "audit" / "health"
+    global MANIFEST_DIR, HEALTH_DIR
+    MANIFEST_DIR = manifest_dir
+    HEALTH_DIR = health_dir
+    monkeypatch.setattr(data_manager, "MANIFEST_DIR", manifest_dir)
+    monkeypatch.setattr(data_manager, "HEALTH_DIR", health_dir)
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    health_dir.mkdir(parents=True, exist_ok=True)
     yield
 
 
@@ -392,4 +398,3 @@ class TestCLIHandlers:
         assert "数据源健康状态" in captured.out
         assert "覆盖率" in captured.out
         assert "缺失率" in captured.out
-    

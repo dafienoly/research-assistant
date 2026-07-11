@@ -66,6 +66,10 @@ jobs:
           commands/tests/test_vnext_review_orchestrator.py
           commands/tests/test_vnext_sbom.py
           commands/tests/test_vnext_ci_gate.py
+          commands/tests/test_data_audit.py
+          commands/tests/test_data_manager.py
+          commands/tests/test_data_pipeline.py
+          commands/tests/test_test_data_isolation.py
           commands/tests/test_routes_vnext.py
           commands/tests/test_decision_loop.py
           commands/tests/test_decision_loop_api.py

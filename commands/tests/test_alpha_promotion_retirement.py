@@ -9,6 +9,7 @@
   6. 安全不变性
 """
 import sys, os, json, shutil
+import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from pathlib import Path
@@ -84,9 +85,10 @@ def _make_valid_candidate():
         "name": _unique_name("alpha_prom"),
         "description": "测试晋级因子",
         "hypothesis": "过去20日收益高的股票未来5日继续跑赢",
-        "factor_expression": "rank(ts_mean(close, 20) / ts_mean(close, 60) - 1)",
+        "industry_hypothesis": "动量效应在流动性充足行业内具备可检验的延续性",
+        "factor_expression": "rank(ts_mean(close, 20) / ts_mean(close, 60) - 1) - rank(pe_ttm)",
         "universe": "all_watchlist",
-        "data_requirements": ["close", "volume"],
+        "data_requirements": ["close", "volume", "pe_ttm"],
         "signal_direction": "long",
         "rebalance_frequency": "weekly",
         "risk_constraints": {"max_position_weight": 0.25, "max_drawdown": 0.15},
@@ -111,11 +113,57 @@ def _make_sample_alpha_spec(name=None):
     )
 
 
-def setup_function():
+@pytest.fixture(autouse=True)
+def isolated_alpha_storage(tmp_path, monkeypatch):
+    """Redirect all Alpha test ledgers away from D:\\HermesData production roots."""
+    import factor_lab.alpha.governance as governance
+    import factor_lab.alpha.llm_alpha_discovery as discovery
+    import factor_lab.alpha.promotion_engine as promotion
+    import factor_lab.alpha.registry as registry
+    import factor_lab.alpha.retirement_engine as retirement
+
+    paths = {
+        "CANDIDATES_ROOT": tmp_path / "alpha_candidates",
+        "PROMOTION_ROOT": tmp_path / "alpha_promotion",
+        "RETIREMENT_ROOT": tmp_path / "alpha_retirement",
+        "REGISTRY_ROOT": tmp_path / "alpha_registry",
+    }
+    files = {
+        "CANDIDATES_INDEX": paths["CANDIDATES_ROOT"] / "candidates_index.json",
+        "PROMOTION_QUEUE_FILE": paths["PROMOTION_ROOT"] / "promotion_queue.json",
+        "PROMOTION_HISTORY_FILE": paths["PROMOTION_ROOT"] / "promotion_history.jsonl",
+        "RETIREMENT_HISTORY_FILE": paths["RETIREMENT_ROOT"] / "retirement_history.jsonl",
+        "RETIREMENT_POLICY_FILE": paths["RETIREMENT_ROOT"] / "retirement_policy.json",
+        "REGISTRY_INDEX": paths["REGISTRY_ROOT"] / "registry_index.json",
+    }
+    for name, value in {**paths, **files}.items():
+        globals()[name] = value
+    for module, values in (
+        (discovery, {
+            "BASE": tmp_path / "reports",
+            "CANDIDATES_ROOT": paths["CANDIDATES_ROOT"],
+            "CANDIDATES_INDEX": files["CANDIDATES_INDEX"],
+        }),
+        (promotion, {
+            "CANDIDATES_ROOT": paths["CANDIDATES_ROOT"],
+            "PROMOTION_ROOT": paths["PROMOTION_ROOT"],
+            "PROMOTION_QUEUE_FILE": files["PROMOTION_QUEUE_FILE"],
+            "PROMOTION_HISTORY_FILE": files["PROMOTION_HISTORY_FILE"],
+            "REGISTRY_ROOT": paths["REGISTRY_ROOT"],
+        }),
+        (retirement, {
+            "RETIREMENT_ROOT": paths["RETIREMENT_ROOT"],
+            "RETIREMENT_HISTORY_FILE": files["RETIREMENT_HISTORY_FILE"],
+            "RETIREMENT_POLICY_FILE": files["RETIREMENT_POLICY_FILE"],
+            "REGISTRY_ROOT": paths["REGISTRY_ROOT"],
+        }),
+        (registry, {"REGISTRY_ROOT": paths["REGISTRY_ROOT"], "REGISTRY_INDEX": files["REGISTRY_INDEX"]}),
+        (governance, {"CANDIDATES_ROOT": paths["CANDIDATES_ROOT"]}),
+    ):
+        for name, value in values.items():
+            monkeypatch.setattr(module, name, value, raising=False)
     _cleanup()
-
-
-def teardown_function():
+    yield
     _cleanup()
 
 
