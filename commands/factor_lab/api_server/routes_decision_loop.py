@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 
 from factor_lab.api_server.response import api_success
@@ -43,6 +45,10 @@ class PositionPreviewBody(Body):
 class PositionConfirmBody(Body):
     preview_id: str
     expected_hash: str
+
+
+class PositionRollbackBody(Body):
+    snapshot_id: str
 
 
 class GuardBody(Body):
@@ -115,6 +121,9 @@ class ParameterProposalBody(Body):
     current_value: Any
     proposed_value: Any
     evidence: dict[str, Any]
+    decision_id: str | None = None
+    event_id: str | None = None
+    order_id: str | None = None
 
 
 class OosBody(Body):
@@ -132,6 +141,11 @@ class BenchmarkBody(Body):
     instrument_type: Literal["stock", "etf"]
     stock_sector_map: dict[str, dict[str, Any]] = Field(default_factory=dict)
     etf_map: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
+
+class PortfolioBenchmarkBody(Body):
+    exposure_weights: dict[str, float]
+    tradable: list[str]
 
 
 def _service() -> DecisionLoopService:
@@ -170,6 +184,70 @@ async def confirm_positions(body: PositionConfirmBody, request: Request):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return api_success(data=result.model_dump(mode="json"), request=request)
+
+
+@router.post("/positions/ocr-preview")
+async def preview_ocr_upload(request: Request, image: UploadFile = File(...)):
+    suffix = Path(image.filename or "position.png").suffix.lower()
+    if suffix not in {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}:
+        raise HTTPException(status_code=415, detail="unsupported OCR image type")
+    content = await image.read(10 * 1024 * 1024 + 1)
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="OCR image exceeds 10 MiB")
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temporary:
+            temporary.write(content)
+            temporary_path = Path(temporary.name)
+        result = _service().positions.preview_ocr(temporary_path)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+    return api_success(data=result.model_dump(mode="json"), request=request)
+
+
+@router.post("/positions/miniqmt/preview")
+async def preview_miniqmt_positions(request: Request):
+    try:
+        result = _service().qmt_sync.preview()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return api_success(data=result.model_dump(mode="json"), request=request)
+
+
+@router.post("/positions/miniqmt/confirm")
+async def confirm_miniqmt_positions(body: PositionConfirmBody, request: Request):
+    try:
+        result = _service().qmt_sync.confirm(body.preview_id, body.expected_hash)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return api_success(data=result.model_dump(mode="json"), request=request)
+
+
+@router.get("/positions/template")
+async def position_import_template(request: Request):
+    return api_success(data={
+        "columns": ["证券代码", "证券名称", "持仓数量", "可用数量", "成本价", "现价", "证券类型", "账簿", "主题"],
+        "csv": "证券代码,证券名称,持仓数量,可用数量,成本价,现价,证券类型,账簿,主题\n588200.SH,示例ETF,1000,1000,1.20,1.25,ETF,催化,半导体设备\n",
+    }, request=request)
+
+
+@router.get("/positions/history")
+async def position_history(request: Request, limit: int = 50):
+    return api_success(data=[row.model_dump(mode="json") for row in _service().positions.history(limit)], request=request)
+
+
+@router.post("/positions/rollback")
+async def rollback_positions(body: PositionRollbackBody, request: Request):
+    try:
+        result = _service().positions.rollback(body.snapshot_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return api_success(data=result.model_dump(mode="json"), request=request)
 
 
@@ -296,7 +374,8 @@ async def portfolio_risk(body: PortfolioRiskInput, request: Request):
 
 @router.post("/benchmarks/match")
 async def match_benchmark(body: BenchmarkBody, request: Request):
-    match = BenchmarkMatcher(body.stock_sector_map, body.etf_map).match_instrument(
+    matcher = BenchmarkMatcher(body.stock_sector_map, body.etf_map) if body.stock_sector_map or body.etf_map else BenchmarkMatcher.from_durable_registry()
+    match = matcher.match_instrument(
         body.symbol, body.instrument_type
     )
     return api_success(
@@ -306,6 +385,15 @@ async def match_benchmark(body: BenchmarkBody, request: Request):
             "reason": match.reason,
             "evidence_source": match.evidence_source,
         },
+        request=request,
+    )
+
+
+@router.post("/benchmarks/portfolio")
+async def match_portfolio_benchmark(body: PortfolioBenchmarkBody, request: Request):
+    result = BenchmarkMatcher.match_portfolio(body.exposure_weights, set(body.tradable))
+    return api_success(
+        data=result or {"components": None, "reason": "no reliable tradable exposure mapping"},
         request=request,
     )
 

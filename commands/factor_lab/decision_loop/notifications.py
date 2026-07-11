@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -15,9 +16,22 @@ from .storage import DecisionLoopStore
 
 
 Sender = Callable[[dict], dict]
+ALLOWED_NOTIFICATION_HOSTS = {
+    "api.telegram.org",
+    "qyapi.weixin.qq.com",
+    "work.weixin.qq.com",
+}
 
 
 def _post_json(url: str, payload: dict, timeout: int = 8) -> dict:
+    endpoint = urllib.parse.urlsplit(url)
+    if (
+        endpoint.scheme != "https"
+        or endpoint.hostname not in ALLOWED_NOTIFICATION_HOSTS
+        or endpoint.username
+        or endpoint.password
+    ):
+        return {"ok": False, "error": "endpoint_not_allowed"}
     request = urllib.request.Request(
         url,
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
@@ -25,7 +39,10 @@ def _post_json(url: str, payload: dict, timeout: int = 8) -> dict:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        # The HTTPS scheme and exact hostname allow-list are enforced above.
+        with urllib.request.urlopen(  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+            request, timeout=timeout
+        ) as response:
             body = json.loads(response.read().decode("utf-8"))
             return {
                 "ok": response.status < 300,
@@ -144,13 +161,21 @@ class DualChannelNotifier:
         return {"status": "attempted", "count": len(pending), "channels": outcomes}
 
     def acknowledge(self, event_id: str, actor: str) -> dict:
+        existing = next(
+            (row for row in self.store.read_jsonl("notifications/acknowledgements.jsonl") if row.get("event_id") == event_id),
+            None,
+        )
+        if existing:
+            return existing
         record = {
             "event_id": event_id,
             "actor": actor,
             "acknowledged_at": datetime.now().astimezone().isoformat(),
             "closes_channels": list(self.senders),
         }
-        self.store.append_jsonl("notifications/acknowledgements.jsonl", record)
+        self.store.append_unique_jsonl(
+            "notifications/acknowledgements.jsonl", record, f"ack:{event_id}"
+        )
         return record
 
     @staticmethod

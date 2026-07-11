@@ -133,6 +133,39 @@ def ocr_image(image_path: str | Path, timeout: int = 30) -> str:
     return completed.stdout
 
 
+def ocr_quality_issues(image_path: str | Path, timeout: int = 30, threshold: float = 70.0) -> list[dict[str, Any]]:
+    path = Path(image_path).expanduser().resolve()
+    completed = subprocess.run(
+        ["tesseract", str(path), "stdout", "-l", "chi_sim+eng", "--psm", "6", "tsv"],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError("OCR confidence scan failed: " + completed.stderr.strip()[:300])
+    issues = []
+    for row in csv.DictReader(io.StringIO(completed.stdout), delimiter="\t"):
+        text = str(row.get("text") or "").strip()
+        if not text:
+            continue
+        try:
+            confidence = float(row.get("conf") or -1)
+        except ValueError:
+            confidence = -1
+        if confidence < threshold:
+            issues.append({
+                "text": text,
+                "confidence": confidence,
+                "left": int(row.get("left") or 0),
+                "top": int(row.get("top") or 0),
+                "width": int(row.get("width") or 0),
+                "height": int(row.get("height") or 0),
+                "requires_manual_correction": True,
+            })
+    return issues
+
+
 class PositionIngestionService:
     def __init__(self, store: DecisionLoopStore | None = None):
         self.store = store or DecisionLoopStore()
@@ -143,7 +176,15 @@ class PositionIngestionService:
         return self.preview_positions(parse_delimited(text), source)
 
     def preview_ocr(self, image_path: str | Path) -> PositionDiff:
-        return self.preview_positions(parse_ocr_text(ocr_image(image_path)), "ocr")
+        preview = self.preview_positions(parse_ocr_text(ocr_image(image_path)), "ocr")
+        issues = ocr_quality_issues(image_path)
+        if issues:
+            preview = preview.model_copy(update={"quality_issues": issues, "requires_correction": True})
+            self.store.write_json(
+                f"positions/previews/{preview.preview_id}.json",
+                preview.model_dump(mode="json"),
+            )
+        return preview
 
     def preview_rows(
         self, rows: list[dict[str, Any]], source: str = "manual"
@@ -214,6 +255,8 @@ class PositionIngestionService:
         if not raw:
             raise KeyError("position preview not found")
         preview = PositionDiff.model_validate(raw)
+        if preview.requires_correction:
+            raise ValueError("low-confidence OCR fields require manual correction and a new preview")
         if preview.proposed_snapshot.content_hash != expected_hash:
             raise ValueError("preview hash mismatch; import must be previewed again")
         snapshot = preview.proposed_snapshot.model_copy(update={"confirmed": True})
@@ -228,3 +271,19 @@ class PositionIngestionService:
     def current(self) -> PositionSnapshot | None:
         raw = self.store.read_json("positions/current.json")
         return PositionSnapshot.model_validate(raw) if raw else None
+
+    def history(self, limit: int = 50) -> list[PositionSnapshot]:
+        return [PositionSnapshot.model_validate(row) for row in self.store.read_jsonl("positions/history.jsonl", limit=limit)]
+
+    def rollback(self, snapshot_id: str) -> PositionSnapshot:
+        for snapshot in reversed(self.history(limit=500)):
+            if snapshot.snapshot_id == snapshot_id:
+                restored = snapshot.model_copy(update={"as_of": datetime.now().astimezone(), "confirmed": True})
+                self.store.write_json("positions/current.json", restored.model_dump(mode="json"))
+                self.store.append_jsonl("positions/history.jsonl", restored.model_dump(mode="json"))
+                self.store.append_jsonl("positions/rollback_audit.jsonl", {
+                    "snapshot_id": snapshot_id,
+                    "restored_at": restored.as_of.isoformat(),
+                })
+                return restored
+        raise KeyError("position snapshot not found")

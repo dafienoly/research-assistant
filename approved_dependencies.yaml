@@ -14,7 +14,7 @@ environments:
   hermes-core:
     status: active
     lock_file: requirements/core.lock
-    sha256: 9c7595d4d3dbf60223f275f800cd354ef8bdcc1b0844abed0bd30d6ed73387a7
+    sha256: 9577091a0b08718324bfbe8fca5fe380572ec0fa86fb5d1065a9d657ecf58b39
     allow_all_exactly_locked_packages: true
     prohibited_packages: [vectorbt, vnpy, openbb, finrl]
   hermes-research-vectorbt:

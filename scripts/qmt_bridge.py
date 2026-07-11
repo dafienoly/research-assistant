@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""QMT Bridge — xtdata only.
+"""QMT Bridge — read-only market and account gateway.
 
 Supports both old xtquant (built-in, auto-connect) and
 new xtquant (needs explicit connect).
@@ -28,7 +28,9 @@ def now_iso():
 class QMTDataBackend:
     def __init__(self):
         self.xtdata = None; self.connected = False; self.error = ""
+        self.trader = None; self.account = None; self.trader_error = ""
         self._connect()
+        self._connect_trader()
 
     def _connect(self):
         try:
@@ -47,8 +49,110 @@ class QMTDataBackend:
             self.connected = False
             self.error = str(exc)
 
+    def _connect_trader(self):
+        """Connect a read-only XtQuantTrader session when explicitly configured."""
+        userdata = os.environ.get("QMT_USERDATA_PATH", "").strip()
+        account_id = os.environ.get("QMT_ACCOUNT_ID", "").strip()
+        if not userdata or not account_id:
+            self.trader_error = "QMT_USERDATA_PATH or QMT_ACCOUNT_ID is not configured"
+            return
+        try:
+            from xtquant.xttrader import XtQuantTrader
+            from xtquant.xttype import StockAccount
+
+            session_text = os.environ.get("QMT_SESSION_ID", "").strip()
+            session_id = int(session_text) if session_text else int(datetime.now().timestamp())
+            trader = XtQuantTrader(userdata, session_id)
+            trader.start()
+            connect_result = trader.connect()
+            if connect_result not in (0, None):
+                raise RuntimeError(f"XtQuantTrader connect failed: {connect_result}")
+            account = StockAccount(
+                account_id,
+                os.environ.get("QMT_ACCOUNT_TYPE", "STOCK").strip() or "STOCK",
+            )
+            subscribe_result = trader.subscribe(account)
+            if subscribe_result not in (0, None):
+                raise RuntimeError(f"XtQuantTrader subscribe failed: {subscribe_result}")
+            self.trader = trader
+            self.account = account
+            self.trader_error = ""
+        except Exception as exc:
+            self.trader = None
+            self.account = None
+            self.trader_error = str(exc)
+
     def health(self):
-        return {"connected": self.connected, "xtdata_available": self.xtdata is not None, "error": self.error}
+        return {
+            "connected": self.connected,
+            "xtdata_available": self.xtdata is not None,
+            "xttrader_available": self.trader is not None,
+            "xttrader_connected": self.trader is not None and self.account is not None,
+            "live_trading_enabled": False,
+            "account_id_masked": self._masked_account_id(),
+            "error": self.error,
+            "trader_error": self.trader_error,
+        }
+
+    def _masked_account_id(self):
+        account_id = os.environ.get("QMT_ACCOUNT_ID", "").strip()
+        return f"***{account_id[-4:]}" if account_id else ""
+
+    def _require_trader(self):
+        if self.trader is None or self.account is None:
+            raise RuntimeError(self.trader_error or "XtQuantTrader unavailable")
+
+    @staticmethod
+    def _serialize(obj):
+        if obj is None:
+            return None
+        if isinstance(obj, (str, int, float, bool)):
+            return obj
+        if isinstance(obj, dict):
+            return {str(k): QMTDataBackend._serialize(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return [QMTDataBackend._serialize(v) for v in obj]
+        values = {}
+        for name in dir(obj):
+            if name.startswith("_"):
+                continue
+            try:
+                value = getattr(obj, name)
+            except Exception:
+                continue
+            if callable(value):
+                continue
+            if isinstance(value, (str, int, float, bool, type(None), list, tuple, dict)):
+                values[name] = QMTDataBackend._serialize(value)
+        return values
+
+    def account_asset(self):
+        self._require_trader()
+        asset = self.trader.query_stock_asset(self.account)
+        if asset is None:
+            raise RuntimeError("QMT returned no account asset")
+        return self._serialize(asset)
+
+    def positions(self):
+        self._require_trader()
+        positions = self.trader.query_stock_positions(self.account)
+        if positions is None:
+            raise RuntimeError("QMT returned no positions response")
+        return self._serialize(positions)
+
+    def orders(self):
+        self._require_trader()
+        orders = self.trader.query_stock_orders(self.account)
+        if orders is None:
+            raise RuntimeError("QMT returned no orders response")
+        return self._serialize(orders)
+
+    def trades(self):
+        self._require_trader()
+        trades = self.trader.query_stock_trades(self.account)
+        if trades is None:
+            raise RuntimeError("QMT returned no trades response")
+        return self._serialize(trades)
 
     @staticmethod
     def _to_qmt_symbol(symbol):
@@ -153,6 +257,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 self._send("ok", self.backend.bars(
                     q.get("symbol",[""])[0], q.get("period",["1d"])[0],
                     int(q.get("count",["120"])[0])))
+            elif p.path == "/account": self._send("ok", self.backend.account_asset())
+            elif p.path == "/positions": self._send("ok", self.backend.positions())
+            elif p.path == "/orders": self._send("ok", self.backend.orders())
+            elif p.path == "/trades": self._send("ok", self.backend.trades())
             else: self._send("error",error="unknown path")
         except Exception as e: self._send("error",error=str(e))
 

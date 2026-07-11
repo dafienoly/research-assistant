@@ -106,10 +106,6 @@ interface HistoryData {
   incidents?: AlertItem[]
 }
 
-interface DimensionResponse {
-  [key: string]: unknown
-}
-
 const STATUS_CONFIG: Record<string, StatusConfigEntry> = {
   healthy:  { color: 'success', icon: <CheckCircleOutlined />, label: '健康',   dot: '#059669', bg: '#D1FAE5', text: '#059669' },
   degraded: { color: 'warning', icon: <ExclamationCircleOutlined />, label: '降级',   dot: '#D97706', bg: '#FEF3C7', text: '#D97706' },

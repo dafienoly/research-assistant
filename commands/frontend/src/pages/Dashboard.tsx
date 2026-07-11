@@ -1,13 +1,10 @@
 /** V5.3 首页投研驾驶舱 Dashboard — 视觉优化版 */
 import { useNavigate } from 'react-router-dom'
-import { Card, Row, Col, Table, Tag, Typography, Space, Spin, Alert, Button, Tooltip } from 'antd'
+import { Card, Row, Col, Table, Tag, Typography, Space, Spin, Tooltip } from 'antd'
 import {
   ClockCircleOutlined,
   DatabaseOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
   WarningOutlined,
-  QuestionCircleOutlined,
   ThunderboltOutlined,
   BarChartOutlined,
   SafetyCertificateOutlined,
@@ -24,7 +21,6 @@ import MetricCard from '../components/common/MetricCard'
 import StatusBadge from '../components/common/StatusBadge'
 import StatusDot from '../components/common/StatusDot'
 import LoadingState from '../components/common/LoadingState'
-import ErrorState from '../components/common/ErrorState'
 import PageHeader from '../components/common/PageHeader'
 import type { StatusType } from '../types'
 import {
@@ -57,17 +53,7 @@ const CARD_HOVER: React.CSSProperties = {
   transition: 'box-shadow 0.2s ease, transform 0.15s ease',
 }
 
-const SECTION_TITLE: React.CSSProperties = {
-  fontSize: 16,
-  fontWeight: 600,
-  color: '#0F172A',
-  marginBottom: 16,
-  paddingBottom: 12,
-  borderBottom: '1px solid #E2E8F0',
-}
-
 const META_LABEL: React.CSSProperties = { fontSize: 12, color: '#64748B' }
-const META_VALUE: React.CSSProperties = { fontSize: 12, color: '#0F172A', fontFamily: 'monospace' }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function fmtTime(iso?: string): string {
@@ -102,14 +88,6 @@ function statusToBadge(s?: string): StatusType {
     processing: 'running',
   }
   return m[s.toLowerCase()] || 'idle'
-}
-
-const SEVERITY_COLOR: Record<string, string> = {
-  critical: '#DC2626',
-  high: '#DC2626',
-  medium: '#D97706',
-  low: '#64748B',
-  info: '#2563EB',
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

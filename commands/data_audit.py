@@ -2,7 +2,7 @@
 """
 V4.2 数据审计脚本 — coverage / freshness / missing / survivorship_check
 
-基于 data/normalized/market/ 目录下归一化 CSV 文件进行审计。
+基于 DataHub 统一目录 data/market/daily_kline/ 进行审计。
 输出 JSON 报告到 data/audit/health/。
 
 用法:
@@ -35,7 +35,10 @@ CST = timezone(timedelta(hours=8))
 # ─── 目录 ────────────────────────────────────────────────────────────
 BASE = Path(__file__).resolve().parent.parent  # research-assistant/
 NORMALIZED_DIR = BASE / "data" / "normalized"
-DAILY_DIR = NORMALIZED_DIR / "market"           # 日线 CSV 目录
+LOCAL_DAILY_DIR = BASE / "data" / "market" / "daily_kline"
+SHARED_DAILY_DIR = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline")
+DAILY_DIR = SHARED_DAILY_DIR if SHARED_DAILY_DIR.exists() else LOCAL_DAILY_DIR
+EFFECTIVE_DAILY_DIR = DAILY_DIR
 FINA_DIR = NORMALIZED_DIR / "fundamentals"      # 财务 CSV 目录
 HEALTH_DIR = BASE / "data" / "audit" / "health"  # 审计输出目录
 
@@ -76,6 +79,39 @@ def _read_csv(path: Path) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+def _daily_files() -> list[Path]:
+    """List canonical daily files while retaining test monkeypatch compatibility."""
+    if DAILY_DIR != EFFECTIVE_DAILY_DIR:
+        files = _list_csv_files(DAILY_DIR)
+        return [f for f in files if not f.name.startswith("valuation_")]
+    by_code: dict[str, Path] = {}
+    for root in (SHARED_DAILY_DIR, LOCAL_DAILY_DIR, NORMALIZED_DIR / "market"):
+        for path in _list_csv_files(root):
+            if not path.name.startswith("valuation_"):
+                by_code[_code_from_path(path)] = path
+    return sorted(by_code.values())
+
+
+def _code_from_path(path: Path) -> str:
+    stem = path.stem.replace("_daily_kline", "")
+    if "." in stem:
+        return stem.upper()
+    if len(stem) == 6 and stem.isdigit():
+        suffix = "SH" if stem.startswith(("5", "6", "9")) else "SZ"
+        return f"{stem}.{suffix}"
+    return stem
+
+
+def _normalize_trade_date(df: pd.DataFrame) -> pd.DataFrame:
+    for column in ("trade_date", "timeString", "date"):
+        if column in df.columns:
+            if column != "trade_date":
+                df = df.rename(columns={column: "trade_date"})
+            df["trade_date"] = pd.to_datetime(df["trade_date"], errors="coerce")
+            return df
+    return df
+
+
 # ══════════════════════════════════════════════════════════════════════
 # 覆盖率统计
 # ══════════════════════════════════════════════════════════════════════
@@ -95,8 +131,7 @@ def coverage() -> dict[str, Any]:
     """
     _ensure_dirs()
 
-    csv_files = _list_csv_files(DAILY_DIR)
-    daily_files = [f for f in csv_files if not f.name.startswith("valuation_")]
+    daily_files = _daily_files()
 
     total_files = len(daily_files)
     total_rows = 0
@@ -107,26 +142,20 @@ def coverage() -> dict[str, Any]:
     empty_files: list[str] = []
 
     for f in daily_files:
-        ts_code = f.stem  # 文件名去掉 .csv 即为 ts_code
+        ts_code = _code_from_path(f)
         try:
             # 只读前几行获取基本信息，不读全文件
-            df = pd.read_csv(
-                f, encoding="utf-8-sig", nrows=5,
-                parse_dates=["trade_date"] if f.stat().st_size > 0 else False,
-            )
+            df = _normalize_trade_date(pd.read_csv(f, encoding="utf-8-sig", nrows=5))
             if df.empty:
                 empty_files.append(ts_code)
                 continue
 
             # 读全文件统计行数
-            df_full = pd.read_csv(f, encoding="utf-8-sig")
+            df_full = _normalize_trade_date(pd.read_csv(f, encoding="utf-8-sig"))
             row_count = len(df_full)
             total_rows += row_count
 
             if "trade_date" in df_full.columns:
-                df_full["trade_date"] = pd.to_datetime(
-                    df_full["trade_date"], errors="coerce"
-                )
                 min_d = df_full["trade_date"].min()
                 max_d = df_full["trade_date"].max()
 
@@ -222,8 +251,7 @@ def freshness() -> dict[str, Any]:
     """
     _ensure_dirs()
 
-    csv_files = _list_csv_files(DAILY_DIR)
-    daily_files = [f for f in csv_files if not f.name.startswith("valuation_")]
+    daily_files = _daily_files()
     today = datetime.now(CST).replace(tzinfo=None)
     today_ymd = today.strftime("%Y%m%d")
 
@@ -236,12 +264,9 @@ def freshness() -> dict[str, Any]:
     min_lag_code = ""
 
     for f in daily_files:
-        ts_code = f.stem
+        ts_code = _code_from_path(f)
         try:
-            df = pd.read_csv(
-                f, encoding="utf-8-sig",
-                parse_dates=["trade_date"] if f.stat().st_size > 0 else False,
-            )
+            df = _normalize_trade_date(pd.read_csv(f, encoding="utf-8-sig"))
             if df.empty or "trade_date" not in df.columns:
                 continue
 
@@ -352,9 +377,9 @@ def missing() -> dict[str, Any]:
         pass
 
     # 2) 扫描已拉取的日线
-    csv_files = _list_csv_files(DAILY_DIR)
-    daily_files = [f for f in csv_files if not f.name.startswith("valuation_")]
-    pulled_codes = {f.stem for f in daily_files}
+    daily_files = _daily_files()
+    file_by_code = {_code_from_path(f): f for f in daily_files}
+    pulled_codes = set(file_by_code)
 
     # 3) 缺失统计
     if u0_codes:
@@ -376,10 +401,7 @@ def missing() -> dict[str, Any]:
         expected_days = 0
         for f in sample_files:
             try:
-                df = pd.read_csv(
-                    f, encoding="utf-8-sig",
-                    parse_dates=["trade_date"] if f.stat().st_size > 0 else False,
-                )
+                df = _normalize_trade_date(pd.read_csv(f, encoding="utf-8-sig"))
                 if not df.empty and "trade_date" in df.columns:
                     expected_days = max(expected_days, len(df))
             except Exception:
@@ -387,8 +409,8 @@ def missing() -> dict[str, Any]:
 
         # 为每个已拉取股票计算缺失率
         for ts_code in sorted(pulled_codes):
-            f = DAILY_DIR / f"{ts_code}.csv"
-            if not f.exists():
+            f = file_by_code.get(ts_code)
+            if f is None:
                 continue
             try:
                 df = pd.read_csv(f, encoding="utf-8-sig")
@@ -453,9 +475,8 @@ def survivorship_check() -> dict[str, Any]:
     """
     _ensure_dirs()
 
-    csv_files = _list_csv_files(DAILY_DIR)
-    daily_files = [f for f in csv_files if not f.name.startswith("valuation_")]
-    pulled_codes = {f.stem for f in daily_files}
+    daily_files = _daily_files()
+    pulled_codes = {_code_from_path(f) for f in daily_files}
 
     # 1) 获取 U0 池中的股票信息
     u0_stocks: list[dict] = []

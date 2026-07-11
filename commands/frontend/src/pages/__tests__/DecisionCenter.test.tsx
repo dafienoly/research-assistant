@@ -4,9 +4,18 @@ import { vi } from 'vitest'
 import DecisionCenter from '../DecisionCenter'
 import {
   acknowledgeDecisionEvent,
+  activateDailyAuthorization,
   confirmDecisionPositions,
+  confirmMiniQmtPositions,
+  createDailyAuthorization,
   getDecisionLoopStatus,
+  getPositionHistory,
+  getPositionImportTemplate,
   previewDecisionPositions,
+  previewMiniQmtPositions,
+  previewOcrPositions,
+  revokeDailyAuthorization,
+  rollbackPositionSnapshot,
 } from '../../api/decisionLoop'
 
 vi.mock('../../api/decisionLoop', () => ({
@@ -14,6 +23,15 @@ vi.mock('../../api/decisionLoop', () => ({
   previewDecisionPositions: vi.fn(),
   confirmDecisionPositions: vi.fn(),
   acknowledgeDecisionEvent: vi.fn(),
+  previewMiniQmtPositions: vi.fn(),
+  confirmMiniQmtPositions: vi.fn(),
+  createDailyAuthorization: vi.fn(),
+  activateDailyAuthorization: vi.fn(),
+  revokeDailyAuthorization: vi.fn(),
+  previewOcrPositions: vi.fn(),
+  getPositionImportTemplate: vi.fn(),
+  getPositionHistory: vi.fn(),
+  rollbackPositionSnapshot: vi.fn(),
 }))
 
 const status = {
@@ -45,6 +63,15 @@ describe('DecisionCenter page', () => {
     } as never)
     vi.mocked(confirmDecisionPositions).mockResolvedValue({ ok: true, data: {} } as never)
     vi.mocked(acknowledgeDecisionEvent).mockResolvedValue({ ok: true, data: {} } as never)
+    vi.mocked(previewMiniQmtPositions).mockResolvedValue({ ok: true, data: null } as never)
+    vi.mocked(confirmMiniQmtPositions).mockResolvedValue({ ok: true, data: {} } as never)
+    vi.mocked(createDailyAuthorization).mockResolvedValue({ ok: true, data: null } as never)
+    vi.mocked(activateDailyAuthorization).mockResolvedValue({ ok: true, data: {} } as never)
+    vi.mocked(revokeDailyAuthorization).mockResolvedValue({ ok: true, data: {} } as never)
+    vi.mocked(previewOcrPositions).mockResolvedValue({ ok: true, data: null } as never)
+    vi.mocked(getPositionImportTemplate).mockResolvedValue({ ok: true, data: { columns: [], csv: '证券代码,持仓数量\n' } } as never)
+    vi.mocked(getPositionHistory).mockResolvedValue({ ok: true, data: [] } as never)
+    vi.mocked(rollbackPositionSnapshot).mockResolvedValue({ ok: true, data: {} } as never)
   })
 
   it('renders status, non-empty rule tables, positions, and dual-channel events', async () => {
@@ -74,5 +101,23 @@ describe('DecisionCenter page', () => {
     await screen.findByText('量化决策中心')
     fireEvent.click(screen.getByRole('button', { name: '双通道确认' }))
     await waitFor(() => expect(acknowledgeDecisionEvent).toHaveBeenCalledWith('evt1', expect.anything()))
+  })
+
+  it('blocks confirmation when OCR quality requires manual correction', async () => {
+    vi.mocked(previewDecisionPositions).mockResolvedValueOnce({
+      ok: true,
+      data: {
+        preview_id: 'preview-low-confidence', additions: [], removals: [], changes: [], unchanged: 1,
+        proposed_snapshot: { content_hash: 'hash-low', positions: status.current_position_snapshot.positions },
+        requires_correction: true,
+        quality_issues: [{ text: '5882OO', confidence: 41, requires_manual_correction: true }],
+      },
+    } as never)
+    renderPage()
+    await screen.findByText('量化决策中心')
+    fireEvent.change(screen.getByLabelText('持仓CSV或剪贴板内容'), { target: { value: '证券代码\t持仓数量\n588200.SH\t1000' } })
+    fireEvent.click(screen.getByRole('button', { name: /生成差异预览/ }))
+    expect(await screen.findByText(/低置信度字段必须人工修正/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /确认覆盖当前组合/ })).toBeDisabled()
   })
 })

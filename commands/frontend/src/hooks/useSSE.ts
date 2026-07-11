@@ -126,7 +126,7 @@ export default function useSSE(url: string, options: SSEOptions = {}): UseSSERet
       setError(err instanceof Error ? err : new Error(String(err)))
       setIsConnected(false)
     }
-  }, [url, events, withCredentials, reconnectDelay, maxRetries, clearRetryTimer])
+  }, [url, events, withCredentials, reconnectDelay, maxRetries])
 
   // Handle auto-connect lifecycle
   useEffect(() => {

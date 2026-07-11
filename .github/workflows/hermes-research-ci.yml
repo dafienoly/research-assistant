@@ -22,11 +22,11 @@ jobs:
           python-version: "3.14"
           cache: pip
           cache-dependency-path: |
-            requirements/core.lock
+            requirements/core.hashed.lock
             requirements/vectorbt.lock
 
-      - name: Install exact core lock
-        run: python -m pip install -r requirements/core.lock
+      - name: Install exact hashed core lock
+        run: python -m pip install --require-hashes -r requirements/core.hashed.lock
 
       - name: Install isolated vectorbt lock
         run: |
@@ -67,6 +67,39 @@ jobs:
           commands/tests/test_vnext_sbom.py
           commands/tests/test_vnext_ci_gate.py
           commands/tests/test_routes_vnext.py
+          commands/tests/test_decision_loop.py
+          commands/tests/test_decision_loop_api.py
+          commands/tests/test_decision_loop_production.py
+          commands/tests/test_qmt_integration.py
+          commands/tests/test_miniqmt_adapter.py
+
+      - name: Python Ruff blocking gate
+        shell: bash
+        run: |
+          mapfile -t changed_python < <(git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.py')
+          if ((${#changed_python[@]})); then
+            ruff check --select E9,F63,F7,F82 "${changed_python[@]}"
+          fi
+          ruff check \
+            commands/factor_lab/decision_loop \
+            commands/factor_lab/vnext/event_truth_sources.py \
+            commands/factor_lab/vnext/realized_observations.py \
+            commands/scripts/decision_*.py \
+            commands/scripts/ensure_ui_token.py \
+            commands/scripts/generate_capability_status.py \
+            commands/scripts/vnext_*.py \
+            scripts/generate_hashed_lock.py
+
+      - name: Semgrep blocking gate
+        run: >-
+          env -u HTTPS_PROXY -u HTTP_PROXY -u ALL_PROXY
+          semgrep scan --config auto --error --exclude '*test*'
+          commands/factor_lab/decision_loop commands/factor_lab/api_server
+
+      - name: GitNexus current-index and change-impact gate
+        run: |
+          node .gitnexus/run.cjs analyze
+          node .gitnexus/run.cjs detect-changes --scope compare --base-ref origin/main
 
       - name: Generate CycloneDX SBOM
         env:

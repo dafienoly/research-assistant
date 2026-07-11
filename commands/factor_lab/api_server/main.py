@@ -100,7 +100,7 @@ class RunContextMiddleware(BaseHTTPMiddleware):
 class AuthMiddleware(BaseHTTPMiddleware):
     """HERMES_UI_TOKEN 认证。
 
-    如果环境变量 HERMES_UI_TOKEN 未设置，允许所有请求。
+    仅回环监听时允许未设置 Token；外部监听由 serve() 强制拒绝。
     如果已设置，前端必须在 Authorization header 中提供 Bearer token。
     跳过 /api/health, /docs, /openapi.json, /redoc 等路径。
     """
@@ -433,4 +433,9 @@ async def spa_fallback(request: Request, exc):
 def serve(host: str = "127.0.0.1", port: int = 8766):
     """启动 uvicorn 服务器。"""
     import uvicorn
+    loopback_hosts = {"127.0.0.1", "localhost", "::1"}
+    if host not in loopback_hosts and not os.environ.get("HERMES_UI_TOKEN"):
+        raise RuntimeError(
+            "HERMES_UI_TOKEN is required when the API listens on a non-loopback host"
+        )
     uvicorn.run(app, host=host, port=port, log_level="info")

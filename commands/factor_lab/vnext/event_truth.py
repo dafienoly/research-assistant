@@ -59,6 +59,9 @@ class BarData:
     amount_yuan: float
     suspended: bool = False
     adj_factor: float | None = None
+    official_limit_up: float | None = None
+    official_limit_down: float | None = None
+    cash_dividend: float = 0.0
     source_snapshot_id: str = ""
 
 
@@ -224,8 +227,8 @@ class MechanicalRiskManager:
         position: PositionData,
     ) -> RiskDecision:
         limit_pct = self.price_limit_pct(contract, bar.trading_date)
-        limit_up = round(bar.pre_close * (1 + limit_pct) + 1e-9, 2)
-        limit_down = round(bar.pre_close * (1 - limit_pct) + 1e-9, 2)
+        limit_up = bar.official_limit_up or round(bar.pre_close * (1 + limit_pct) + 1e-9, 2)
+        limit_down = bar.official_limit_down or round(bar.pre_close * (1 - limit_pct) + 1e-9, 2)
         capacity = int(bar.volume_shares * self.max_volume_participation / contract.lot_size) * contract.lot_size
         if not contract.account_allowed:
             return RiskDecision(0, "account_permission_blocked", False, limit_up, limit_down, capacity)
@@ -333,7 +336,12 @@ class AShareEventTruthLane:
             frame = pd.DataFrame(records)
             frame["trade_date"] = pd.to_datetime(frame["trade_date"].astype(str), format="%Y%m%d", errors="coerce")
             frame = frame.dropna(subset=["trade_date"]).drop_duplicates("trade_date", keep="last").set_index("trade_date")
-            frames[symbol] = frame.sort_index()
+            frame = frame.sort_index()
+            from .event_truth_sources import load_event_truth
+            truth = load_event_truth(self.project_root, symbol)
+            if not truth.empty:
+                frame = frame.join(truth.drop(columns=[column for column in ("source_provider", "observed_at") if column in truth]), how="left", rsuffix="_truth")
+            frames[symbol] = frame
         missing = sorted(required - set(frames))
         if missing:
             raise ValueError(f"target instruments missing from snapshot: {missing}")
@@ -373,8 +381,17 @@ class AShareEventTruthLane:
             pre_close=float(row.get("pre_close", row["open"])),
             volume_shares=max(0.0, volume_lots * 100),
             amount_yuan=max(0.0, amount_thousand * 1000),
-            suspended=volume_lots <= 0 or any(pd.isna(row.get(name)) for name in ("open", "close")),
-            adj_factor=float(row["adj_factor"]) if "adj_factor" in row and pd.notna(row["adj_factor"]) else None,
+            suspended=bool(pd.notna(row.get("suspend_type"))) or volume_lots <= 0 or any(pd.isna(row.get(name)) for name in ("open", "close")),
+            adj_factor=(
+                float(row["adj_factor_truth"])
+                if "adj_factor_truth" in row and pd.notna(row["adj_factor_truth"])
+                else float(row["adj_factor"])
+                if "adj_factor" in row and pd.notna(row["adj_factor"])
+                else None
+            ),
+            official_limit_up=float(row["up_limit"]) if "up_limit" in row and pd.notna(row["up_limit"]) else None,
+            official_limit_down=float(row["down_limit"]) if "down_limit" in row and pd.notna(row["down_limit"]) else None,
+            cash_dividend=float(row.get("cash_div") or 0.0) if pd.notna(row.get("cash_div")) else 0.0,
             source_snapshot_id=snapshot_id,
         )
 
@@ -402,8 +419,25 @@ class AShareEventTruthLane:
         equity_records: list[dict[str, Any]] = []
         order_counter = 0
         trade_counter = 0
-        missing_evidence: set[str] = {"official_suspend_d", "official_stk_limit", "cash_dividend_events"}
-        adj_factors_seen = False
+        missing_evidence: set[str] = set()
+        def has_truth(column: str) -> bool:
+            return any(column in frame and frame[column].notna().any() for frame in frames.values())
+        if not (has_truth("up_limit") and has_truth("down_limit")):
+            missing_evidence.add("official_stk_limit")
+        truth_manifest_path = self.project_root / "data/vnext/event-truth/manifest.json"
+        try:
+            truth_manifest = json.loads(truth_manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            truth_manifest = {}
+        suspension_queries_verified = bool(truth_manifest.get("results")) and all(
+            not any(error.get("dataset") == "suspend_d" for error in result.get("errors", []))
+            for result in truth_manifest.get("results", [])
+        )
+        if not has_truth("suspend_type") and not suspension_queries_verified:
+            missing_evidence.add("official_suspend_d")
+        if not has_truth("cash_div"):
+            missing_evidence.add("cash_dividend_events")
+        adj_factors_seen = has_truth("adj_factor") or has_truth("adj_factor_truth")
 
         for day_index, timestamp in enumerate(dates):
             trading_date = timestamp.date().isoformat()
@@ -411,6 +445,10 @@ class AShareEventTruthLane:
                 symbol: self._bar(symbol, frame.loc[timestamp], weights.data_snapshot_id, trading_date)
                 for symbol, frame in frames.items()
             }
+            cash += sum(
+                positions[symbol].quantity * max(0.0, bars[symbol].cash_dividend)
+                for symbol in positions
+            )
             for bar in bars.values():
                 event_engine.put(EventType.BAR, _serialize(bar))
                 adj_factors_seen = adj_factors_seen or bar.adj_factor is not None

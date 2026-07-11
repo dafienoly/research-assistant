@@ -12,7 +12,6 @@ type BackendStatus = 'checking' | 'ok' | 'error'
 
 const TopStatusBar: React.FC = () => {
   const [backendStatus, setBackendStatus] = useState<BackendStatus>('checking')
-  const [retryCount, setRetryCount] = useState(0)
 
   const checkBackend = useCallback(async (silent = false) => {
     if (!silent) setBackendStatus('checking')
@@ -36,7 +35,6 @@ const TopStatusBar: React.FC = () => {
   }, [checkBackend])
 
   const handleRetry = () => {
-    setRetryCount((c) => c + 1)
     checkBackend()
   }
 

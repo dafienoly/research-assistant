@@ -132,10 +132,12 @@ def _momentum_targets(
 ) -> pd.DataFrame:
     targets = pd.DataFrame(np.nan, index=close.index, columns=close.columns)
     scores = close.pct_change(lookback).shift(1)
+    market_trend = close.pct_change(20).mean(axis=1).rolling(5).mean().shift(1)
     for index in range(lookback + 1, len(targets), rebalance_days):
-        row = scores.iloc[index].dropna().sort_values(ascending=False)
-        selected = list(row.head(min(top_k, len(row))).index)
+        row = scores.iloc[index].dropna()
+        row = row[row > 0].sort_values(ascending=False)
         target = pd.Series(0.0, index=close.columns)
+        selected = [] if pd.isna(market_trend.iloc[index]) or market_trend.iloc[index] <= 0 else list(row.head(min(top_k, len(row))).index)
         if selected:
             target.loc[selected] = invested_weight / len(selected)
         targets.iloc[index] = target
@@ -151,15 +153,32 @@ def _walk_forward(
     boundaries = [(0.6, 0.8), (0.8, 1.0)]
     for fold_index, (train_end_fraction, test_end_fraction) in enumerate(boundaries, start=1):
         train_end = max(20, int(sessions * train_end_fraction))
-        previous_end = 0 if fold_index == 1 else int(sessions * 0.6)
+        previous_end = 0
         test_start = train_end
         test_end = max(test_start + 1, int(sessions * test_end_fraction))
         ranked = []
         for scenario in scenarios:
             series = returns_by_id[scenario["scenario_id"]]
             train = series.iloc[previous_end:train_end]
-            ranked.append((_metrics(train).get("sharpe") or -999.0, scenario))
-        selected = max(ranked, key=lambda item: item[0])[1]
+            split_points = np.linspace(0, len(train), 4, dtype=int)
+            segments = [
+                train.iloc[split_points[index]:split_points[index + 1]]
+                for index in range(3)
+                if split_points[index + 1] - split_points[index] >= 20
+            ]
+            segment_sharpes = [float(_metrics(segment).get("sharpe") or -999.0) for segment in segments]
+            full_metrics = _metrics(train)
+            if not segment_sharpes:
+                robust_score = -999.0
+            else:
+                robust_score = (
+                    float(np.median(segment_sharpes))
+                    - 0.5 * float(np.std(segment_sharpes))
+                    - float(full_metrics.get("max_drawdown") or 0)
+                )
+            ranked.append((robust_score, scenario, segment_sharpes, full_metrics))
+        selected_row = max(ranked, key=lambda item: item[0])
+        selected = selected_row[1]
         test = returns_by_id[selected["scenario_id"]].iloc[test_start:test_end]
         folds.append(
             {
@@ -170,7 +189,10 @@ def _walk_forward(
                 "test_end": str(returns_by_id[selected["scenario_id"]].index[test_end - 1].date()),
                 "selected_scenario_id": selected["scenario_id"],
                 "selected_parameters": selected["parameters"],
-                "train_sharpe": max(ranked, key=lambda item: item[0])[0],
+                "train_sharpe": selected_row[3].get("sharpe"),
+                "robust_selection_score": selected_row[0],
+                "train_segment_sharpes": selected_row[2],
+                "selection_method": "expanding_train_median_sharpe_minus_instability_and_drawdown",
                 "test_metrics": _metrics(test),
                 "purged_signal_lag_days": 1,
             }
@@ -207,7 +229,12 @@ def run(bundle: dict[str, Any], project_root: Path) -> dict[str, Any]:
     for lookback in config["momentum_lookbacks"]:
         for top_k in config["top_k"]:
             for frequency in config["rebalance_frequencies_days"]:
-                parameters = {"lookback": int(lookback), "top_k": int(top_k), "rebalance_days": int(frequency)}
+                parameters = {
+                    "lookback": int(lookback),
+                    "top_k": int(top_k),
+                    "rebalance_days": int(frequency),
+                    "market_trend_filter": "20d_mean_return_5d_smooth_lag1_gt_0",
+                }
                 scenario_id = f"momentum-{_canonical_hash(parameters)[:12]}"
                 targets = _momentum_targets(
                     close,
@@ -271,6 +298,12 @@ def run(bundle: dict[str, Any], project_root: Path) -> dict[str, Any]:
             }
         )
 
+    walk_forward = _walk_forward(scenarios, returns_by_id, len(close))
+    all_oos_positive = len(walk_forward) >= 2 and all(
+        float(fold.get("test_metrics", {}).get("total_return") or 0) > 0
+        and float(fold.get("test_metrics", {}).get("sharpe") or 0) > 0
+        for fold in walk_forward
+    )
     return {
         "schema_version": "1.0",
         "status": "OK",
@@ -287,7 +320,10 @@ def run(bundle: dict[str, Any], project_root: Path) -> dict[str, Any]:
         "symbols": list(close.columns),
         "static_target_scenario": static_result,
         "parameter_scan": scenarios,
-        "walk_forward": _walk_forward(scenarios, returns_by_id, len(close)),
+        "walk_forward": walk_forward,
+        "multi_interval_oos_passed": all_oos_positive,
+        "strategy_promotion_status": "ELIGIBLE_FOR_REVIEW" if all_oos_positive else "BLOCKED",
+        "strategy_promotion_blockers": [] if all_oos_positive else ["one_or_more_oos_folds_non_positive"],
         "cost_slippage_stress": cost_stress,
         "event_study": event_study,
         "execution_truth": False,

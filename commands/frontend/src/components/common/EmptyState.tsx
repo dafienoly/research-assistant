@@ -1,5 +1,5 @@
 import React from 'react'
-import { Empty, Typography } from 'antd'
+import { Empty } from 'antd'
 
 interface EmptyStateProps {
   description?: string

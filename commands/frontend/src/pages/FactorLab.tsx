@@ -6,7 +6,7 @@ import {
   Divider, Progress,
 } from 'antd'
 import {
-  WarningOutlined, CheckCircleOutlined, CloseCircleOutlined,
+  WarningOutlined, CloseCircleOutlined,
   ExperimentOutlined, ReloadOutlined, FundOutlined,
 } from '@ant-design/icons'
 import ReactEChartsCore from 'echarts-for-react'
@@ -16,7 +16,7 @@ import LoadingState from '../components/common/LoadingState'
 import ErrorState from '../components/common/ErrorState'
 import StatusDot from '../components/common/StatusDot'
 
-const { Text, Title } = Typography
+const { Text } = Typography
 
 // ─── Types ──────────────────────────────────────────────────────
 interface FactorRow {
@@ -222,7 +222,7 @@ export default function FactorLab() {
 
   // ─── Batch Compute ──────────────────────────────────────────
   const [computing, setComputing] = useState(false)
-  const handleComputeAll = useCallback(async () => {
+  const handleComputeAll = async () => {
     setComputing(true)
     try {
       const r = await fetch(`${API}/api/factors/compute-all`, { method: 'POST' })
@@ -238,7 +238,7 @@ export default function FactorLab() {
     } finally {
       setComputing(false)
     }
-  }, [])
+  }
 
   // ─── Data Fetching ────────────────────────────────────────────
   const fetchFactors = useCallback(async () => {
@@ -463,7 +463,7 @@ export default function FactorLab() {
       align: 'right' as const,
       sorter: (a: FactorRow, b: FactorRow) =>
         (a.excess_vs_semiconductor_ew ?? 0) - (b.excess_vs_semiconductor_ew ?? 0),
-      render: (v: number | undefined, r: FactorRow) => {
+      render: (v: number | undefined) => {
         if (v === undefined) return <Text type="secondary">-</Text>
         const isNegative = v < 0
         return (

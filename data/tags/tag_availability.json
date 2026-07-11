@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-07-11T00:00:00+08:00",
+  "policy": "Missing datasets are explicitly unavailable; this file is not a substitute for tag content.",
+  "datasets": {
+    "industry_chain_tags.csv": {
+      "status": "MISSING_SOURCE_DATA",
+      "rows": 0,
+      "source": null,
+      "reason": "No durable verified upstream payload is available; production consumers must remain blocked or watch-only."
+    },
+    "semiconductor_chain_tags.csv": {
+      "status": "MISSING_SOURCE_DATA",
+      "rows": 0,
+      "source": null,
+      "reason": "No durable verified upstream payload is available; production consumers must remain blocked or watch-only."
+    },
+    "stock_theme_tags.csv": {
+      "status": "MISSING_SOURCE_DATA",
+      "rows": 0,
+      "source": null,
+      "reason": "No durable verified upstream payload is available; production consumers must remain blocked or watch-only."
+    }
+  }
+}

@@ -1,15 +1,14 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Card, Tabs, Table, Tag, Button, Modal, Spin, Alert,
-  Select, Space, Typography, Tooltip, Row, Col, Descriptions, Empty,
+  Select, Space, Typography, Tooltip, Row, Col, Descriptions,
 } from 'antd'
 import {
-  AuditOutlined, ReloadOutlined, CheckCircleOutlined,
-  CloseCircleOutlined, WarningOutlined, MinusCircleOutlined,
+  AuditOutlined, CheckCircleOutlined,
+  CloseCircleOutlined, MinusCircleOutlined,
 } from '@ant-design/icons'
 import PageHeader from '../components/common/PageHeader'
 import MetricCard from '../components/common/MetricCard'
-import StatusDot from '../components/common/StatusDot'
 import type { UniverseDetail, UniverseAuditResponse } from '../api/schemas'
 
 // ─── Tab definitions ──────────────────────────────────────────────
@@ -67,7 +66,7 @@ export default function StockPool() {
 
   // ── Fetch universe data ──────────────────────────────────────────
   const fetchUniverse = useCallback((silent = false) => {
-    if (!silent && !universeCache[activeTab]) setLoading(true)
+    if (!silent) setLoading(true)
     if (!silent) setError(null)
     apiGet<{ universe: UniverseDetail }>(`/api/universe/${activeTab}`)
       .then(d => {
@@ -75,7 +74,7 @@ export default function StockPool() {
         setSubsectorFilter([])
       })
       .catch(e => {
-        if (!silent && !universeCache[activeTab]) setError(e.message)
+        if (!silent) setError(e.message)
       })
       .finally(() => {
         setLoading(false)
@@ -96,7 +95,7 @@ export default function StockPool() {
         .then(d => setUniverseCache(prev => ({ ...prev, [tab]: d.universe })))
         .catch(() => {})
     })
-  }, [activeTab])
+  }, [activeTab, universe, universeCache])
 
   // ── Audit ────────────────────────────────────────────────────────
   const openAudit = useCallback(async () => {
@@ -105,7 +104,7 @@ export default function StockPool() {
     try {
       const data = await apiGet<UniverseAuditResponse>(`/api/universe/${activeTab}/audit`)
       setAuditData(data)
-    } catch (e: any) {
+    } catch {
       setAuditData(null)
     } finally {
       setAuditLoading(false)
@@ -113,7 +112,7 @@ export default function StockPool() {
   }, [activeTab])
 
   // ── Derived ──────────────────────────────────────────────────────
-  const stocks: any[] = universe?.stocks ?? []
+  const stocks: any[] = useMemo(() => universe?.stocks ?? [], [universe])
   const filteredStocks = useMemo(() => {
     if (activeTab !== 'U3' || subsectorFilter.length === 0) return stocks
     return stocks.filter((s: any) => {

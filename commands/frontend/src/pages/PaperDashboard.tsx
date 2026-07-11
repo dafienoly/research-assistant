@@ -3,14 +3,10 @@ import { Card, Row, Col, Table, Tag, Button, Typography, Tabs, Space, Empty, Too
 import {
   ThunderboltOutlined,
   ReloadOutlined,
-  WalletOutlined,
-  RiseOutlined,
   SwapOutlined,
   WarningOutlined,
   CheckCircleOutlined,
-  CloseCircleOutlined,
   HistoryOutlined,
-  InfoCircleOutlined,
   FileTextOutlined,
   BlockOutlined,
 } from '@ant-design/icons'
@@ -302,11 +298,6 @@ const FillsTable: FC<{ trades: ShadowFilledTrade[] }> = ({ trades }) => {
       style={{ borderTop: '1px solid #E2E8F0' }}
     />
   )
-}
-
-interface DailyReviewTableProps {
-  shadowDash: NonNullable<ReturnType<typeof useShadowDashboard>['data']>['data']
-  date: string
 }
 
 const DailyReviewTable: FC<{ shadowDash: any; shadowDashDate: string }> = ({ shadowDash, shadowDashDate }) => {

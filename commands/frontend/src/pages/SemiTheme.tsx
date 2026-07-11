@@ -2,14 +2,11 @@
 import { useMemo, type CSSProperties } from 'react'
 import { Card, Row, Col, Table, Tag, Typography, Space, Tooltip, Progress } from 'antd'
 import {
-  ArrowUpOutlined,
-  ArrowDownOutlined,
   ThunderboltOutlined,
   TeamOutlined,
   BarChartOutlined,
   FundOutlined,
   RiseOutlined,
-  FallOutlined,
 } from '@ant-design/icons'
 import ReactEChartsCore from 'echarts-for-react'
 import dayjs from 'dayjs'

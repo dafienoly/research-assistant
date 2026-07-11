@@ -20,11 +20,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Card, Row, Col, Table, Tag, Button, Modal, Descriptions,
-  Space, Tabs, Typography, Skeleton,
+  Space, Typography, Skeleton,
 } from 'antd'
 import {
   ReloadOutlined, FileTextOutlined, WarningOutlined,
-  CheckCircleOutlined, CloseCircleOutlined,
 } from '@ant-design/icons'
 import { API } from '../App'
 import PageHeader from '../components/common/PageHeader'
@@ -134,8 +133,8 @@ export default function Events() {
   const [detailError, setDetailError] = useState<string | null>(null)
 
   // 筛选
-  const [filterType, setFilterType] = useState('')
-  const [filterDirection, setFilterDirection] = useState('')
+  const filterType = ''
+  const filterDirection = ''
 
   // ─── 数据加载 ───────────────────────────────────────────────
   const load = useCallback(async () => {

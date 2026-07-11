@@ -29,10 +29,18 @@ from typing import Any, Callable, Optional
 import pandas as pd
 
 try:
-    from commands.data_providers.tushare import TushareMarketProvider, TushareFinaProvider
+    from commands.data_providers.tushare import (
+        TushareFinaProvider,
+        TushareFundFlowProvider,
+        TushareMarketProvider,
+    )
     from commands.data_recovery import RecoveryManifest, atomic_write_frame, frame_date_range, merge_without_data_loss
 except ModuleNotFoundError:
-    from data_providers.tushare import TushareMarketProvider, TushareFinaProvider
+    from data_providers.tushare import (
+        TushareFinaProvider,
+        TushareFundFlowProvider,
+        TushareMarketProvider,
+    )
     from data_recovery import RecoveryManifest, atomic_write_frame, frame_date_range, merge_without_data_loss
 
 logger = logging.getLogger(__name__)
@@ -58,7 +66,7 @@ BATCH_SLEEP = 1.5         # 批间休眠秒数（叠加在 TushareClient 内置�
 # ─── Provider 单例 ───────────────────────────────────────────────────
 _market_provider: Optional[TushareMarketProvider] = None
 _fina_provider: Optional[TushareFinaProvider] = None
-_fund_flow_provider: Optional["TushareFundFlowProvider"] = None
+_fund_flow_provider: Optional[TushareFundFlowProvider] = None
 
 
 def _get_market_provider() -> TushareMarketProvider:
@@ -1260,14 +1268,22 @@ def gap_report_and_plan() -> dict:
     tc = _get_ts_client()
     sb = tc._query("stock_basic", fields="ts_code", list_status="L")
     total = len(sb)
+    u0_codes = {str(code).split(".")[0] for code in sb.get("ts_code", pd.Series(dtype=str)).dropna()}
     print(f"全A股票: {total} 只")
     print()
 
     # 逐股数据盘点
-    daily_count = len([p for p in DAILY_DIR.glob("*.csv") if not p.name.startswith("valuation_")])
-    val_count = len(list(VALUATION_DIR.glob("valuation_*.csv")))
-    ff_count = len(list(FUND_FLOW_DIR.glob("*.csv")))
-    fina_count = len(list(FINA_DIR.glob("*.csv")))
+    canonical_daily_dir = BASE / "data" / "market" / "daily_kline"
+    shared_daily_dir = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline")
+    normalized_daily = [p for p in DAILY_DIR.glob("*.csv") if not p.name.startswith("valuation_")]
+    canonical_daily = list(canonical_daily_dir.glob("*.csv"))
+    shared_daily = list(shared_daily_dir.glob("*.csv")) if shared_daily_dir.exists() else []
+    def _daily_code(path: Path) -> str:
+        return path.stem.replace("_daily_kline", "").split(".")[0]
+    daily_count = len({_daily_code(p) for p in [*normalized_daily, *canonical_daily, *shared_daily]} & u0_codes)
+    val_count = len({p.stem.replace("valuation_", "").split(".")[0] for p in VALUATION_DIR.glob("valuation_*.csv")} & u0_codes)
+    ff_count = len({p.stem.split(".")[0] for p in FUND_FLOW_DIR.glob("*.csv")} & u0_codes)
+    fina_count = len({p.stem.split(".")[0] for p in FINA_DIR.glob("*.csv")} & u0_codes)
 
     stock_datasets = [
         ("日线 kline", daily_count),

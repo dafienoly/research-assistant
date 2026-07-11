@@ -154,6 +154,9 @@ class ParameterPromotionService:
         current_value: Any,
         proposed_value: Any,
         evidence: dict[str, Any],
+        decision_id: str | None = None,
+        event_id: str | None = None,
+        order_id: str | None = None,
     ) -> ParameterCandidate:
         candidate = ParameterCandidate(
             candidate_id=f"param_{uuid.uuid4().hex}",
@@ -162,6 +165,9 @@ class ParameterPromotionService:
             proposed_value=proposed_value,
             evidence=evidence,
             created_at=datetime.now().astimezone(),
+            decision_id=decision_id,
+            event_id=event_id,
+            order_id=order_id,
         )
         self._save(candidate, "proposed")
         return candidate
@@ -212,6 +218,9 @@ class ParameterPromotionService:
                 "values": values,
                 "promoted_at": now.isoformat(),
                 "candidate_id": candidate_id,
+                "decision_id": updated.decision_id,
+                "event_id": updated.event_id,
+                "order_id": updated.order_id,
             }
             self.store.write_json("parameters/production.json", production)
             self.store.append_jsonl("parameters/production_history.jsonl", production)

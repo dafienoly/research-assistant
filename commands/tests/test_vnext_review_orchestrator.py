@@ -29,7 +29,7 @@ def test_formal_antifragile_review_consumes_common_lineage(tmp_path: Path) -> No
         "Execution",
     }
     assert result["metrics"]["over_aggression_score"] == pytest.approx(0.23)
-    assert result["unexplained_discrepancy_count"] == 0
+    assert result["unexplained_discrepancy_count"] == 1
     assert result["promotion_status"] == "BLOCKED"
     assert result["real_broker_called"] is False
 

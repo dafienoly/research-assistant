@@ -45,6 +45,7 @@ class Position(StrictModel):
     name: str = ""
     quantity: int = Field(ge=0)
     available_quantity: int = Field(default=0, ge=0)
+    frozen_quantity: int = Field(default=0, ge=0)
     cost_price: float = Field(ge=0)
     market_price: float | None = Field(default=None, ge=0)
     instrument_type: Literal["stock", "etf"] = "stock"
@@ -62,6 +63,8 @@ class Position(StrictModel):
     def available_not_above_quantity(self):
         if self.available_quantity > self.quantity:
             raise ValueError("available_quantity cannot exceed quantity")
+        if self.available_quantity + self.frozen_quantity > self.quantity:
+            raise ValueError("available plus frozen quantity cannot exceed quantity")
         return self
 
 
@@ -83,6 +86,8 @@ class PositionDiff(StrictModel):
     changes: list[dict[str, Any]] = Field(default_factory=list)
     unchanged: int = 0
     proposed_snapshot: PositionSnapshot
+    quality_issues: list[dict[str, Any]] = Field(default_factory=list)
+    requires_correction: bool = False
 
 
 class QuoteSnapshot(StrictModel):
@@ -262,6 +267,22 @@ class ReviewMetrics(StrictModel):
     attribution: dict[str, str]
 
 
+class ReviewRecord(StrictModel):
+    review_id: str
+    trading_date: str
+    decision_id: str | None = None
+    event_id: str | None = None
+    order_id: str | None = None
+    parameter_version: str | None = None
+    symbol: str
+    book: Book
+    execution_status: str
+    metrics: ReviewMetrics | None = None
+    benchmark_symbol: str | None = None
+    benchmark_missing_reason: str | None = None
+    created_at: datetime
+
+
 class ParameterCandidate(StrictModel):
     candidate_id: str
     parameter: str
@@ -273,3 +294,21 @@ class ParameterCandidate(StrictModel):
     status: Literal["candidate", "promoted", "rejected"] = "candidate"
     created_at: datetime
     promoted_at: datetime | None = None
+    decision_id: str | None = None
+    event_id: str | None = None
+    order_id: str | None = None
+
+
+class DecisionCycleResult(StrictModel):
+    cycle_id: str
+    decision_id: str | None = None
+    started_at: datetime
+    completed_at: datetime
+    status: Literal["ok", "degraded", "blocked", "skipped"]
+    data_gate: dict[str, Any]
+    portfolio_risk: PortfolioRiskResult | None = None
+    action_cards: list[ActionCard] = Field(default_factory=list)
+    notification_receipts: list[dict[str, Any]] = Field(default_factory=list)
+    execution_results: list[dict[str, Any]] = Field(default_factory=list)
+    reconciliation: dict[str, Any] | None = None
+    blockers: list[str] = Field(default_factory=list)

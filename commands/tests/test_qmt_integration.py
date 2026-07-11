@@ -150,3 +150,27 @@ def test_sync_writes_artifacts():
         assert result["status"] == "ok"
         for name in ["qmt_sync.json", "qmt_positions.csv", "qmt_orders.csv", "qmt_trades.csv", "order_book.json"]:
             assert os.path.exists(os.path.join(tmp, name))
+
+
+def test_partial_fill_is_reconciled_without_marking_order_complete():
+    with tempfile.TemporaryDirectory() as tmp:
+        fake = FakeQMTClient()
+        fake.existing_orders = [{
+            "order_id": "ORD_B_001",
+            "status": "partially_filled",
+            "filled_quantity": 100,
+        }]
+        adapter = QMTExecutionAdapter(client=fake, output_dir=tmp)
+        adapter.order_book.add_order(
+            order_id="ORD_B_001",
+            symbol="000001",
+            side="buy",
+            price=10.0,
+            quantity=200,
+            status="submitted",
+        )
+        adapter.sync()
+        reconciled = adapter.order_book.get_order("ORD_B_001")
+        assert reconciled.status == "partially_filled"
+        assert reconciled.filled_quantity == 100
+        assert reconciled.remaining_quantity == 100

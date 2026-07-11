@@ -89,23 +89,23 @@ async def qmt_bars(symbol: str = "", period: str = "1d", count: int = 120, reque
 
 @router.get("/qmt/account")
 async def qmt_account(request: Request):
-    # 不可用时返回空数据而非 HTTP 400，避免前端 API client throw + 无限重试
     client = _get_client()
     if not client:
-        return api_success(data={"accounts": [], "total_asset": 0, "available_cash": 0}, request=request)
+        return api_success(data={"available": False, "accounts": [], "total_asset": None, "available_cash": None, "error": "QMT bridge not configured"}, request=request)
     try:
-        resp = await _call(client, "account")
-    except Exception:
-        return api_success(data={"accounts": [], "total_asset": 0, "available_cash": 0}, request=request)
+        resp = await _call(client, "get_account")
+    except Exception as exc:
+        return api_success(data={"available": False, "accounts": [], "total_asset": None, "available_cash": None, "error": str(exc)}, request=request)
     if resp.get("status") != "ok":
-        return api_success(data={"accounts": [], "total_asset": 0, "available_cash": 0}, request=request)
+        return api_success(data={"available": False, "accounts": [], "total_asset": None, "available_cash": None, "error": resp.get("error", "QMT account unavailable")}, request=request)
     raw = resp.get("data", {})
     # Bridge returns a single asset dict or None → wrap in accounts[]
-    accounts = [raw] if isinstance(raw, dict) and raw.get("m_dTotalAsset") is not None else []
+    accounts = [raw] if isinstance(raw, dict) and (raw.get("m_dTotalAsset") is not None or raw.get("total_asset") is not None) else []
     return api_success(data={
+        "available": bool(accounts),
         "accounts": accounts,
-        "total_asset": raw.get("m_dTotalAsset", 0) if accounts else 0,
-        "available_cash": raw.get("m_dAvailable", 0) if accounts else 0,
+        "total_asset": raw.get("m_dTotalAsset", raw.get("total_asset")) if accounts else None,
+        "available_cash": raw.get("m_dAvailable", raw.get("cash")) if accounts else None,
     }, request=request)
 
 
@@ -113,18 +113,19 @@ async def qmt_account(request: Request):
 async def qmt_positions(request: Request):
     client = _get_client()
     if not client:
-        return api_success(data={"positions": [], "total_market_value": 0, "total_profit_loss": 0, "position_count": 0}, request=request)
+        return api_success(data={"available": False, "positions": [], "total_market_value": None, "total_profit_loss": None, "position_count": None, "error": "QMT bridge not configured"}, request=request)
     try:
-        resp = await _call(client, "positions")
-    except Exception:
-        return api_success(data={"positions": [], "total_market_value": 0, "total_profit_loss": 0, "position_count": 0}, request=request)
+        resp = await _call(client, "get_positions")
+    except Exception as exc:
+        return api_success(data={"available": False, "positions": [], "total_market_value": None, "total_profit_loss": None, "position_count": None, "error": str(exc)}, request=request)
     if resp.get("status") != "ok":
-        return api_success(data={"positions": [], "total_market_value": 0, "total_profit_loss": 0, "position_count": 0}, request=request)
+        return api_success(data={"available": False, "positions": [], "total_market_value": None, "total_profit_loss": None, "position_count": None, "error": resp.get("error", "QMT positions unavailable")}, request=request)
     raw_list = resp.get("data")
     positions = raw_list if isinstance(raw_list, list) else []
-    total_mv = sum(p.get("m_dMarketValue", 0) or 0 for p in positions)
-    total_pnl = sum(p.get("m_dProfitLoss", 0) or 0 for p in positions)
+    total_mv = sum(p.get("m_dMarketValue", p.get("market_value", 0)) or 0 for p in positions)
+    total_pnl = sum(p.get("m_dProfitLoss", p.get("profit_loss", 0)) or 0 for p in positions)
     return api_success(data={
+        "available": True,
         "positions": positions,
         "total_market_value": total_mv,
         "total_profit_loss": total_pnl,
@@ -138,7 +139,7 @@ async def qmt_orders(request: Request):
     if not client:
         return api_success(data=[], request=request)
     try:
-        resp = await _call(client, "orders")
+        resp = await _call(client, "get_orders")
     except Exception:
         return api_success(data=[], request=request)
     if resp.get("status") != "ok":
@@ -152,7 +153,7 @@ async def qmt_trades(request: Request):
     if not client:
         return api_success(data=[], request=request)
     try:
-        resp = await _call(client, "trades")
+        resp = await _call(client, "get_trades")
     except Exception:
         return api_success(data=[], request=request)
     if resp.get("status") != "ok":

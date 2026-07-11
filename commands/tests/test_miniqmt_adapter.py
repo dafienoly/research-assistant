@@ -37,11 +37,12 @@ def test_load_account_unavailable():
     assert asset["status"] == "unavailable"
 
 
-def test_load_positions_empty():
-    """不可用时持仓为空"""
+def test_load_positions_fails_explicitly():
+    """不可用时禁止用空列表伪装空仓。"""
     adapter = MiniQMTPositionAdapter()
-    pos = adapter.load_positions()
-    assert pos == []
+    import pytest
+    with pytest.raises(RuntimeError, match="QMT Bridge"):
+        adapter.load_positions()
 
 
 def test_normalize_no_crash():
@@ -62,16 +63,19 @@ def test_normalize_cash():
 
 
 def test_export_normalized():
-    """导出标准化 CSV"""
+    """无真实持仓时导出同样必须显式失败。"""
+    import pytest
     with tempfile.TemporaryDirectory() as tmp:
         out = os.path.join(tmp, "norm.csv")
         adapter = MiniQMTPositionAdapter()
-        path = adapter.export_normalized_positions(out)
-        assert os.path.exists(path)
+        with pytest.raises(RuntimeError, match="QMT Bridge"):
+            adapter.export_normalized_positions(out)
+        assert not os.path.exists(out)
 
 
 def test_no_fake_positions():
-    """不可用时返回空列表, 不生成假数据"""
+    """不可用时抛错，不用空列表伪装空仓。"""
+    import pytest
     adapter = MiniQMTPositionAdapter()
-    pos = adapter.load_positions()
-    assert pos == []
+    with pytest.raises(RuntimeError, match="QMT Bridge"):
+        adapter.load_positions()

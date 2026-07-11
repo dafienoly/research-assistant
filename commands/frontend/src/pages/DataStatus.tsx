@@ -6,11 +6,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Card, Row, Col, Table, Tag, Button, Progress,
-  Alert, Modal, Descriptions, Space, Tooltip,
+  Alert, Modal, Descriptions, Space,
 } from 'antd'
 import {
   ReloadOutlined, DatabaseOutlined, CheckCircleOutlined,
-  CloseCircleOutlined, MinusCircleOutlined, ExclamationCircleOutlined,
+  MinusCircleOutlined, ExclamationCircleOutlined,
   FileTextOutlined, HistoryOutlined, EyeOutlined,
 } from '@ant-design/icons'
 import { API } from '../App'
@@ -93,24 +93,6 @@ async function fetchJson<T>(url: string): Promise<T> {
   }
   return json as T
 }
-
-// ═════════════════════════════════════════════════════════════════
-// 子组件: 状态圆点
-// ═════════════════════════════════════════════════════════════════
-const StatusDot: React.FC<{ color: string; title?: string }> = ({ color, title }) => (
-  <Tooltip title={title}>
-    <span
-      style={{
-        display: 'inline-block',
-        width: 10,
-        height: 10,
-        borderRadius: '50%',
-        backgroundColor: color,
-        marginRight: 4,
-      }}
-    />
-  </Tooltip>
-)
 
 // ═════════════════════════════════════════════════════════════════
 // 子组件: 缺失率进度条

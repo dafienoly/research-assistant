@@ -11,12 +11,10 @@ import {
   Alert,
   Button,
   Tooltip,
-  Divider,
   Descriptions,
   Row,
   Col,
   Empty,
-  Modal,
 } from 'antd'
 import {
   CheckCircleOutlined,
@@ -27,15 +25,12 @@ import {
   SafetyCertificateOutlined,
   ThunderboltOutlined,
   FileTextOutlined,
-  InfoCircleOutlined,
-  ExclamationCircleOutlined,
   PlayCircleOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
 import ErrorState from '../components/common/ErrorState'
-import StatusDot from '../components/common/StatusDot'
 import {
   useLiveGateLatest,
   useLiveGateHistory,
@@ -381,7 +376,6 @@ function BlockersSection({ blockers }: { blockers: GateReport['blockers'] }) {
 function SummaryMetrics({ report }: { report: GateReport }) {
   const total = report.gates?.length || 0
   const passed = report.gates?.filter((g) => g.passed).length || 0
-  const blockers = report.blockers?.length || 0
   const warnings = report.warnings?.length || 0
   const failed = report.gates?.filter((g) => !g.passed && g.severity === 'blocker').length || 0
 
@@ -643,7 +637,6 @@ const LiveGate: React.FC = () => {
 
   const {
     data: historyResp,
-    isLoading: loadingHistory,
   } = useLiveGateHistory()
 
   const runMutation = useRunLiveGate()

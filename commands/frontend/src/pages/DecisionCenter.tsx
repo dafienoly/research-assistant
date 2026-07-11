@@ -1,18 +1,28 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Button, Card, Col, Descriptions, Input, Row, Select, Space, Statistic, Table, Tag, Typography, message } from 'antd'
+import { Alert, Button, Card, Checkbox, Col, Descriptions, Input, InputNumber, Row, Select, Space, Statistic, Table, Tag, Typography, Upload, message } from 'antd'
 import { BellOutlined, CheckOutlined, SafetyCertificateOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../components/common/PageHeader'
 import LoadingState from '../components/common/LoadingState'
 import ErrorState from '../components/common/ErrorState'
 import {
   acknowledgeDecisionEvent,
+  activateDailyAuthorization,
   confirmDecisionPositions,
+  confirmMiniQmtPositions,
+  createDailyAuthorization,
   getDecisionLoopStatus,
+  getPositionHistory,
+  getPositionImportTemplate,
   previewDecisionPositions,
+  previewMiniQmtPositions,
+  previewOcrPositions,
+  revokeDailyAuthorization,
+  rollbackPositionSnapshot,
   type DecisionEvent,
   type DecisionPosition,
   type PositionPreview,
+  type PositionSnapshot,
 } from '../api/decisionLoop'
 
 const BOOK_ROWS = [
@@ -36,21 +46,79 @@ export default function DecisionCenter() {
   const [source, setSource] = useState<'csv' | 'clipboard'>('clipboard')
   const [content, setContent] = useState('')
   const [preview, setPreview] = useState<PositionPreview | null>(null)
+  const [previewKind, setPreviewKind] = useState<'manual' | 'miniqmt'>('manual')
+  const [history, setHistory] = useState<PositionSnapshot[]>([])
+  const [strategySummary, setStrategySummary] = useState('盘中利润保护与计划内交易')
+  const [parameterVersion, setParameterVersion] = useState('decision-loop-v1')
+  const [maxOrderAmount, setMaxOrderAmount] = useState(50_000)
+  const [maxTotalAmount, setMaxTotalAmount] = useState(100_000)
+  const [ordersJson, setOrdersJson] = useState('[]')
+  const [activationNonce, setActivationNonce] = useState('')
+  const [activationHash, setActivationHash] = useState('')
+  const [hashConfirmed, setHashConfirmed] = useState(false)
   const statusQuery = useQuery({
     queryKey: ['decision-loop-status'],
     queryFn: async () => (await getDecisionLoopStatus()).data,
     refetchInterval: 60_000,
   })
+  const status = statusQuery.data
+  const positions = status?.current_position_snapshot?.positions ?? []
+  const authorization = status?.daily_authorization
   const previewMutation = useMutation({
     mutationFn: () => previewDecisionPositions(source, content),
     onSuccess: result => {
-      if (result.data) setPreview(result.data)
+      if (result.data) {
+        setPreviewKind('manual')
+        setPreview(result.data)
+      }
       else message.error('导入预览未返回数据')
     },
     onError: error => message.error(`导入预览失败：${error instanceof Error ? error.message : '未知错误'}`),
   })
+  const qmtPreviewMutation = useMutation({
+    mutationFn: previewMiniQmtPositions,
+    onSuccess: result => {
+      if (result.data) {
+        setPreviewKind('miniqmt')
+        setPreview(result.data)
+      }
+    },
+    onError: error => message.error(`MiniQMT 对账失败：${error instanceof Error ? error.message : '未知错误'}`),
+  })
+  const ocrPreviewMutation = useMutation({
+    mutationFn: previewOcrPositions,
+    onSuccess: result => {
+      if (result.data) {
+        setPreviewKind('manual')
+        setPreview(result.data)
+      }
+    },
+    onError: error => message.error(`OCR 识别失败：${error instanceof Error ? error.message : '未知错误'}`),
+  })
+  const templateMutation = useMutation({
+    mutationFn: getPositionImportTemplate,
+    onSuccess: result => {
+      setSource('csv')
+      setContent(result.data?.csv ?? '')
+      message.success('导入模板已载入，可替换示例行后预览')
+    },
+  })
+  const historyMutation = useMutation({
+    mutationFn: () => getPositionHistory(20),
+    onSuccess: result => setHistory(result.data ?? []),
+  })
+  const rollbackMutation = useMutation({
+    mutationFn: rollbackPositionSnapshot,
+    onSuccess: async () => {
+      message.success('历史持仓快照已回滚')
+      await queryClient.invalidateQueries({ queryKey: ['decision-loop-status'] })
+      historyMutation.mutate()
+    },
+  })
   const confirmMutation = useMutation({
-    mutationFn: () => confirmDecisionPositions(preview!.preview_id, preview!.proposed_snapshot.content_hash),
+    mutationFn: () => previewKind === 'miniqmt'
+      ? confirmMiniQmtPositions(preview!.preview_id, preview!.proposed_snapshot.content_hash)
+      : confirmDecisionPositions(preview!.preview_id, preview!.proposed_snapshot.content_hash),
     onSuccess: async () => {
       message.success('持仓快照已确认')
       setPreview(null)
@@ -60,12 +128,51 @@ export default function DecisionCenter() {
   })
   const ackMutation = useMutation({
     mutationFn: acknowledgeDecisionEvent,
-    onSuccess: () => message.success('事件已确认，Telegram 与企业微信提醒同时关闭'),
+    onSuccess: async () => {
+      message.success('事件已确认，Telegram 与企业微信提醒同时关闭')
+      await queryClient.invalidateQueries({ queryKey: ['decision-loop-status'] })
+    },
+  })
+  const createAuthorizationMutation = useMutation({
+    mutationFn: () => {
+      const orders = JSON.parse(ordersJson)
+      if (!Array.isArray(orders)) throw new Error('计划订单必须是 JSON 数组')
+      return createDailyAuthorization({
+        trading_date: new Date().toLocaleDateString('sv-SE'),
+        strategy_summary: strategySummary,
+        risk_budget: { catalyst: 0.25, swing: 0.5, core: 0.2, cash_min: 0.05 },
+        max_order_amount: maxOrderAmount,
+        max_total_amount: maxTotalAmount,
+        orders,
+        parameter_version: parameterVersion,
+      })
+    },
+    onSuccess: async result => {
+      const auth = result.data?.authorization
+      setActivationNonce(result.data?.confirmation_nonce ?? '')
+      setActivationHash(auth?.plan.plan_hash ?? '')
+      setHashConfirmed(false)
+      message.success('授权计划已创建，请核对计划哈希并二次确认')
+      await queryClient.invalidateQueries({ queryKey: ['decision-loop-status'] })
+    },
+    onError: error => message.error(`创建授权失败：${error instanceof Error ? error.message : '未知错误'}`),
+  })
+  const activateAuthorizationMutation = useMutation({
+    mutationFn: () => activateDailyAuthorization(authorization!.plan.trading_date, activationNonce, activationHash),
+    onSuccess: async () => {
+      message.success('当日授权已激活，收盘自动失效')
+      await queryClient.invalidateQueries({ queryKey: ['decision-loop-status'] })
+    },
+    onError: error => message.error(`激活失败：${error instanceof Error ? error.message : '未知错误'}`),
+  })
+  const revokeAuthorizationMutation = useMutation({
+    mutationFn: () => revokeDailyAuthorization(authorization!.plan.trading_date, 'user_revoked_from_console'),
+    onSuccess: async () => {
+      message.success('当日授权已撤销')
+      await queryClient.invalidateQueries({ queryKey: ['decision-loop-status'] })
+    },
   })
 
-  const status = statusQuery.data
-  const positions = status?.current_position_snapshot?.positions ?? []
-  const authorization = status?.daily_authorization
   const eventRows = useMemo(() => (status?.recent_events ?? []).slice().reverse(), [status?.recent_events])
 
   if (statusQuery.isLoading) return <LoadingState tip="正在读取量化决策闭环状态" />
@@ -87,7 +194,7 @@ export default function DecisionCenter() {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} md={8}><Card><Statistic title="已确认持仓" value={positions.length} suffix="项" prefix={<SafetyCertificateOutlined />} /></Card></Col>
-        <Col xs={24} md={8}><Card><Statistic title="未确认风险事件" value={eventRows.length} suffix="项" prefix={<BellOutlined />} /></Card></Col>
+        <Col xs={24} md={8}><Card><Statistic title="未确认风险事件" value={status?.unacknowledged_event_count ?? eventRows.filter(row => !row.acknowledged).length} suffix="项" prefix={<BellOutlined />} /></Card></Col>
         <Col xs={24} md={8}><Card><Statistic title="执行授权" value={authorization?.status ?? 'inactive'} styles={{ content: { color: authorization?.status === 'active' ? '#d97706' : '#64748b' } }} /></Card></Col>
       </Row>
 
@@ -143,12 +250,35 @@ export default function DecisionCenter() {
               <Button icon={<UploadOutlined />} type="primary" disabled={!content.trim()} loading={previewMutation.isPending} onClick={() => previewMutation.mutate()}>
                 生成差异预览
               </Button>
+              <Button loading={qmtPreviewMutation.isPending} onClick={() => qmtPreviewMutation.mutate()}>
+                从 MiniQMT 读取并预览差异
+              </Button>
+              <Space wrap>
+                <Upload
+                  accept="image/png,image/jpeg,image/webp,image/bmp,image/tiff"
+                  maxCount={1}
+                  showUploadList={false}
+                  customRequest={({ file, onSuccess, onError }) => {
+                    ocrPreviewMutation.mutate(file as File, {
+                      onSuccess: () => onSuccess?.({}),
+                      onError: error => onError?.(error),
+                    })
+                  }}
+                >
+                  <Button loading={ocrPreviewMutation.isPending}>上传券商截图 OCR</Button>
+                </Upload>
+                <Button loading={templateMutation.isPending} onClick={() => templateMutation.mutate()}>载入导入模板</Button>
+                <Button loading={historyMutation.isPending} onClick={() => historyMutation.mutate()}>查看历史快照</Button>
+              </Space>
               {preview && (
                 <Alert
-                  type="warning"
+                  type={preview.requires_correction ? 'error' : 'warning'}
                   showIcon
-                  title={`待确认：新增 ${preview.additions.length}，删除 ${preview.removals.length}，变更 ${preview.changes.length}，不变 ${preview.unchanged}`}
-                  description={<Button icon={<CheckOutlined />} loading={confirmMutation.isPending} onClick={() => confirmMutation.mutate()}>确认覆盖当前组合</Button>}
+                  title={`${previewKind === 'miniqmt' ? '券商对账' : '导入'}待确认：新增 ${preview.additions.length}，删除 ${preview.removals.length}，变更 ${preview.changes.length}，不变 ${preview.unchanged}`}
+                  description={<Space orientation="vertical">
+                    {preview.requires_correction && <Typography.Text type="danger">低置信度字段必须人工修正后重新生成预览：{preview.quality_issues?.map(issue => <Tag color="red" key={`${issue.text}:${issue.confidence}`}>{issue.text} ({issue.confidence.toFixed(0)})</Tag>)}</Typography.Text>}
+                    <Button icon={<CheckOutlined />} disabled={preview.requires_correction} loading={confirmMutation.isPending} onClick={() => confirmMutation.mutate()}>确认覆盖当前组合</Button>
+                  </Space>}
                 />
               )}
               <Table<DecisionPosition>
@@ -161,9 +291,22 @@ export default function DecisionCenter() {
                   { title: '标的', dataIndex: 'symbol' },
                   { title: '账簿', dataIndex: 'book' },
                   { title: '数量', dataIndex: 'quantity' },
+                  { title: '可用/冻结', key: 'available', render: (_, row) => `${row.available_quantity}/${row.frozen_quantity ?? 0}` },
                   { title: '成本', dataIndex: 'cost_price' },
                 ]}
               />
+              {history.length > 0 && <Table<PositionSnapshot>
+                size="small"
+                pagination={{ pageSize: 5, hideOnSinglePage: true }}
+                rowKey="snapshot_id"
+                dataSource={history}
+                columns={[
+                  { title: '快照时间', dataIndex: 'as_of' },
+                  { title: '来源', dataIndex: 'source' },
+                  { title: '持仓数', render: (_, row) => row.positions.length },
+                  { title: '操作', render: (_, row) => <Button size="small" danger loading={rollbackMutation.isPending} onClick={() => rollbackMutation.mutate(row.snapshot_id)}>一键回滚</Button> },
+                ]}
+              />}
             </Space>
           </Card>
         </Col>
@@ -181,9 +324,52 @@ export default function DecisionCenter() {
                 { title: '标的', dataIndex: 'symbol', render: value => value || '组合' },
                 { title: '操作卡片', dataIndex: 'reason' },
                 { title: '动作', dataIndex: 'action' },
-                { title: '确认', key: 'ack', render: (_, row) => <Button size="small" onClick={() => ackMutation.mutate(row.event_id)}>双通道确认</Button> },
+                { title: '状态', key: 'ack', render: (_, row) => row.acknowledged
+                  ? <Tag color="green">acknowledged</Tag>
+                  : <Button size="small" onClick={() => ackMutation.mutate(row.event_id)}>双通道确认</Button> },
               ]}
             />
+          </Card>
+        </Col>
+
+        <Col xs={24}>
+          <Card title="当日日级执行授权" extra={<Tag color={authorization?.status === 'active' ? 'orange' : 'default'}>{authorization?.status ?? '未创建'}</Tag>}>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} md={12}>
+                <Space orientation="vertical" style={{ width: '100%' }}>
+                  <Space.Compact style={{ width: '100%' }}><Button disabled>策略</Button><Input aria-label="策略摘要" value={strategySummary} onChange={event => setStrategySummary(event.target.value)} /></Space.Compact>
+                  <Space.Compact style={{ width: '100%' }}><Button disabled>参数版本</Button><Input aria-label="参数版本" value={parameterVersion} onChange={event => setParameterVersion(event.target.value)} /></Space.Compact>
+                  <Space wrap>
+                    <Typography.Text>单笔上限</Typography.Text>
+                    <InputNumber min={1} value={maxOrderAmount} onChange={value => setMaxOrderAmount(Number(value ?? 0))} />
+                    <Typography.Text>总额上限</Typography.Text>
+                    <InputNumber min={1} value={maxTotalAmount} onChange={value => setMaxTotalAmount(Number(value ?? 0))} />
+                  </Space>
+                  <Input.TextArea aria-label="计划订单JSON" rows={6} value={ordersJson} onChange={event => setOrdersJson(event.target.value)} placeholder='[{"order_id":"ord_1","symbol":"588200.SH","side":"SELL","quantity":500,"limit_price":1.2,"book":"catalyst","strategy":"profit_guard","reason":"计划减仓"}]' />
+                  <Typography.Text type="secondary">风险预算固定展示：催化 25%、波段 50%、核心 20%、现金至少 5%。计划外 BUY 始终阻断。</Typography.Text>
+                  <Button type="primary" loading={createAuthorizationMutation.isPending} onClick={() => createAuthorizationMutation.mutate()}>创建待确认授权</Button>
+                </Space>
+              </Col>
+              <Col xs={24} md={12}>
+                {authorization ? <Descriptions bordered size="small" column={1} items={[
+                  { key: 'strategy', label: '策略', children: authorization.plan.strategy_summary },
+                  { key: 'parameter', label: '参数版本', children: authorization.plan.parameter_version },
+                  { key: 'budget', label: '风险预算', children: JSON.stringify(authorization.plan.risk_budget) },
+                  { key: 'orders', label: '计划订单', children: `${authorization.plan.orders.length} 笔` },
+                  { key: 'limits', label: '单笔 / 总额', children: `¥${authorization.plan.max_order_amount.toLocaleString()} / ¥${authorization.plan.max_total_amount.toLocaleString()}` },
+                  { key: 'hash', label: '计划哈希', children: <Typography.Text copyable code>{authorization.plan.plan_hash}</Typography.Text> },
+                  { key: 'expiry', label: '失效时间', children: authorization.expires_at },
+                ]} /> : <Alert type="info" showIcon title="尚未创建当日授权" />}
+                {authorization?.status === 'pending' && (
+                  <Space orientation="vertical" style={{ width: '100%', marginTop: 16 }}>
+                    <Checkbox checked={hashConfirmed} onChange={event => setHashConfirmed(event.target.checked)}>我已逐项核对策略、预算、订单和计划哈希</Checkbox>
+                    <Button danger disabled={!hashConfirmed || !activationNonce || activationHash !== authorization.plan.plan_hash} loading={activateAuthorizationMutation.isPending} onClick={() => activateAuthorizationMutation.mutate()}>二次确认并激活</Button>
+                    {!activationNonce && <Alert type="warning" showIcon title="当前页面没有本次创建的确认随机码，请重新创建计划后激活" />}
+                  </Space>
+                )}
+                {authorization?.status === 'active' && <Button danger style={{ marginTop: 16 }} loading={revokeAuthorizationMutation.isPending} onClick={() => revokeAuthorizationMutation.mutate()}>立即撤销当日授权</Button>}
+              </Col>
+            </Row>
           </Card>
         </Col>
       </Row>
@@ -194,6 +380,9 @@ export default function DecisionCenter() {
           { key: 'aux', label: '辅助数据', children: '新闻 / 资金流 / 基本面缺失 → 降置信度、仅观察、禁止自动 BUY' },
           { key: 'notify', label: '通知一致性', children: '统一 event_id、独立回执；任一通道失败不阻塞风险处置' },
           { key: 'learning', label: '参数学习', children: '只生成候选；样本外验证 + 周度人工确认后晋级生产' },
+          { key: 'gate-mode', label: '当前数据门禁', children: `${status?.data_gate?.mode ?? 'blocked'} ${(status?.data_gate?.reasons ?? []).join('；')}` },
+          { key: 'risk-mode', label: '当前账户风险模式', children: status?.account_risk_mode?.mode ?? 'unknown' },
+          { key: 'execution', label: '执行就绪度', children: status?.execution_readiness?.ready ? 'ready' : (status?.execution_readiness?.reasons ?? []).join('；') },
         ]} />
       </Card>
     </div>

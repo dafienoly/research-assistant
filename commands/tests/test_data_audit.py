@@ -90,13 +90,23 @@ def _create_empty_csv(ts_code: str) -> Path:
 
 
 @pytest.fixture(autouse=True)
-def clean_dirs():
-    """Ensure clean market and health dirs before each test."""
-    for d in [DAILY_DIR, HEALTH_DIR]:
+def clean_dirs(tmp_path, monkeypatch):
+    """Keep audit fixtures isolated from the shared production data hub."""
+    import data_audit
+
+    daily_dir = tmp_path / "daily_kline"
+    health_dir = tmp_path / "health"
+    global DAILY_DIR, HEALTH_DIR
+    DAILY_DIR = daily_dir
+    HEALTH_DIR = health_dir
+    monkeypatch.setattr(data_audit, "DAILY_DIR", daily_dir)
+    monkeypatch.setattr(data_audit, "EFFECTIVE_DAILY_DIR", daily_dir)
+    monkeypatch.setattr(data_audit, "SHARED_DAILY_DIR", tmp_path / "no_shared_data")
+    monkeypatch.setattr(data_audit, "LOCAL_DAILY_DIR", daily_dir)
+    monkeypatch.setattr(data_audit, "NORMALIZED_DIR", tmp_path / "normalized")
+    monkeypatch.setattr(data_audit, "HEALTH_DIR", health_dir)
+    for d in [daily_dir, health_dir]:
         d.mkdir(parents=True, exist_ok=True)
-        for f in d.iterdir():
-            if f.is_file():
-                f.unlink()
     yield
 
 

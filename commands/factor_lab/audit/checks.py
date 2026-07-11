@@ -144,6 +144,20 @@ def _selected_tests(root: Path, files: list[str]) -> list[str]:
                     candidate = root / "commands/tests" / f"test_{gate}.py"
                     if candidate.exists():
                         tests.add(str(candidate.relative_to(root)))
+        if (
+            "commands/factor_lab/decision_loop/" in relative
+            or path.name in {"routes_decision_loop.py", "routes_qmt.py", "qmt_bridge.py"}
+            or path.name == "decision_guard_once.py"
+        ):
+            for test_name in (
+                "test_decision_loop.py",
+                "test_decision_loop_api.py",
+                "test_decision_loop_production.py",
+                "test_qmt_integration.py",
+            ):
+                candidate = root / "commands/tests" / test_name
+                if candidate.exists():
+                    tests.add(str(candidate.relative_to(root)))
     return sorted(tests)
 
 
@@ -171,6 +185,9 @@ def full_checks(report: AuditReport, root: Path, files: list[str], scope: str, b
         commands_path = str(root / "commands")
         existing_pythonpath = test_env.get("PYTHONPATH", "")
         test_env["PYTHONPATH"] = commands_path + (os.pathsep + existing_pythonpath if existing_pythonpath else "")
+        # Internal TestClient suites validate contracts, not deployment auth.
+        # An explicit empty value prevents a developer .env from changing test behavior.
+        test_env["HERMES_UI_TOKEN"] = ""
         result = _run(
             [executable, "-m", "pytest", "-q", "-s", "--basetemp", temp_root, *tests],
             root,
@@ -190,8 +207,10 @@ def full_checks(report: AuditReport, root: Path, files: list[str], scope: str, b
         from fastapi.testclient import TestClient
         from factor_lab.api_server.main import app
         client = TestClient(app)
+        token = os.environ.get("HERMES_UI_TOKEN", "").strip()
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
         for endpoint in ("/api/health", "/api/status"):
-            response = client.get(endpoint)
+            response = client.get(endpoint, headers=headers)
             if response.status_code != 200:
                 report.add(_finding("full", "FAIL", "api-contract-smoke", endpoint, f"HTTP {response.status_code}"))
     except Exception as exc:
