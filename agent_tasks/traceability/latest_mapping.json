@@ -603,6 +603,15 @@
           "line": 28
         },
         {
+          "file": "commands/strategy_lab/paths.py",
+          "line": 1
+        },
+        {
+          "file": "commands/strategy_lab/publisher.py",
+          "function": "publish_results",
+          "line": 24
+        },
+        {
           "file": "commands/tests/test_strategy_lab_datahub.py",
           "line": 1
         }
@@ -611,10 +620,13 @@
         "daily_kline_path",
         "read_stock_industry_map",
         "SHARED_DATAHUB_ROOT",
+        "PERFORMANCE",
+        "OUTPUTS",
+        "INCOMING",
         "UNIVERSE_DIR",
         "trade_date"
       ],
-      "behavior": "Strategy Lab 回测和 regime 通过 DataHub facade 读取 canonical 日线并规范日期/schema；半导体 universe 使用 canonical stock_basic 行业和版本控制标签，所有项目/output 根由文件位置或共享 DataHub 配置推导。"
+      "behavior": "Strategy Lab 回测和 regime 通过 DataHub facade 读取 canonical 日线并规范日期/schema；半导体 universe 使用 canonical stock_basic 行业和版本控制标签；策略、performance、research_outputs 和跨系统 handoff 路径全部由单一 paths 模块推导；发布包使用 UUID 唯一暂存目录并拒绝覆盖，绝不删除既有包。"
     },
     {
       "id": "INFRA-BATCH-FACTOR-DATAHUB-01",

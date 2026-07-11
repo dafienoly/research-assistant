@@ -1,13 +1,15 @@
 """发布 Strategy Lab 结果包给 Codex ingest"""
-import csv, json, hashlib
+import hashlib
+import json
+import uuid
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
+from strategy_lab.paths import INCOMING, OUTPUTS, PERFORMANCE
+
 CST = timezone(timedelta(hours=8))
-INCOMING = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub/incoming_from_hermes")
-BASE = Path("/home/ly/.hermes/research-assistant")
-PERF = BASE / "performance"
-OUTPUT = BASE / "research_outputs"
+PERF = PERFORMANCE
+OUTPUT = OUTPUTS
 
 
 def now_str():
@@ -28,16 +30,13 @@ def publish_results(pkg_type: str = "strategy_lab_results"):
     pkg_type: 包类型标识，如 'strategy_lab_results', 'factor_lab_results', 'paper_trading_results'
     """
     ts = datetime.now(CST).strftime("%Y%m%d_%H%M%S")
-    pkg_id = f"{pkg_type}_{ts}"
-    tmp = INCOMING / f"{pkg_id}.tmp"
+    pkg_id = f"{pkg_type}_{ts}_{uuid.uuid4().hex[:12]}"
+    tmp = INCOMING / f".{pkg_id}.staging"
     final = INCOMING / pkg_id
-
-    if tmp.exists():
-        import shutil
-        shutil.rmtree(tmp)
-    if final.exists():
-        import shutil
-        shutil.rmtree(final)
+    INCOMING.mkdir(parents=True, exist_ok=True)
+    if tmp.exists() or final.exists():
+        raise FileExistsError(f"refusing to overwrite Strategy Lab package: {pkg_id}")
+    tmp.mkdir()
 
     # 构建 payload
     payload = tmp / "payload"

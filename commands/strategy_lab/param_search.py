@@ -1,10 +1,13 @@
 """参数网格搜索 — 对任意策略做参数稳定性测试"""
-import csv, json, copy, itertools
-from pathlib import Path
+import csv
+import itertools
+import json
 from datetime import datetime, timezone, timedelta
 
+from strategy_lab.paths import PERFORMANCE, STRATEGIES
+
 CST = timezone(timedelta(hours=8))
-PERF = Path("/home/ly/.hermes/research-assistant") / "performance"
+PERF = PERFORMANCE
 
 
 def now_str():
@@ -39,9 +42,7 @@ def run_parameter_grid(strategy_name: str) -> dict:
     from strategy_lab.backtest import run as backtest_run
     import yaml
 
-    for d in [Path("/home/ly/.hermes/research-assistant/strategies/templates"),
-              Path("/home/ly/.hermes/research-assistant/strategies/active"),
-              Path("/home/ly/.hermes/research-assistant/strategies/candidates")]:
+    for d in [STRATEGIES / "templates", STRATEGIES / "active", STRATEGIES / "candidates"]:
         p = d / f"{strategy_name}.yaml"
         if p.exists():
             with open(p) as f:

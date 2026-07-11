@@ -1,18 +1,18 @@
 """Strategy Lab 入口调度 — 统筹 universe/factor/backtest/signal/package"""
 
-import csv, json, yaml, os, sys
-from pathlib import Path
+import csv
+import json
+import yaml
 from datetime import datetime, timezone, timedelta
 
+from strategy_lab.paths import OUTPUTS, PERFORMANCE, ROOT, STRATEGIES
+
 CST = timezone(timedelta(hours=8))
-BASE = Path("/home/ly/.hermes/research-assistant")
-STRATEGIES_DIR = BASE / "strategies"
-OUTPUT_DIR = BASE / "research_outputs"
-PERF_DIR = BASE / "performance"
+BASE = ROOT
+STRATEGIES_DIR = STRATEGIES
+OUTPUT_DIR = OUTPUTS
+PERF_DIR = PERFORMANCE
 SIGNALS_DIR = PERF_DIR / "signals"
-
-sys.path.insert(0, str(BASE / "commands"))
-
 
 def now_str():
     return datetime.now(CST).strftime("%Y-%m-%dT%H:%M:%S+08:00")
@@ -131,7 +131,7 @@ def run_backtest(strategy_name: str) -> dict:
 
 def build_latest_signals(strategy_name: str) -> list[dict]:
     """生成最新策略信号"""
-    cfg = load_strategy(strategy_name)
+    load_strategy(strategy_name)
     # TODO: full signal generation with live data
     signals = [{
         "date": now_str()[:10],

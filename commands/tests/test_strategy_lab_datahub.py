@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from strategy_lab import backtest, regime, universe
+from strategy_lab import backtest, orchestrator, param_search, publisher, ranker, regime, universe, walk_forward
 
 
 def test_strategy_backtest_reads_canonical_kline(monkeypatch, tmp_path: Path) -> None:
@@ -50,7 +50,24 @@ def test_strategy_universe_uses_canonical_reference(monkeypatch, tmp_path: Path)
 
 
 def test_strategy_lab_contains_no_machine_specific_data_paths() -> None:
-    for module in (backtest, regime, universe):
+    for module in (backtest, regime, universe, orchestrator, param_search, publisher, ranker, walk_forward):
         source = Path(module.__file__).read_text(encoding="utf-8")
         assert "/mnt/c/Users/" not in source
         assert "/home/ly/" not in source
+
+
+def test_strategy_publisher_never_deletes_existing_package(monkeypatch, tmp_path: Path) -> None:
+    incoming = tmp_path / "incoming"
+    monkeypatch.setattr(publisher, "INCOMING", incoming)
+    monkeypatch.setattr(publisher, "PERF", tmp_path / "performance")
+    monkeypatch.setattr(publisher, "OUTPUT", tmp_path / "outputs")
+
+    first = publisher.publish_results()
+    marker = Path(first["path"]) / "preserve.txt"
+    marker.write_text("must survive", encoding="utf-8")
+    second = publisher.publish_results()
+
+    assert Path(first["path"]).is_dir()
+    assert marker.read_text(encoding="utf-8") == "must survive"
+    assert Path(second["path"]).is_dir()
+    assert first["package_id"] != second["package_id"]

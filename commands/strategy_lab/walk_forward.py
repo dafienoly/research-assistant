@@ -1,12 +1,14 @@
 """滚动时间窗验证 — 调用真实回测引擎"""
-import json, yaml
-from pathlib import Path
+import json
+import yaml
 from datetime import datetime, timezone, timedelta
 
+from strategy_lab.paths import PERFORMANCE, ROOT, STRATEGIES
+
 CST = timezone(timedelta(hours=8))
-BASE = Path("/home/ly/.hermes/research-assistant")
-PERF = BASE / "performance"
-STRATEGIES_DIR = BASE / "strategies"
+BASE = ROOT
+PERF = PERFORMANCE
+STRATEGIES_DIR = STRATEGIES
 
 
 def now_str():

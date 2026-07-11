@@ -1,12 +1,14 @@
 """策略排行与注册表 — Strategy Ranker"""
-import csv, json
-from pathlib import Path
+import csv
+import json
 from datetime import datetime, timezone, timedelta
 
+from strategy_lab.paths import OUTPUTS, PERFORMANCE, ROOT
+
 CST = timezone(timedelta(hours=8))
-BASE = Path("/home/ly/.hermes/research-assistant")
-PERF = BASE / "performance"
-OUTPUT = BASE / "research_outputs"
+BASE = ROOT
+PERF = PERFORMANCE
+OUTPUT = OUTPUTS
 
 
 def now_str():
