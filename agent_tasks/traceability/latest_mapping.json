@@ -476,10 +476,11 @@
       "code_locations": [
         {"file": "commands/factor_lab/notify.py", "function": "_send_wecom_markdown", "line": 38},
         {"file": "commands/factor_lab/notification_transport.py", "function": "enterprise_wechat_sender", "line": 45},
+        {"file": "commands/gen_stock_card.py", "function": "push_to_wechat", "line": 135},
         {"file": "commands/tests/test_legacy_notify_transport.py", "line": 1}
       ],
-      "expected_keywords": ["enterprise_wechat_sender", "format", "markdown", "ALLOWED_NOTIFICATION_HOSTS"],
-      "behavior": "保留 kill switch/risk sentinel/盘中调用契约，将 urllib、webhook 和 .bashrc 读取移出 legacy notify；中央 transport 支持原 Markdown 格式和 HTTPS host allow-list。"
+      "expected_keywords": ["enterprise_wechat_sender", "post_json", "format", "markdown", "ALLOWED_NOTIFICATION_HOSTS"],
+      "behavior": "保留 kill switch/risk sentinel/盘中调用契约，将 urllib、requests、webhook 和 .bashrc 网络实现移到 allow-list 中央 transport；Markdown 与企业微信图片格式保持兼容。"
     },
     {
       "id": "P0-SCHEDULER-OPS-ALERT-01",
