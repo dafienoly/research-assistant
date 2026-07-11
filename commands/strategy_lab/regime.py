@@ -1,11 +1,14 @@
 """分阶段市场环境评估 — 按时间窗口 + SSE 指数收益分类"""
-import csv, json
+import csv
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
+import pandas as pd
+
+from factor_lab.datahub_access import daily_kline_path
+
 CST = timezone(timedelta(hours=8))
-KLINE_DIR = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline")
-PERF = Path("/home/ly/.hermes/research-assistant") / "performance"
+PERF = Path(__file__).resolve().parents[2] / "performance"
 
 
 def now_str():
@@ -14,15 +17,21 @@ def now_str():
 
 def _sse_return(start: str, end: str) -> float | None:
     """计算 SSE 指数区间收益"""
-    f = KLINE_DIR / "000001.csv"
-    if not f.exists():
+    try:
+        source = daily_kline_path("000001")
+    except FileNotFoundError:
         return None
-    prices = []
-    with open(f, encoding="utf-8-sig") as fh:
-        for row in csv.DictReader(fh):
-            d = row.get("date", "")
-            if start <= d <= end:
-                prices.append(float(row.get("close", 0) or 0))
+    frame = pd.read_csv(source, encoding="utf-8-sig", low_memory=False)
+    date_column = "trade_date" if "trade_date" in frame else "date" if "date" in frame else None
+    if date_column is None or "close" not in frame:
+        return None
+    raw_dates = frame[date_column].astype("string").str.replace(r"\.0$", "", regex=True)
+    compact = raw_dates.str.fullmatch(r"\d{8}", na=False)
+    parsed = pd.to_datetime(raw_dates.where(compact), format="%Y%m%d", errors="coerce")
+    parsed = parsed.fillna(pd.to_datetime(raw_dates.where(~compact), format="mixed", errors="coerce"))
+    closes = pd.to_numeric(frame["close"], errors="coerce")
+    mask = parsed.between(pd.Timestamp(start), pd.Timestamp(end))
+    prices = closes.loc[mask].dropna().tolist()
     if len(prices) >= 2:
         return (prices[-1] - prices[0]) / prices[0]
     return None

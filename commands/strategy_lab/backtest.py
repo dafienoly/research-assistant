@@ -2,13 +2,18 @@
 
 T日收盘信号 → T+1开盘成交。支持任意因子组合，由 strategy YAML 驱动。
 """
-import csv, json, math
+import csv
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
+import pandas as pd
+
+from factor_lab.datahub_access import daily_kline_path
+
 CST = timezone(timedelta(hours=8))
-KLINE = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline")
+ROOT = Path(__file__).resolve().parents[2]
+UNIVERSE_DIR = ROOT / "research_outputs/universes"
 
 
 def now_str():
@@ -18,11 +23,23 @@ def now_str():
 # ─── 数据加载 ───────────────────────────────────────────────
 
 def load_kline(symbol: str) -> list[dict]:
-    f = KLINE / f"{symbol}.csv"
-    if not f.exists():
+    try:
+        source = daily_kline_path(symbol)
+    except FileNotFoundError:
         return []
-    with open(f, encoding="utf-8-sig") as fh:
-        return list(csv.DictReader(fh))
+    frame = pd.read_csv(source, encoding="utf-8-sig", low_memory=False)
+    frame = frame.rename(columns={"trade_date": "date", "vol": "volume", "ts_code": "symbol"})
+    if frame.empty or not {"date", "close"}.issubset(frame.columns):
+        return []
+    if "symbol" not in frame:
+        frame["symbol"] = str(symbol).split(".")[0]
+    raw_dates = frame["date"].astype("string").str.replace(r"\.0$", "", regex=True)
+    compact = raw_dates.str.fullmatch(r"\d{8}", na=False)
+    parsed = pd.to_datetime(raw_dates.where(compact), format="%Y%m%d", errors="coerce")
+    parsed = parsed.fillna(pd.to_datetime(raw_dates.where(~compact), format="mixed", errors="coerce"))
+    frame["date"] = parsed.dt.strftime("%Y-%m-%d")
+    frame = frame.dropna(subset=["date"])
+    return frame.to_dict(orient="records")
 
 
 def to_float(v, default=0.0):
@@ -168,7 +185,7 @@ def run(cfg: dict, start_date: str | None = None,
     executor = ExecutionSimulator(cost_cfg)
 
     # 读 universe
-    universe_file = Path("/home/ly/.hermes/research-assistant/research_outputs/universes") / f"{universe_name}.csv"
+    universe_file = UNIVERSE_DIR / f"{universe_name}.csv"
     symbols = []
     if universe_file.exists():
         with open(universe_file) as f:

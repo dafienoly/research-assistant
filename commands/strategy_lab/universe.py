@@ -4,12 +4,14 @@
 每个 universe 标记 survivorship_bias 和 label_timing_bias。
 """
 
-import csv, json, yaml
+import csv
 from pathlib import Path
-from typing import Optional
 
-BASE = Path("/home/ly/.hermes/research-assistant")
-DATA_HUB = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub")
+from factor_lab.datahub_access import SHARED_DATAHUB_ROOT, read_stock_industry_map
+
+
+BASE = Path(__file__).resolve().parents[2]
+DATA_HUB = SHARED_DATAHUB_ROOT
 WSL_TAGS = BASE / "data" / "tags"
 
 UNIVERSE_DIR = BASE / "research_outputs" / "universes"
@@ -38,15 +40,12 @@ def build_semiconductor_theme() -> tuple[list[dict], dict]:
         sources[f] = rows
         codes.update(_code_set(rows))
 
-    # Baostock 行业分类
-    p = DATA_HUB / "tags" / "stock_industry.csv"
-    if p.exists():
-        rows = _read_csv(p)
-        sources["stock_industry.csv"] = rows
-        for r in rows:
-            ind = (r.get("industry") or "").lower()
-            if any(k in ind for k in ["半导体", "集成电路", "电子"]):
-                codes.add(r.get("code", ""))
+    industries = read_stock_industry_map()
+    sources["datahub:stock_basic"] = [{"code": code, "industry": industry} for code, industry in industries.items()]
+    for code, industry in industries.items():
+        lowered = industry.lower()
+        if any(keyword in lowered for keyword in ["半导体", "集成电路", "电子"]):
+            codes.add(code)
 
     # 过滤
     code_list = sorted(codes)

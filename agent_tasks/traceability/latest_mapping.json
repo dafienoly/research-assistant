@@ -584,6 +584,39 @@
       "behavior": "五类公司事件只在 ingestion 层拉取并原子发布；累计三次异常触发熔断；合法空结果标记 EMPTY 而非 MISSING；每个标的后原子更新运行中 manifest。"
     },
     {
+      "id": "INFRA-STRATEGY-LAB-DATAHUB-01",
+      "title": "Strategy Lab 统一读取 DataHub facade",
+      "code_locations": [
+        {
+          "file": "commands/strategy_lab/backtest.py",
+          "function": "load_kline",
+          "line": 25
+        },
+        {
+          "file": "commands/strategy_lab/regime.py",
+          "function": "_sse_return",
+          "line": 19
+        },
+        {
+          "file": "commands/strategy_lab/universe.py",
+          "function": "build_semiconductor_theme",
+          "line": 28
+        },
+        {
+          "file": "commands/tests/test_strategy_lab_datahub.py",
+          "line": 1
+        }
+      ],
+      "expected_keywords": [
+        "daily_kline_path",
+        "read_stock_industry_map",
+        "SHARED_DATAHUB_ROOT",
+        "UNIVERSE_DIR",
+        "trade_date"
+      ],
+      "behavior": "Strategy Lab 回测和 regime 通过 DataHub facade 读取 canonical 日线并规范日期/schema；半导体 universe 使用 canonical stock_basic 行业和版本控制标签，所有项目/output 根由文件位置或共享 DataHub 配置推导。"
+    },
+    {
       "id": "INFRA-BATCH-FACTOR-DATAHUB-01",
       "title": "批量因子计算只读取 canonical 日线索引",
       "code_locations": [
