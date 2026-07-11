@@ -584,6 +584,17 @@
       "behavior": "五类公司事件只在 ingestion 层拉取并原子发布；累计三次异常触发熔断；合法空结果标记 EMPTY 而非 MISSING；每个标的后原子更新运行中 manifest。"
     },
     {
+      "id": "INFRA-EVENT-ALPHA-DATAHUB-01",
+      "title": "Event Alpha 只读 canonical 公司事件分区",
+      "code_locations": [
+        {"file": "commands/factor_lab/alpha/event_loader.py", "function": "_load_canonical", "line": 31},
+        {"file": "commands/factor_lab/alpha/event_loader.py", "function": "event_data_status", "line": 178},
+        {"file": "commands/tests/test_event_loader_datahub.py", "line": 1}
+      ],
+      "expected_keywords": ["CORPORATE_EVENT_ROOT", "share_float", "repurchase", "dividend", "forecast", "canonical_datahub_corporate_events", "PARTIAL"],
+      "behavior": "解禁、回购、分红和业绩预告因子仅从 DataHub corporate_events 分区派生并保留原输出列；forecast 缺失显式 PARTIAL/MISSING，不回退旧公告、复权或预告 CSV。"
+    },
+    {
       "id": "INFRA-STRATEGY-LAB-DATAHUB-01",
       "title": "Strategy Lab 统一读取 DataHub facade",
       "code_locations": [

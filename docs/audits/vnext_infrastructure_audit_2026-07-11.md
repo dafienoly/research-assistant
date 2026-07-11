@@ -136,6 +136,8 @@ VNext `TelegramApprovalGate` 原来默认同步单发 Telegram，与用户要求
 
 因子 pipeline、walk-forward、rolling validation、正交性验证、validate_factor、事件加载和行业映射仍把项目根绑定到开发机 `/home/ly`。现项目/数据根全部由模块位置或统一 DataHub facade 推导，研究报告根提供环境变量覆盖；算法、窗口和输出 schema 未改变，跨机器运行不再静默读取另一个用户目录。
 
+`alpha/event_loader.py` 虽已改为可移植路径，仍分别读取 `announcements_extracted.csv`、`adjust_factor.csv` 和 `forecast_report.csv` 三份旧派生数据，绕过公司事件 manifest。现解禁、回购、分红、业绩预告只读 canonical `normalized/events/corporate_events` 分区，保留原因子列 schema；forecast 上游当前缺失时状态为 PARTIAL/MISSING，不回退旧 CSV，也不伪造股息率价格分母。
+
 扩大测试时发现 `test_alpha_governance.py` 直接把候选和报告写入 D 盘真实目录，并在 teardown 递归删除；删除保护成功阻止了清理，但首个测试已产生一份真实候选残留，按“严禁删除”要求保留现场。测试现通过 autouse fixture 将 discovery/governance 的候选、索引和报告根全部重定向到 pytest 临时目录，31 项治理/退役专项通过，后续不再触碰 D 盘生产研究数据。
 
 ## 前端基础设施

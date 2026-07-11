@@ -1021,9 +1021,9 @@ def test_event_loader_basic():
 
     # 状态报告
     status = event_data_status()
-    assert "announcements_exists" in status
-    assert "adjust_factor_exists" in status
-    assert "forecast_report_exists" in status
+    assert status["source"] == "canonical_datahub_corporate_events"
+    assert set(status["datasets"]) == {"share_float", "repurchase", "dividend", "forecast"}
+    assert status["status"] in {"OK", "PARTIAL"}
 
 
 def test_event_merge_event_data():
