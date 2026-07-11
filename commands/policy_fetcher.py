@@ -1,7 +1,6 @@
 """A 股政策与行业事件获取器 — Phase 2
 
-使用 Hermes web_search + web_extract 工具 + 公告解析结果，
-抓取政策消息、行业新闻、交易所公告等。
+从 DataHub canonical 公告快照构建政策与盘前事件派生视图。
 
 数据源优先级:
   1. 交易所/监管机构官网 (SSE/SZSE/CSRC) — 通过公告 API
@@ -9,13 +8,15 @@
   3. Web 搜索 (Hermes web_search 工具)
 """
 
-import csv
 import json
-import time
 from pathlib import Path
-from datetime import datetime, timedelta
 
-from config import PATHS, now_str, now_cst, date_id, ensure_dirs, read_csv_safe, append_jsonl
+import pandas as pd
+
+from config import PATHS, now_str, now_cst, append_jsonl
+from announcement_parser import classify_announcement
+from data_recovery import atomic_write_frame
+from factor_lab.datahub_ingestion.event_truth import EventTruthIngestion
 
 
 # ========== 政策事件关键词 ==========
@@ -53,36 +54,35 @@ POLICY_SOURCES = {
 class PolicyEventFetcher:
     """政策/行业事件获取器"""
 
-    def get_market_news_akshare(self) -> list[dict]:
-        """尝试通过 AKShare 获取财经新闻 (非 Eastmoney 接口)"""
-        events = []
-        try:
-            import akshare as ak
-            # 试试 stock_info_global 之类不在 Eastmoney 的接口
-            # 大部分 AKShare 新闻接口走 Eastmoney，被阻断
-            pass
-        except Exception:
-            pass
-        return events
+    def __init__(self, snapshot_path: Path | None = None):
+        self.snapshot_path = snapshot_path or (
+            Path(__file__).resolve().parents[1] / "data/normalized/events/regulatory_watchlist.json"
+        )
+        self.snapshot_meta: dict = {}
 
     def get_announcement_events(self, symbols: list[str] = None) -> list[dict]:
-        """从公告解析结果提取政策/事件相关公告"""
+        """从 DataHub canonical 公告快照提取政策/事件。"""
         events = []
-        csv_path = PATHS["fundamentals"] / "announcements_extracted.csv"
-        if not csv_path.exists():
-            return events
-
-        rows = read_csv_safe(csv_path)
-        for row in rows:
-            ann_type = row.get("announce_type", "")
+        if not self.snapshot_path.exists():
+            raise FileNotFoundError(f"canonical announcement snapshot missing: {self.snapshot_path}")
+        snapshot = json.loads(self.snapshot_path.read_text(encoding="utf-8"))
+        self.snapshot_meta = snapshot
+        covered = set(snapshot.get("covered_symbols", []))
+        requested = {"".join(ch for ch in str(symbol) if ch.isdigit())[:6] for symbol in (symbols or [])}
+        if requested and not requested.issubset(covered):
+            raise ValueError(f"canonical announcement coverage missing: {sorted(requested - covered)}")
+        for row in snapshot.get("announcements", []):
+            if requested and row.get("symbol") not in requested:
+                continue
+            ann_type = classify_announcement(str(row.get("title", "")))
             if ann_type in ("减持", "监管函", "风险事项", "业绩预告"):
                 events.append({
-                    "source": "announcement",
+                    "source": row.get("source", "announcement"),
                     "event_type": ann_type,
                     "title": row.get("title", ""),
-                    "symbol": row.get("code", ""),
+                    "symbol": row.get("symbol", ""),
                     "date": row.get("date", ""),
-                    "parsed_at": row.get("parsed_at", now_str()),
+                    "parsed_at": snapshot.get("generated_at", now_str()),
                 })
         return events
 
@@ -143,19 +143,14 @@ class PolicyEventFetcher:
 
     def save_preopen_events(self, events: list[dict]):
         """保存盘前事件到 CSV"""
-        if not events:
-            return
-
         path = PATHS["events"] / "preopen_events.csv"
         fields = ["event_id", "source", "title", "content", "related_symbols",
                    "sectors", "publish_time", "impact_level", "data_source"]
-        with open(path, "w", encoding="utf-8-sig", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
-            w.writeheader()
-            for event in events:
-                w.writerow({k: event.get(k, "") for k in fields})
+        self._publish(events, path, fields, "events/preopen_events")
 
-        append_jsonl(PATHS["audit"] / "fetch_log.jsonl", {
+        audit_path = PATHS["audit"] / "fetch_log.jsonl"
+        audit_path.parent.mkdir(parents=True, exist_ok=True)
+        append_jsonl(audit_path, {
             "timestamp": now_str(),
             "action": "build_preopen_events",
             "records": len(events),
@@ -165,17 +160,30 @@ class PolicyEventFetcher:
 
     def save_policy_events(self, events: list[dict]):
         """保存政策事件"""
-        if not events:
-            return
         path = PATHS["events"] / "policy_events.csv"
         fields = ["event_id", "source", "title", "content", "related_symbols",
                    "sectors", "publish_time", "impact_level", "data_source"]
-        with open(path, "w", encoding="utf-8-sig", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
-            w.writeheader()
-            for event in events:
-                w.writerow({k: event.get(k, "") for k in fields})
+        self._publish(events, path, fields, "events/policy_events")
         print(f"📜 政策事件已保存: {len(events)} 条 → {path}")
+
+    def _publish(self, events: list[dict], path: Path, fields: list[str], dataset: str) -> None:
+        frame = pd.DataFrame(
+            [{key: event.get(key, "") for key in fields} for event in events],
+            columns=fields,
+        )
+        content_hash = atomic_write_frame(frame, path)
+        manifest = {
+            "status": "OK" if events else "EMPTY",
+            "dataset": dataset,
+            "generated_at": now_str(),
+            "rows": len(events),
+            "sha256": content_hash,
+            "source": "datahub_regulatory_watchlist",
+            "source_generated_at": self.snapshot_meta.get("generated_at"),
+            "covered_symbols": self.snapshot_meta.get("covered_symbols", []),
+            "coverage_policy": "CSV content is valid only with this canonical coverage manifest",
+        }
+        EventTruthIngestion._atomic_json(path.with_suffix(".manifest.json"), manifest)
 
 
 def classify_announcement_impact(ann_type: str) -> str:
@@ -203,28 +211,12 @@ def cmd_update_events():
     ann_events = fetcher.get_announcement_events()
     print(f"📄 公告事件: {len(ann_events)} 条")
 
-    # 2. 搜索增强（谨慎使用：Tavily 1000次/月 ≈ 50次/日）
-    # 每个交易日只搜 2 个主题，最多用 4 次
-    print("🔍 搜索增强 (Tavily 2主题)...")
-    try:
-        from search_enhancer import TavilySearch
-        tv = TavilySearch()
-        if tv.api_key:
-            # 交易日双主题搜索
-            topics = ["半导体 设备 政策", "AI 芯片 国产替代"]
-            for topic in topics:
-                results = tv.search(topic, max_results=2, days=3)
-                if results:
-                    print(f"   {topic}: {len(results)} 条")
-    except Exception as e:
-        print(f"⚠️ 搜索增强失败: {e}")
-
-    # 3. 构建盘前事件 (仅公告事件, 搜索结果由上面直接添加)
+    # 2. 构建 canonical 公告派生事件；新闻催化剂由独立 DataHub ingestion 负责。
     preopen = fetcher.build_preopen_events(ann_events)
     fetcher.save_preopen_events(preopen)
 
-    # 3. 保存政策事件
-    fetcher.save_policy_events(ann_events[:(20)])
+    # 3. policy/preopen 使用同一标准化 schema，避免写入空字段。
+    fetcher.save_policy_events(preopen[:20])
 
 
 if __name__ == "__main__":
