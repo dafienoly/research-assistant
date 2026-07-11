@@ -595,6 +595,17 @@
       "behavior": "解禁、回购、分红和业绩预告因子仅从 DataHub corporate_events 分区派生并保留原输出列；forecast 缺失显式 PARTIAL/MISSING，不回退旧公告、复权或预告 CSV。"
     },
     {
+      "id": "INFRA-INDUSTRY-MAPPER-DATAHUB-01",
+      "title": "行业映射 canonical-only 且禁止平行缓存",
+      "code_locations": [
+        {"file": "commands/factor_lab/alpha/industry_mapper.py", "function": "load", "line": 31},
+        {"file": "commands/factor_lab/alpha/industry_mapper.py", "function": "save_cache", "line": 87},
+        {"file": "commands/tests/test_industry_mapper_datahub_only.py", "line": 1}
+      ],
+      "expected_keywords": ["read_stock_industry_map", "status = \"MISSING\"", "DataHub-owned and read-only", "unknown", "has_no_legacy_feature_fallback"],
+      "behavior": "行业分类只读 canonical stock_basic；缺失暴露 MISSING/error，不通过 style/pool 猜测；业务层不能写第二份 stock_industry 缓存。"
+    },
+    {
       "id": "INFRA-STRATEGY-LAB-DATAHUB-01",
       "title": "Strategy Lab 统一读取 DataHub facade",
       "code_locations": [

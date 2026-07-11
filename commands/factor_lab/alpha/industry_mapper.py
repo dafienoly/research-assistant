@@ -1,10 +1,8 @@
 """Industry Mapper — 行业分类映射 V3.1
 
 为 Industry Relative Alpha Pack 提供股票→行业映射。
-支持数据源:
-1. canonical DataHub reference/stock_basic.csv
-2. tag_features.csv 中 style/tags 的 fallback
-3. 所有股票归入 "unknown" (兜底)
+唯一数据源是 canonical DataHub reference/stock_basic.csv；缺失时显式
+MISSING，单标的查询返回 ``unknown``，不读取或写入平行缓存。
 
 用法:
     from factor_lab.alpha.industry_mapper import IndustryMapper
@@ -14,33 +12,9 @@
     stocks_by_industry = mapper.get_stocks_by_industry()  # → {"银行": ["000001", ...], ...}
 """
 
-import csv
 import json
-import os
-from pathlib import Path
-from typing import Optional
 
-from factor_lab.datahub_access import PROJECT_ROOT, SHARED_DATAHUB_ROOT, read_stock_industry_map
-
-# ─── 路径常量 ──────────────────────────────────────────────
-DATA_HUB = Path(os.environ.get("DATA_HUB", SHARED_DATAHUB_ROOT))
-HERMES_DATA = PROJECT_ROOT / "data"
-
-STOCK_INDUSTRY_CSV = HERMES_DATA / "tags" / "stock_industry.csv"
-POOL_CSV = DATA_HUB / "market" / "pool.csv"
-TAG_FEATURES_CSV = DATA_HUB / "features" / "tag_features.csv"
-FUNDAMENTAL_FEATURES_CSV = DATA_HUB / "features" / "fundamental_features.csv"
-STYLE_INDUSTRY_MAP = {
-    "cyclical_growth": "cyclical",
-    "cyclical_value": "cyclical",
-    "defensive_growth": "defensive",
-    "defensive_value": "defensive",
-    "large_cap_growth": "large_cap",
-    "large_cap_value": "large_cap",
-    "small_cap_growth": "small_cap",
-    "small_cap_value": "small_cap",
-    "thematic": "other",
-}
+from factor_lab.datahub_access import read_stock_industry_map
 
 
 class IndustryMapper:
@@ -49,15 +23,21 @@ class IndustryMapper:
     def __init__(self, auto_load: bool = True):
         self._mapping: dict[str, str] = {}
         self._industry_codes: dict[str, set[str]] = {}
+        self.status = "NOT_LOADED"
+        self.error = ""
         if auto_load:
             self.load()
 
     # ─── 加载 ────────────────────────────────────────────
 
     def load(self) -> dict[str, str]:
-        """加载行业映射, 优先顺序: canonical DataHub → fallback。"""
-        if not self._try_load_from_datahub():
-            self._try_load_from_tag_features()
+        """Load only the canonical DataHub stock-industry mapping."""
+        self._mapping.clear()
+        if self._try_load_from_datahub():
+            self.status = "OK"
+            self.error = ""
+        else:
+            self.status = "MISSING"
         self._build_index()
         return self._mapping
 
@@ -66,54 +46,9 @@ class IndustryMapper:
         try:
             self._mapping.update(read_stock_industry_map())
             return bool(self._mapping)
-        except Exception:
+        except (FileNotFoundError, OSError, ValueError) as exc:
+            self.error = str(exc)
             return False
-
-    def _try_load_from_cache(self) -> bool:
-        """从本地缓存 CSV 加载"""
-        if not STOCK_INDUSTRY_CSV.exists():
-            return False
-        try:
-            with open(STOCK_INDUSTRY_CSV, encoding="utf-8-sig") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    code = (row.get("code") or "").strip()
-                    industry = (row.get("industry") or "").strip()
-                    if code and industry:
-                        self._mapping[code] = industry
-            return len(self._mapping) > 0
-        except Exception:
-            return False
-
-    def _try_load_from_tag_features(self) -> bool:
-        """从 tag_features.csv 的 style 推测行业"""
-        if not TAG_FEATURES_CSV.exists():
-            self._fallback_unknown()
-            return
-        try:
-            with open(TAG_FEATURES_CSV, encoding="utf-8-sig") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    code = (row.get("symbol") or "").strip()
-                    style = (row.get("style") or "").strip().lower()
-                    if code:
-                        industry = STYLE_INDUSTRY_MAP.get(style, "unknown")
-                        self._mapping[code] = industry
-            if not self._mapping:
-                self._fallback_unknown()
-        except Exception:
-            self._fallback_unknown()
-
-    def _fallback_unknown(self):
-        """兜底: 从 pool.csv 取所有股票代码, 全部分类为 unknown"""
-        if not POOL_CSV.exists():
-            return
-        with open(POOL_CSV, encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                code = (row.get("code") or "").strip()
-                if code:
-                    self._mapping[code] = "unknown"
 
     def _build_index(self):
         """构建 industry → [stock code] 倒排索引"""
@@ -149,15 +84,8 @@ class IndustryMapper:
         self._build_index()
 
     def save_cache(self):
-        """保存映射到本地 CSV"""
-        STOCK_INDUSTRY_CSV.parent.mkdir(parents=True, exist_ok=True)
-        with open(STOCK_INDUSTRY_CSV, "w", encoding="utf-8-sig", newline="") as f:
-            w = csv.writer(f)
-            w.writerow(["code", "industry", "asof_date"])
-            from datetime import datetime, timezone, timedelta
-            now = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
-            for code in sorted(self._mapping.keys()):
-                w.writerow([code, self._mapping[code], now])
+        """Reject parallel cache writes; DataHub owns the reference dataset."""
+        raise RuntimeError("industry mapping is DataHub-owned and read-only")
 
     def to_dict(self) -> dict:
         """序列化为 JSON 可序列化 dict"""
@@ -166,6 +94,8 @@ class IndustryMapper:
             "industry_count": self.get_industry_count(),
             "total_stocks": len(self._mapping),
             "industry_list": self.get_industry_list(),
+            "status": self.status,
+            "error": self.error,
         }
 
 

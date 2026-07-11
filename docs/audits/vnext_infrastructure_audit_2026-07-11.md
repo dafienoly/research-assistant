@@ -138,6 +138,8 @@ VNext `TelegramApprovalGate` 原来默认同步单发 Telegram，与用户要求
 
 `alpha/event_loader.py` 虽已改为可移植路径，仍分别读取 `announcements_extracted.csv`、`adjust_factor.csv` 和 `forecast_report.csv` 三份旧派生数据，绕过公司事件 manifest。现解禁、回购、分红、业绩预告只读 canonical `normalized/events/corporate_events` 分区，保留原因子列 schema；forecast 上游当前缺失时状态为 PARTIAL/MISSING，不回退旧 CSV，也不伪造股息率价格分母。
 
+`alpha/industry_mapper.py` 在 canonical stock_basic 失败时仍用 `tag_features.csv` 的 style 猜行业，再从 `pool.csv` 补 unknown，并允许写独立 `stock_industry.csv` 缓存。现行业映射 canonical-only：读取失败暴露 `status=MISSING/error`，未知标的按调用返回 `unknown`，但不制造伪映射；`save_cache` 明确拒绝，DataHub 是唯一 reference owner。
+
 扩大测试时发现 `test_alpha_governance.py` 直接把候选和报告写入 D 盘真实目录，并在 teardown 递归删除；删除保护成功阻止了清理，但首个测试已产生一份真实候选残留，按“严禁删除”要求保留现场。测试现通过 autouse fixture 将 discovery/governance 的候选、索引和报告根全部重定向到 pytest 临时目录，31 项治理/退役专项通过，后续不再触碰 D 盘生产研究数据。
 
 ## 前端基础设施
