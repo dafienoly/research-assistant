@@ -1,17 +1,17 @@
 {
-  "generated_at": "2026-07-11T22:45:04.006800+08:00",
+  "generated_at": "2026-07-12T03:27:07.805537+08:00",
   "source": "tushare_official_structured_gateway",
-  "start_date": "20260701",
+  "start_date": "20250101",
   "end_date": "20260711",
   "results": [
     {
       "symbol": "159928.SZ",
       "path": "/home/ly/.hermes/research-assistant/data/normalized/events/event_truth/159928.SZ.csv",
-      "rows": 11,
+      "rows": 557,
       "coverage": {
-        "stk_limit": 8,
+        "stk_limit": 367,
         "suspend_d": 0,
-        "adj_factor": 8,
+        "adj_factor": 367,
         "dividend": 0
       },
       "errors": [],
@@ -20,11 +20,11 @@
     {
       "symbol": "510230.SH",
       "path": "/home/ly/.hermes/research-assistant/data/normalized/events/event_truth/510230.SH.csv",
-      "rows": 11,
+      "rows": 557,
       "coverage": {
-        "stk_limit": 8,
+        "stk_limit": 367,
         "suspend_d": 0,
-        "adj_factor": 8,
+        "adj_factor": 367,
         "dividend": 8
       },
       "errors": [],
@@ -33,11 +33,11 @@
     {
       "symbol": "510880.SH",
       "path": "/home/ly/.hermes/research-assistant/data/normalized/events/event_truth/510880.SH.csv",
-      "rows": 11,
+      "rows": 557,
       "coverage": {
-        "stk_limit": 8,
+        "stk_limit": 367,
         "suspend_d": 0,
-        "adj_factor": 8,
+        "adj_factor": 367,
         "dividend": 32
       },
       "errors": [],
@@ -46,11 +46,11 @@
     {
       "symbol": "511010.SH",
       "path": "/home/ly/.hermes/research-assistant/data/normalized/events/event_truth/511010.SH.csv",
-      "rows": 11,
+      "rows": 557,
       "coverage": {
-        "stk_limit": 8,
+        "stk_limit": 367,
         "suspend_d": 0,
-        "adj_factor": 8,
+        "adj_factor": 367,
         "dividend": 9
       },
       "errors": [],
@@ -59,11 +59,11 @@
     {
       "symbol": "512400.SH",
       "path": "/home/ly/.hermes/research-assistant/data/normalized/events/event_truth/512400.SH.csv",
-      "rows": 11,
+      "rows": 557,
       "coverage": {
-        "stk_limit": 8,
+        "stk_limit": 367,
         "suspend_d": 0,
-        "adj_factor": 8,
+        "adj_factor": 367,
         "dividend": 4
       },
       "errors": [],
@@ -72,11 +72,11 @@
     {
       "symbol": "512480.SH",
       "path": "/home/ly/.hermes/research-assistant/data/normalized/events/event_truth/512480.SH.csv",
-      "rows": 11,
+      "rows": 557,
       "coverage": {
-        "stk_limit": 8,
+        "stk_limit": 367,
         "suspend_d": 0,
-        "adj_factor": 8,
+        "adj_factor": 367,
         "dividend": 0
       },
       "errors": [],
@@ -85,11 +85,11 @@
     {
       "symbol": "512660.SH",
       "path": "/home/ly/.hermes/research-assistant/data/normalized/events/event_truth/512660.SH.csv",
-      "rows": 11,
+      "rows": 557,
       "coverage": {
-        "stk_limit": 8,
+        "stk_limit": 367,
         "suspend_d": 0,
-        "adj_factor": 8,
+        "adj_factor": 367,
         "dividend": 0
       },
       "errors": [],
@@ -98,11 +98,11 @@
     {
       "symbol": "513100.SH",
       "path": "/home/ly/.hermes/research-assistant/data/normalized/events/event_truth/513100.SH.csv",
-      "rows": 11,
+      "rows": 557,
       "coverage": {
-        "stk_limit": 8,
+        "stk_limit": 367,
         "suspend_d": 0,
-        "adj_factor": 8,
+        "adj_factor": 367,
         "dividend": 0
       },
       "errors": [],
@@ -111,11 +111,11 @@
     {
       "symbol": "513180.SH",
       "path": "/home/ly/.hermes/research-assistant/data/normalized/events/event_truth/513180.SH.csv",
-      "rows": 11,
+      "rows": 557,
       "coverage": {
-        "stk_limit": 8,
+        "stk_limit": 367,
         "suspend_d": 0,
-        "adj_factor": 8,
+        "adj_factor": 367,
         "dividend": 0
       },
       "errors": [],
@@ -124,11 +124,11 @@
     {
       "symbol": "515000.SH",
       "path": "/home/ly/.hermes/research-assistant/data/normalized/events/event_truth/515000.SH.csv",
-      "rows": 11,
+      "rows": 557,
       "coverage": {
-        "stk_limit": 8,
+        "stk_limit": 367,
         "suspend_d": 0,
-        "adj_factor": 8,
+        "adj_factor": 367,
         "dividend": 0
       },
       "errors": [],
@@ -137,11 +137,11 @@
     {
       "symbol": "515070.SH",
       "path": "/home/ly/.hermes/research-assistant/data/normalized/events/event_truth/515070.SH.csv",
-      "rows": 11,
+      "rows": 557,
       "coverage": {
-        "stk_limit": 8,
+        "stk_limit": 367,
         "suspend_d": 0,
-        "adj_factor": 8,
+        "adj_factor": 367,
         "dividend": 0
       },
       "errors": [],
@@ -150,11 +150,11 @@
     {
       "symbol": "518880.SH",
       "path": "/home/ly/.hermes/research-assistant/data/normalized/events/event_truth/518880.SH.csv",
-      "rows": 11,
+      "rows": 557,
       "coverage": {
-        "stk_limit": 8,
+        "stk_limit": 367,
         "suspend_d": 0,
-        "adj_factor": 8,
+        "adj_factor": 367,
         "dividend": 0
       },
       "errors": [],
@@ -163,11 +163,11 @@
     {
       "symbol": "588200.SH",
       "path": "/home/ly/.hermes/research-assistant/data/normalized/events/event_truth/588200.SH.csv",
-      "rows": 11,
+      "rows": 557,
       "coverage": {
-        "stk_limit": 8,
+        "stk_limit": 367,
         "suspend_d": 0,
-        "adj_factor": 8,
+        "adj_factor": 367,
         "dividend": 0
       },
       "errors": [],

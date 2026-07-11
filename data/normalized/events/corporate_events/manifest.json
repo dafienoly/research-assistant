@@ -1,0 +1,3806 @@
+{
+  "status": "PARTIAL",
+  "run_status": "COMPLETE",
+  "dataset": "normalized/events/corporate_events",
+  "generated_at": "2026-07-12T04:15:08.507608+08:00",
+  "start_date": "20250101",
+  "end_date": "20260711",
+  "source": "tushare_official_structured_gateway",
+  "results": [
+    {
+      "symbol": "000063.SZ",
+      "path": "000063.SZ.csv",
+      "rows": 9,
+      "new_rows": 9,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 3,
+        "share_float": 0,
+        "dividend": 51
+      },
+      "errors": [],
+      "sha256": "151d84b5a62c9f77a65b761d6867c427d6a9dbdd568d0c0e394ce13fc56ad099",
+      "status": "OK"
+    },
+    {
+      "symbol": "000400.SZ",
+      "path": "000400.SZ.csv",
+      "rows": 13,
+      "new_rows": 13,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 5,
+        "share_float": 0,
+        "dividend": 55
+      },
+      "errors": [],
+      "sha256": "5861a59df5dce0d81d7d479fd581615bcf05844e447b5396582200f9d9c1ba49",
+      "status": "OK"
+    },
+    {
+      "symbol": "000533.SZ",
+      "path": "000533.SZ.csv",
+      "rows": 6,
+      "new_rows": 6,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 1,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 34
+      },
+      "errors": [],
+      "sha256": "fd344d5bb04042644bee4091f90d344d0335729222a72e9bb159fa8cf9dcb4b9",
+      "status": "OK"
+    },
+    {
+      "symbol": "000620.SZ",
+      "path": "000620.SZ.csv",
+      "rows": 7,
+      "new_rows": 7,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 3,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 36
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "RuntimeError"
+        }
+      ],
+      "sha256": "63a9ddf2423eae36a38dd95d4fb8fdb1df7bf1cc4f1a69ed77e1e20ff5330848",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "000938.SZ",
+      "path": "000938.SZ.csv",
+      "rows": 12,
+      "new_rows": 12,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 5,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 46
+      },
+      "errors": [],
+      "sha256": "5a25f3a58a1216c92f1c72fb239e4df2fa91efbf1dd74be7add18e353b3bd2d1",
+      "status": "OK"
+    },
+    {
+      "symbol": "000959.SZ",
+      "path": "000959.SZ.csv",
+      "rows": 28,
+      "new_rows": 28,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 12,
+        "share_float": 9,
+        "dividend": 45
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "RuntimeError"
+        }
+      ],
+      "sha256": "cfbf9b93ac8361decd3f114647d3262137c11965430dd1e3e029deb6a5d8d626",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "000977.SZ",
+      "path": "000977.SZ.csv",
+      "rows": 22,
+      "new_rows": 22,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 6,
+        "repurchase": 9,
+        "share_float": 0,
+        "dividend": 47
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "RuntimeError"
+        }
+      ],
+      "sha256": "a0f96cd6f06c09182e4be3882402af2fb9f489aafc44fa6491e2130dae96a9a2",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "000988.SZ",
+      "path": "000988.SZ.csv",
+      "rows": 12,
+      "new_rows": 12,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 1,
+        "repurchase": 4,
+        "share_float": 0,
+        "dividend": 49
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "30bf7e51e6cfeb421edaad77aa82a837d3b7cd6053018593fe158a2393012f08",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "001309.SZ",
+      "path": "001309.SZ.csv",
+      "rows": 87,
+      "new_rows": 87,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 16,
+        "repurchase": 24,
+        "share_float": 40,
+        "dividend": 17
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "b15c29c1889f2c9f7666ed1e27c84c963643f224b882252d60b713ee9303c9dc",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002028.SZ",
+      "path": "002028.SZ.csv",
+      "rows": 11,
+      "new_rows": 11,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 4,
+        "share_float": 0,
+        "dividend": 47
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "76f2cf16376ba8a037cdd04901fb89cc8b85d11bd55a2534895fee356f3c49ce",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002049.SZ",
+      "path": "002049.SZ.csv",
+      "rows": 12,
+      "new_rows": 12,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 5,
+        "share_float": 0,
+        "dividend": 46
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "a8bbc73570206d5de6892d27d9d22fd130f97246c243d18190967006d4d10834",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002080.SZ",
+      "path": "002080.SZ.csv",
+      "rows": 7,
+      "new_rows": 7,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 45
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "def74435a5d1c387ed8448a2ec0525f42e0e7475845eefbce8cdc6b9d9a14704",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002090.SZ",
+      "path": "002090.SZ.csv",
+      "rows": 10,
+      "new_rows": 10,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 1,
+        "repurchase": 1,
+        "share_float": 0,
+        "dividend": 47
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "1a2fb763e11c65f38de878c311215455dd85797f26649f3ed01b7c2b112e4665",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002130.SZ",
+      "path": "002130.SZ.csv",
+      "rows": 10,
+      "new_rows": 10,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 3,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 43
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "ffb5d338f73075c160c1f4246a1e714a6c4688b6263d7fca515ce620f1cfcaa3",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002151.SZ",
+      "path": "002151.SZ.csv",
+      "rows": 14,
+      "new_rows": 14,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 7,
+        "repurchase": 2,
+        "share_float": 0,
+        "dividend": 40
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "a53b12e30850d53329168d0e1587eef863b92a0bf77682a5cc067e7856c4a727",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002156.SZ",
+      "path": "002156.SZ.csv",
+      "rows": 16,
+      "new_rows": 16,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 9,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 40
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "98d33a900d9d7c7032c7b340229b39f4bfb1889a1276452399ce178048f9a4d7",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002185.SZ",
+      "path": "002185.SZ.csv",
+      "rows": 7,
+      "new_rows": 7,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 43
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "3ca76e5ce15bbf18b1fb24c2414361c3fa7b86a8aad7bc5af3c05e94d8bd8eba",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002202.SZ",
+      "path": "002202.SZ.csv",
+      "rows": 36,
+      "new_rows": 36,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 16,
+        "repurchase": 14,
+        "share_float": 0,
+        "dividend": 44
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "ea2fd3435c8dd2ef76ed9cac71055793f2afb61b1c7bf6e77a0c5a13bc3634d9",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002236.SZ",
+      "path": "002236.SZ.csv",
+      "rows": 41,
+      "new_rows": 41,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 16,
+        "share_float": 15,
+        "dividend": 51
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "0ee720418449652cbbd3a8b6bce84451a78ade9f08ea93cbbb5c2ae12945cadb",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002270.SZ",
+      "path": "002270.SZ.csv",
+      "rows": 25,
+      "new_rows": 25,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 11,
+        "share_float": 2,
+        "dividend": 60
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "1d6d6f837b4495d4df57474f3b0cab80e41ceda1cfc91f96694b2fa195c0531a",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002273.SZ",
+      "path": "002273.SZ.csv",
+      "rows": 17,
+      "new_rows": 17,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 9,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 44
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "6431df5712819d28eba59eb6b51ad4f5c5b4c63d42ea39622dadc0ce42f2a7dc",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002281.SZ",
+      "path": "002281.SZ.csv",
+      "rows": 9,
+      "new_rows": 9,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 3,
+        "share_float": 0,
+        "dividend": 41
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "16651fb87d71a02c16a3caf531ff1c266d0d1f24cf0ff9d2b75d0c316d1bda18",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002288.SZ",
+      "path": "002288.SZ.csv",
+      "rows": 0,
+      "new_rows": 0,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 25
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": null,
+      "status": "MISSING"
+    },
+    {
+      "symbol": "002335.SZ",
+      "path": "002335.SZ.csv",
+      "rows": 13,
+      "new_rows": 13,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 6,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 44
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "f6d153071e1e1ed62d6caea7abc6628d5a2a88c2dce4c16f4b1141c60a60b5c7",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002364.SZ",
+      "path": "002364.SZ.csv",
+      "rows": 17,
+      "new_rows": 17,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 3,
+        "repurchase": 7,
+        "share_float": 0,
+        "dividend": 41
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "7c9ef28225ed2164d2046c13f193bc536dc052aacaf66eff5970db48edf86c66",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002371.SZ",
+      "path": "002371.SZ.csv",
+      "rows": 10,
+      "new_rows": 10,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 3,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 40
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "649beb17af7c8d0661a0c3f8448f78d5ff7159beeea210d75438dbf8e5703427",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002384.SZ",
+      "path": "002384.SZ.csv",
+      "rows": 11,
+      "new_rows": 11,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 5,
+        "share_float": 0,
+        "dividend": 39
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "f698df4323f2c57abd8d8e8a06ae4d3478937e26af2cabba9f0053ae32f0cd13",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002396.SZ",
+      "path": "002396.SZ.csv",
+      "rows": 12,
+      "new_rows": 12,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 5,
+        "share_float": 0,
+        "dividend": 41
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "b7109949050ef2bea29be18dc4ad4341746f5699ac5ded9de482cb08c8831b0f",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002405.SZ",
+      "path": "002405.SZ.csv",
+      "rows": 11,
+      "new_rows": 11,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 6,
+        "share_float": 0,
+        "dividend": 36
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "2fbe092e8c3ce0c38e601e2038aa9372c0d96dd1f74bc823c20672ce882d590f",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002415.SZ",
+      "path": "002415.SZ.csv",
+      "rows": 25,
+      "new_rows": 25,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 4,
+        "repurchase": 10,
+        "share_float": 0,
+        "dividend": 46
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "093be3af5840dabd09fec2782e3d323c5d147ebddc7c92aeae98675f15b2c9be",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002436.SZ",
+      "path": "002436.SZ.csv",
+      "rows": 16,
+      "new_rows": 16,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 7,
+        "repurchase": 2,
+        "share_float": 0,
+        "dividend": 42
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "d079d7e7505fcb85f3c31f09ada58f8c4a52940cde63a354fb17aa642e7baa5d",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002463.SZ",
+      "path": "002463.SZ.csv",
+      "rows": 9,
+      "new_rows": 9,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 39
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "5bf5b2ddbd8b4601d080e5e6f13a648c1e592bc86f138f3cf8c3447d397064f7",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002517.SZ",
+      "path": "002517.SZ.csv",
+      "rows": 39,
+      "new_rows": 39,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 24,
+        "repurchase": 8,
+        "share_float": 0,
+        "dividend": 37
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "baa447666074a8d6ee35b4c21ace685e4221ec4b8876a28fff601e248a97aa60",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002518.SZ",
+      "path": "002518.SZ.csv",
+      "rows": 23,
+      "new_rows": 23,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 16,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 41
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "e68fefd0aa29f04c32d198665c92afcbfb62013cbf84a9456f3a424535ee8926",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002558.SZ",
+      "path": "002558.SZ.csv",
+      "rows": 11,
+      "new_rows": 11,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 2,
+        "share_float": 0,
+        "dividend": 44
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "32a5db5ff5f6d978655d7acf2e44eab4a95f63620664b1498dc0f2246b8302c7",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002636.SZ",
+      "path": "002636.SZ.csv",
+      "rows": 13,
+      "new_rows": 13,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 6,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 34
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "8e91aa64d5d02a733c1d1e2615bf26b4ffb8a72aa05ffe4659cc390496efbdc8",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002851.SZ",
+      "path": "002851.SZ.csv",
+      "rows": 9,
+      "new_rows": 9,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 3,
+        "share_float": 0,
+        "dividend": 33
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "52ac035bbc86ef1fc903a6e0b3442fe4212235c687f67f7b5ecf5007414e4ef1",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002916.SZ",
+      "path": "002916.SZ.csv",
+      "rows": 8,
+      "new_rows": 8,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 1,
+        "share_float": 0,
+        "dividend": 34
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "4abf40e44ef2285d95b3643bf875722ff1bfc0f98160e3173d43c346c15df6ce",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002929.SZ",
+      "path": "002929.SZ.csv",
+      "rows": 12,
+      "new_rows": 12,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 4,
+        "repurchase": 2,
+        "share_float": 0,
+        "dividend": 33
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "a97e23e47a160fed9543ab2f4ace0f8d1e7179cdd0508fba5846f3b4a4cdd7cb",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002938.SZ",
+      "path": "002938.SZ.csv",
+      "rows": 18,
+      "new_rows": 18,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 3,
+        "repurchase": 8,
+        "share_float": 0,
+        "dividend": 32
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "605c9ec1aac9f8a66dea9249cf5f9ce108b666ee58d9603b01f718b0db779655",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "002955.SZ",
+      "path": "002955.SZ.csv",
+      "rows": 16,
+      "new_rows": 16,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 8,
+        "share_float": 0,
+        "dividend": 28
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "f934cc8170bbd046e1794f2e2665e0bbe93421bfa6c68401b090223aa2b4ba30",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "003031.SZ",
+      "path": "003031.SZ.csv",
+      "rows": 20,
+      "new_rows": 20,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 4,
+        "repurchase": 0,
+        "share_float": 9,
+        "dividend": 23
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "586f0eb2e09838441d73566cd238669f4581fc11ed2ff68053ad2b898bb2fcaa",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300014.SZ",
+      "path": "300014.SZ.csv",
+      "rows": 28,
+      "new_rows": 28,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 3,
+        "repurchase": 1,
+        "share_float": 16,
+        "dividend": 41
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "4289949d51af9957aace3ef127ad7403f19ac8b01291882609daaaa7c0b0a689",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300042.SZ",
+      "path": "300042.SZ.csv",
+      "rows": 29,
+      "new_rows": 29,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 23,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 39
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "d5d72a81344802319e2c00d34ac08301eaf5d2ddaedcaea397f59df4d6aca3b8",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300054.SZ",
+      "path": "300054.SZ.csv",
+      "rows": 17,
+      "new_rows": 17,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 10,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 41
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "0d183f57d03d86c76e32e8ab23f007bc0ee59fba46646ddb81b6852a8e7afcbd",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300068.SZ",
+      "path": "300068.SZ.csv",
+      "rows": 7,
+      "new_rows": 7,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 34
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "53602ab13c4eca45472cb91b0511e08fffc861e3318ec164caf7cb3f92d9b472",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300153.SZ",
+      "path": "300153.SZ.csv",
+      "rows": 8,
+      "new_rows": 8,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 36
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "7f2653a0228507a810272e09415e4b116c8431e6fc9a1cbe801f4ebe3f7eb824",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300177.SZ",
+      "path": "300177.SZ.csv",
+      "rows": 5,
+      "new_rows": 5,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 36
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "ec0ba8202a305b4c3ef221eec6202fa6e2cbded21da5f88a532b16fd4493ff93",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300223.SZ",
+      "path": "300223.SZ.csv",
+      "rows": 34,
+      "new_rows": 34,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 27,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 38
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "5eee518132209ed99131116d2612845e5b2c71df66e832c8b511f0f7bbcdc1f8",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300236.SZ",
+      "path": "300236.SZ.csv",
+      "rows": 11,
+      "new_rows": 11,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 4,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 41
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "d73601bfc45493c6897a03c6ff8d98a2951a56fbf942f989c0a1c4cec8455486",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300249.SZ",
+      "path": "300249.SZ.csv",
+      "rows": 10,
+      "new_rows": 10,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 1,
+        "repurchase": 4,
+        "share_float": 0,
+        "dividend": 31
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "3b4781126e9ae6d76a5a4ace1671d92deb4a84d49bc3bf87933034c1feaf40f5",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300252.SZ",
+      "path": "300252.SZ.csv",
+      "rows": 6,
+      "new_rows": 6,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 1,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 33
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "74c8be3e4d3bd22d814978136ce6bef750c25ab9c9605aef9ff613a0cc8d443b",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300274.SZ",
+      "path": "300274.SZ.csv",
+      "rows": 22,
+      "new_rows": 22,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 10,
+        "repurchase": 3,
+        "share_float": 0,
+        "dividend": 41
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "16f50623e8a66198e1adf865256555f6c24c1f447e64f0b5319fe9a1539c3240",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300308.SZ",
+      "path": "300308.SZ.csv",
+      "rows": 24,
+      "new_rows": 24,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 9,
+        "repurchase": 6,
+        "share_float": 0,
+        "dividend": 42
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "31e4c423b3344cb808b008b40871febe5013d660411fc7311e9050c3003c05d8",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300364.SZ",
+      "path": "300364.SZ.csv",
+      "rows": 18,
+      "new_rows": 18,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 10,
+        "repurchase": 3,
+        "share_float": 0,
+        "dividend": 29
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "2a3714983be7b5a91457bfe77b7a19d7324859219d3f4e3a4a659da3a029b8cf",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300376.SZ",
+      "path": "300376.SZ.csv",
+      "rows": 14,
+      "new_rows": 14,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 4,
+        "repurchase": 4,
+        "share_float": 0,
+        "dividend": 38
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "ae9dd4a2d3e39a298d361953e7a5f6186d86a35e624e1051fd4b11be0d262cb9",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300394.SZ",
+      "path": "300394.SZ.csv",
+      "rows": 13,
+      "new_rows": 13,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 5,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 38
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "b59f5ad639d71e8352dd388cab92cf509ebcec93dbd657b57c6d9148b0296afe",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300475.SZ",
+      "path": "300475.SZ.csv",
+      "rows": 14,
+      "new_rows": 14,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 5,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 38
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "e60a8088d006d450520b398d3ab9921212c76917744bf2948ee747c05513d999",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300476.SZ",
+      "path": "300476.SZ.csv",
+      "rows": 57,
+      "new_rows": 57,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 8,
+        "repurchase": 2,
+        "share_float": 40,
+        "dividend": 36
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "53f34f38a571d8d7b264eacc1f0c03bd2ad1e392b9ed2460192083278c989cb4",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300502.SZ",
+      "path": "300502.SZ.csv",
+      "rows": 10,
+      "new_rows": 10,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 3,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 35
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "e9a007d9f1ae44acb50ffe77a176fdbaacfea448c470df2079118a2197987c52",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300548.SZ",
+      "path": "300548.SZ.csv",
+      "rows": 30,
+      "new_rows": 30,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 23,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 34
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "6c82d6c85c426891e8427937c8baf688211b7021307521f53d8f283bc6c2aa07",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300567.SZ",
+      "path": "300567.SZ.csv",
+      "rows": 13,
+      "new_rows": 13,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 7,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 34
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "80a8f88220f25568bc04a31c49ebb8822d118ddde49d52940fe163f8dc98175c",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300570.SZ",
+      "path": "300570.SZ.csv",
+      "rows": 25,
+      "new_rows": 25,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 18,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 34
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "3bd85fa54d0353ba59b46d5850b2edc3c19dd2203ddf416b074bed2c1d59d1c0",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300604.SZ",
+      "path": "300604.SZ.csv",
+      "rows": 14,
+      "new_rows": 14,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 7,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 33
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "10a2f564fc798b9cbca68ea19a91d14a039514658ab42626f0001dcc196396aa",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300627.SZ",
+      "path": "300627.SZ.csv",
+      "rows": 18,
+      "new_rows": 18,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 11,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 34
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "790499364768d809411f481a6180e13061298999c6cf06d7e775bfe49b042ef8",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300661.SZ",
+      "path": "300661.SZ.csv",
+      "rows": 9,
+      "new_rows": 9,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 34
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "ffd05f424e56d98e459f5d4f8b36f1ddaa9ca5ce50e21b97e582c81e4ba969f6",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300666.SZ",
+      "path": "300666.SZ.csv",
+      "rows": 22,
+      "new_rows": 22,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 10,
+        "repurchase": 5,
+        "share_float": 0,
+        "dividend": 34
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "31a9b4423b3b97001067326991322911983eec776cde984d2b6cc71f0a178907",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300750.SZ",
+      "path": "300750.SZ.csv",
+      "rows": 15,
+      "new_rows": 15,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 7,
+        "share_float": 0,
+        "dividend": 38
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "edd2fa6c126d4590cbc9faef3bf1cabdff5f842e7c76ac17b0f889d2b31f8669",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300802.SZ",
+      "path": "300802.SZ.csv",
+      "rows": 24,
+      "new_rows": 24,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 5,
+        "repurchase": 12,
+        "share_float": 0,
+        "dividend": 28
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "44dfbacc93c1ec4f36572e4a8449f4bf9c99fd1ba8e5b2607c6000a557773c77",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300842.SZ",
+      "path": "300842.SZ.csv",
+      "rows": 9,
+      "new_rows": 9,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 3,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 21
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "147060d3dd2a8fa927289702612169cc3abcf26255df7b2b6bf03618540113ce",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300857.SZ",
+      "path": "300857.SZ.csv",
+      "rows": 22,
+      "new_rows": 22,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 15,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 25
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "ef6d3df98ac3db1e50f00466db0bcc796f5e3b76337e478ad335cb49666629c7",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300870.SZ",
+      "path": "300870.SZ.csv",
+      "rows": 14,
+      "new_rows": 14,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 3,
+        "repurchase": 2,
+        "share_float": 0,
+        "dividend": 27
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "0a6f68404271e5a757bfdc158c7c28761259cba38223629a81a7fa596147ad00",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "300913.SZ",
+      "path": "300913.SZ.csv",
+      "rows": 45,
+      "new_rows": 45,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 8,
+        "repurchase": 0,
+        "share_float": 30,
+        "dividend": 24
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "a7e252f16888349e9489c6f2032e57ff04b69b9a064a5c8cef06a60a336ff53c",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "301095.SZ",
+      "path": "301095.SZ.csv",
+      "rows": 38,
+      "new_rows": 38,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 17,
+        "repurchase": 1,
+        "share_float": 13,
+        "dividend": 17
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "0b6110de213cfe7b7951e6be9ed5d21e28c4483ec983df191d561ff0efb4fd02",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "301165.SZ",
+      "path": "301165.SZ.csv",
+      "rows": 17,
+      "new_rows": 17,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 0,
+        "share_float": 8,
+        "dividend": 16
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "38e6b451669a451f74dac5879e999c48c3069cec2e0c792c1d691d53bf3b3bb1",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "301269.SZ",
+      "path": "301269.SZ.csv",
+      "rows": 29,
+      "new_rows": 29,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 8,
+        "repurchase": 0,
+        "share_float": 14,
+        "dividend": 17
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "0d41958ade12d48c5e8db984cbd4fdcd6d135d896f21e1fed0c7e1475a119f0b",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "301291.SZ",
+      "path": "301291.SZ.csv",
+      "rows": 23,
+      "new_rows": 23,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 10,
+        "repurchase": 0,
+        "share_float": 5,
+        "dividend": 15
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "e67f2620a1871a6461eebd44fd0beec30c67b787fc9da9292c42ac92d5024e2b",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "301308.SZ",
+      "path": "301308.SZ.csv",
+      "rows": 80,
+      "new_rows": 80,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 18,
+        "repurchase": 0,
+        "share_float": 53,
+        "dividend": 21
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "9ce2e868e885348eaeda69d6fce969bbb59e57520613d216d21e173760ff5c8e",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "301377.SZ",
+      "path": "301377.SZ.csv",
+      "rows": 18,
+      "new_rows": 18,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 8,
+        "dividend": 23
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "8477049935b9fc443543723f1d714dcc8b2dd9a1ecb5751fc07402e738ac7510",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "301666.SZ",
+      "path": "301666.SZ.csv",
+      "rows": 102,
+      "new_rows": 102,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 100,
+        "dividend": 2
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "cf17ca8c3f8cba8cc9d80293370ce7e514bc97c65976ac6a90a64f704a3eaf29",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600019.SH",
+      "path": "600019.SH.csv",
+      "rows": 13,
+      "new_rows": 13,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 5,
+        "share_float": 0,
+        "dividend": 58
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "2b25a7af634defc7ca08e20a82110d2bb9c47091952a4a625349efb3ff9e73e7",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600055.SH",
+      "path": "600055.SH.csv",
+      "rows": 15,
+      "new_rows": 15,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 6,
+        "share_float": 1,
+        "dividend": 52
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "815847e985db51bcab83087c8ccf533385b734a2acd34ee54aaa43db699e5aef",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600089.SH",
+      "path": "600089.SH.csv",
+      "rows": 7,
+      "new_rows": 7,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 57
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "3fa04dd399b01323a97859e7fa5535b1421c1e768a220ec092142240c821a46c",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600131.SH",
+      "path": "600131.SH.csv",
+      "rows": 16,
+      "new_rows": 16,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 1,
+        "repurchase": 7,
+        "share_float": 0,
+        "dividend": 48
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "d66268dfd43a7827c97aea1cb96f9f957de5816f749b3579bd1316816047728f",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600183.SH",
+      "path": "600183.SH.csv",
+      "rows": 20,
+      "new_rows": 20,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 4,
+        "repurchase": 7,
+        "share_float": 0,
+        "dividend": 55
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "8493297cfd5c8c8bfc9b5c1c6a4af8efee96cf43d5c08bcb293572c12b549e19",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600353.SH",
+      "path": "600353.SH.csv",
+      "rows": 13,
+      "new_rows": 13,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 4,
+        "share_float": 0,
+        "dividend": 43
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "00cc70203e9a3e9eecefae6c9daa9c94fb1dbfbd5a90ce568d5e582e1a7b443b",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600406.SH",
+      "path": "600406.SH.csv",
+      "rows": 21,
+      "new_rows": 21,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 13,
+        "share_float": 0,
+        "dividend": 52
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "d9ddf714e76ac8ce021f5f72cf6565e1e4fd894f4b8514b36eab98c42eab6166",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600438.SH",
+      "path": "600438.SH.csv",
+      "rows": 9,
+      "new_rows": 9,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 2,
+        "share_float": 0,
+        "dividend": 42
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "2b61dade055e0085179788f4fbddd2b1755fde3a9d1c8bef774c24c51b56753e",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600487.SH",
+      "path": "600487.SH.csv",
+      "rows": 14,
+      "new_rows": 14,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 5,
+        "share_float": 0,
+        "dividend": 49
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "6ab3b420c9314d6c46bf63529be1e1ecf65d13e3ff7ec55b50a7cb9c1f1b8d1b",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600498.SH",
+      "path": "600498.SH.csv",
+      "rows": 15,
+      "new_rows": 15,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 8,
+        "share_float": 0,
+        "dividend": 50
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "e0c8fabcf4df6600dbb6c80d76895d3545490a8ce05edaca6a93e2353af911eb",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600522.SH",
+      "path": "600522.SH.csv",
+      "rows": 14,
+      "new_rows": 14,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 7,
+        "share_float": 0,
+        "dividend": 44
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "bcd12f80ad35929ea69d21fba17e29b38e6ae78db9fafd539896d049f4ab0a60",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600550.SH",
+      "path": "600550.SH.csv",
+      "rows": 7,
+      "new_rows": 7,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 32
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "eb3d370d2d3b778efb60257267209b97b320179b697f1dd3836ca2d80e0e7943",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600577.SH",
+      "path": "600577.SH.csv",
+      "rows": 18,
+      "new_rows": 18,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 9,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 53
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "405303ed4b7409de02d9d227d13d420faf9fcdeebf4f38e1cd584f8c2fecbb65",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600584.SH",
+      "path": "600584.SH.csv",
+      "rows": 8,
+      "new_rows": 8,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 42
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "72c1b6dfdc5b823ef49ba2200003aaffa7ea0a74114fed1cd9c6db820056f30d",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600590.SH",
+      "path": "600590.SH.csv",
+      "rows": 10,
+      "new_rows": 10,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 4,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 43
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "da2c267f26534a8b2bd4e2c6744c8946552006cbbc0f3498d85fd8712758b56b",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600673.SH",
+      "path": "600673.SH.csv",
+      "rows": 13,
+      "new_rows": 13,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 3,
+        "repurchase": 5,
+        "share_float": 0,
+        "dividend": 41
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "60fbcef978cc59cc27cfecdc311e9145e7629870c526167206fd2973d7bce357",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600703.SH",
+      "path": "600703.SH.csv",
+      "rows": 16,
+      "new_rows": 16,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 4,
+        "repurchase": 6,
+        "share_float": 0,
+        "dividend": 44
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "163ef1163bb406a757f0e4a7c42f7dc2680a0401f772b2114e4306899b94a70b",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600745.SH",
+      "path": "600745.SH.csv",
+      "rows": 24,
+      "new_rows": 24,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 10,
+        "repurchase": 9,
+        "share_float": 0,
+        "dividend": 32
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "3a0291fdad5d4a200eb8f2c6f6831c2e048d86c4d47bf670de22aee984d2eb95",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600875.SH",
+      "path": "600875.SH.csv",
+      "rows": 16,
+      "new_rows": 16,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 5,
+        "repurchase": 1,
+        "share_float": 4,
+        "dividend": 49
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "efac7d2360f04e5a43327286b2934711202f288114b7173567e7cc62185ffcd7",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "600973.SH",
+      "path": "600973.SH.csv",
+      "rows": 8,
+      "new_rows": 8,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 3,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 42
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "df96ccc22ccf2a98202111b647bdfbefd16f7087202bce6710fd9b53d0424917",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "601012.SH",
+      "path": "601012.SH.csv",
+      "rows": 11,
+      "new_rows": 11,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 5,
+        "repurchase": 1,
+        "share_float": 0,
+        "dividend": 39
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "02506e690c4fc058bb357e776838ab9b258913d3987778dfadf19fa487b4c004",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "601138.SH",
+      "path": "601138.SH.csv",
+      "rows": 28,
+      "new_rows": 28,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 18,
+        "share_float": 0,
+        "dividend": 37
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "60c983d7f1c818f6771767250fe6a89eadf4062308b80c2cc58ea4d517262fcd",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "601179.SH",
+      "path": "601179.SH.csv",
+      "rows": 15,
+      "new_rows": 15,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 7,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 44
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "249fae85a83091e313f21e6c275246624128c2df1b87714586682baba3d9a246",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "601208.SH",
+      "path": "601208.SH.csv",
+      "rows": 19,
+      "new_rows": 19,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 8,
+        "repurchase": 3,
+        "share_float": 0,
+        "dividend": 41
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "8da87eed4bd4f4e54882438d7d4569739614b70bfdfeb8e3a1c2383e68f7cbf9",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "601727.SH",
+      "path": "601727.SH.csv",
+      "rows": 13,
+      "new_rows": 13,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 6,
+        "share_float": 0,
+        "dividend": 36
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "0f928df9198af7192518c16f4309cd02b12bec3142df61001d8e2b4148de2e14",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "601869.SH",
+      "path": "601869.SH.csv",
+      "rows": 12,
+      "new_rows": 12,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 5,
+        "share_float": 0,
+        "dividend": 33
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "022728bf4f0f19532016e5aa8af22a3b67cbe9411f1455d845c1b9650b0e8c0a",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "603019.SH",
+      "path": "603019.SH.csv",
+      "rows": 19,
+      "new_rows": 19,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 6,
+        "repurchase": 3,
+        "share_float": 0,
+        "dividend": 42
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "5a9fd9561deda63d89b3c9033c4befeece48772770c74dd1698e2a09d85bb01f",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "603186.SH",
+      "path": "603186.SH.csv",
+      "rows": 7,
+      "new_rows": 7,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 1,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 33
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "05cb1bfe9ed94f58a4043bc04585e8d3a91d48e168139d37536770304040ca98",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "603220.SH",
+      "path": "603220.SH.csv",
+      "rows": 6,
+      "new_rows": 6,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 31
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "8459ae8f8b8839446907071e0b8cd922968be317850d3c3986df10a6d187db41",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "603228.SH",
+      "path": "603228.SH.csv",
+      "rows": 23,
+      "new_rows": 23,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 9,
+        "repurchase": 7,
+        "share_float": 0,
+        "dividend": 37
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "d9c37b1cf8ff22f5aac3738f1eda76daf1831a9a82a1621a28dd68fd90cffd3f",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "603283.SH",
+      "path": "603283.SH.csv",
+      "rows": 26,
+      "new_rows": 26,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 10,
+        "repurchase": 9,
+        "share_float": 0,
+        "dividend": 33
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "7e62b4175ce6a6d00dffa7d1b57e09f2d6cd4c421d6e866bdcfca78780efc89e",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "603501.SH",
+      "path": "603501.SH.csv",
+      "rows": 18,
+      "new_rows": 18,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 1,
+        "repurchase": 8,
+        "share_float": 0,
+        "dividend": 37
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "5e76d1299a469252f0aaf91fe3dacb72fcf994dc4e9ed62194df3ebf65406f53",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "603728.SH",
+      "path": "603728.SH.csv",
+      "rows": 8,
+      "new_rows": 8,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 1,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 34
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "51c0650f78b1582120a4183e4fe81cbf170961bfbfcc3695be02cf6eeb9bd7f5",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "603893.SH",
+      "path": "603893.SH.csv",
+      "rows": 16,
+      "new_rows": 16,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 5,
+        "repurchase": 2,
+        "share_float": 0,
+        "dividend": 33
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "afe9cbb6c920a524af381f66b341e76e48492a0938b6e0d69b9fc31983be215d",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "603985.SH",
+      "path": "603985.SH.csv",
+      "rows": 14,
+      "new_rows": 14,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 5,
+        "repurchase": 3,
+        "share_float": 0,
+        "dividend": 34
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "3c705e3ce73e713fea16938874a56b26bcf734866b547ef394bbf7b469646215",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "603986.SH",
+      "path": "603986.SH.csv",
+      "rows": 19,
+      "new_rows": 20,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 6,
+        "repurchase": 6,
+        "share_float": 0,
+        "dividend": 35
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "454c65a6388eaf3b31016ebf5d3baa91aebda39a6a9544d600643d0d240302f2",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688003.SH",
+      "path": "688003.SH.csv",
+      "rows": 9,
+      "new_rows": 9,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 1,
+        "repurchase": 1,
+        "share_float": 0,
+        "dividend": 31
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "2dc98e7632b24f92a83284add2de012430e5e71059a01e5e0302ed0c81322bde",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688008.SH",
+      "path": "688008.SH.csv",
+      "rows": 28,
+      "new_rows": 28,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 9,
+        "repurchase": 12,
+        "share_float": 0,
+        "dividend": 28
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "69f776c56979352051e1a65912ac25fba6d6051ad9c6de327eb78446fae25def",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688012.SH",
+      "path": "688012.SH.csv",
+      "rows": 16,
+      "new_rows": 18,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 8,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 31
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "47af5c65a61399ecd0063834984e70c97853b4743452ccf102eac9b24b0a38c6",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688019.SH",
+      "path": "688019.SH.csv",
+      "rows": 9,
+      "new_rows": 9,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 29
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "890b7f3a5f91225ae49f520065a33c3bc5b543de18ff791467f555de06015b56",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688035.SH",
+      "path": "688035.SH.csv",
+      "rows": 39,
+      "new_rows": 40,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 13,
+        "repurchase": 10,
+        "share_float": 7,
+        "dividend": 18
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "c0a1aa975c411764a795e38931b9801879a62e37841be26e8d35bc76c30d5564",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688037.SH",
+      "path": "688037.SH.csv",
+      "rows": 7,
+      "new_rows": 8,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 1,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 29
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "df2389031f2028ba4f04ae64726e050ca2308069055c559a99435f02226b9926",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688041.SH",
+      "path": "688041.SH.csv",
+      "rows": 18,
+      "new_rows": 18,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 0,
+        "share_float": 6,
+        "dividend": 20
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "f0da8b5f2d20eed2d05546876489f5588aef5d41e77fb42fe56dd9077b3b0455",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688045.SH",
+      "path": "688045.SH.csv",
+      "rows": 40,
+      "new_rows": 40,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 5,
+        "repurchase": 0,
+        "share_float": 27,
+        "dividend": 16
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "9d1af70ad7afcfd60bb8a4dbc9f2e3e59a6badc763f9d0bdb62a5d125dd6f952",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688072.SH",
+      "path": "688072.SH.csv",
+      "rows": 145,
+      "new_rows": 145,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 36,
+        "repurchase": 0,
+        "share_float": 100,
+        "dividend": 21
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "f5b7a0bf337578352d686652479fa015818abd16445c89b339f5680817574f03",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688082.SH",
+      "path": "688082.SH.csv",
+      "rows": 68,
+      "new_rows": 68,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 5,
+        "repurchase": 5,
+        "share_float": 51,
+        "dividend": 20
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "26098b5d4751233abdd840b638af39b65dfe2ab52925493281228af996121191",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688107.SH",
+      "path": "688107.SH.csv",
+      "rows": 32,
+      "new_rows": 32,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 27,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 15
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "79e46cd2880e2a6560545280af20bbece359358fb3195746e63822df9c19303e",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688110.SH",
+      "path": "688110.SH.csv",
+      "rows": 11,
+      "new_rows": 11,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 6,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 17
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "48bd7854772a8360d6e97cd49621dde31f56ee196a2f0582354724ca424f0dc3",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688120.SH",
+      "path": "688120.SH.csv",
+      "rows": 27,
+      "new_rows": 27,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 5,
+        "repurchase": 12,
+        "share_float": 3,
+        "dividend": 18
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "cf6eee81884f441c25f407e1c242ae4ec9d6afab7f7b8f2890f8b4e58145e111",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688123.SH",
+      "path": "688123.SH.csv",
+      "rows": 17,
+      "new_rows": 17,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 10,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 28
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "0320dd775194085e6beda7947401843f8e8871553d61407fa4348e8df9b4f04a",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688126.SH",
+      "path": "688126.SH.csv",
+      "rows": 41,
+      "new_rows": 41,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 17,
+        "repurchase": 0,
+        "share_float": 20,
+        "dividend": 21
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "411e46b26db3085f1f1daed44f23f5c5d1fc4b69ff06185f495994775fa03650",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688141.SH",
+      "path": "688141.SH.csv",
+      "rows": 19,
+      "new_rows": 19,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 14,
+        "dividend": 12
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "683e8246d24dbe422e33928f80f1f882ba4cc8000d0dcdbcfb1a13c37aa8cd36",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688200.SH",
+      "path": "688200.SH.csv",
+      "rows": 12,
+      "new_rows": 12,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 5,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 33
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "ffd1a61a6438eb28d7f20914289e8c6cee219e104db15279388aa7b7485b6425",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688206.SH",
+      "path": "688206.SH.csv",
+      "rows": 61,
+      "new_rows": 63,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 17,
+        "repurchase": 1,
+        "share_float": 35,
+        "dividend": 22
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "0a26f5da834332323c87a7c0fa85e65b9d66eeb415694ec572e7991762f26fab",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688226.SH",
+      "path": "688226.SH.csv",
+      "rows": 60,
+      "new_rows": 60,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 6,
+        "repurchase": 0,
+        "share_float": 48,
+        "dividend": 21
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "a499b000c8ad7830e0e9f92371aee4355db097579f67311a4f8846ca6712f314",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688256.SH",
+      "path": "688256.SH.csv",
+      "rows": 35,
+      "new_rows": 35,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 3,
+        "share_float": 26,
+        "dividend": 20
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "1980dd11ce78f261cd0a64366a96f0fdd34473ce786fe4e460178b4f9328538d",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688257.SH",
+      "path": "688257.SH.csv",
+      "rows": 16,
+      "new_rows": 8,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 0,
+        "share_float": 6,
+        "dividend": 0
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "b469ccbb44717b537b6ebc110f8f2001691ab7ddc50eca7aa4fab1e4b224041d",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688262.SH",
+      "path": "688262.SH.csv",
+      "rows": 49,
+      "new_rows": 25,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 18,
+        "repurchase": 2,
+        "share_float": 0,
+        "dividend": 18
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "4a2392deb73aae78a1c45682839e3c62ae1e8658edf57ebb28120831aede464c",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688268.SH",
+      "path": "688268.SH.csv",
+      "rows": 52,
+      "new_rows": 52,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 39,
+        "repurchase": 6,
+        "share_float": 0,
+        "dividend": 29
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "add325eb319be99288d024cb2123778baa5b696f9a8dfbf48acc49b9faeccf20",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688271.SH",
+      "path": "688271.SH.csv",
+      "rows": 20,
+      "new_rows": 20,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 4,
+        "repurchase": 4,
+        "share_float": 5,
+        "dividend": 16
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "e0551268d1f570d9b1359555c38ecc41c9908a172d3e2bf95a7705363929da38",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688300.SH",
+      "path": "688300.SH.csv",
+      "rows": 7,
+      "new_rows": 7,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 30
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "4b131ea2b4e317815ee494c533bfd5c9ff2d1677b7e829eb838d7afbd8dfa150",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688313.SH",
+      "path": "688313.SH.csv",
+      "rows": 9,
+      "new_rows": 9,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 2,
+        "share_float": 0,
+        "dividend": 23
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "800849e6c9f880d1bc0be9320326d4c84339c6e162f3b4b2f6ab09049b88ca63",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688343.SH",
+      "path": "688343.SH.csv",
+      "rows": 48,
+      "new_rows": 42,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 9,
+        "repurchase": 0,
+        "share_float": 33,
+        "dividend": 0
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "26759617a1ea397ddbc6f3d63729b022a3dbe51f7f43907c0655fab0fd381499",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688361.SH",
+      "path": "688361.SH.csv",
+      "rows": 70,
+      "new_rows": 70,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 9,
+        "repurchase": 0,
+        "share_float": 56,
+        "dividend": 11
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "6880f37e36660e6a82163b2d3855663403bf30968641cb5dd03303ad27d297a0",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688362.SH",
+      "path": "688362.SH.csv",
+      "rows": 38,
+      "new_rows": 18,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 4,
+        "repurchase": 9,
+        "share_float": 0,
+        "dividend": 13
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "0149fcf3551d6779e892435863b698e506e5ac114f48cdffbbe9bf9829098023",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688368.SH",
+      "path": "688368.SH.csv",
+      "rows": 8,
+      "new_rows": 9,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 30
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "e03c45dd26e7e801376274144fca198861e2093f1c6c91ed739de4977bdfffe8",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688383.SH",
+      "path": "688383.SH.csv",
+      "rows": 12,
+      "new_rows": 12,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 4,
+        "share_float": 0,
+        "dividend": 20
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "ada83f1ba27d83023754ee7fb79b6f83acbc72f18d79614cfda9187cf9285585",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688385.SH",
+      "path": "688385.SH.csv",
+      "rows": 9,
+      "new_rows": 10,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 22
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "87e2fc1349a2201a2c19ff3c81a767d31902b19dba58042ce906165e27317119",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688388.SH",
+      "path": "688388.SH.csv",
+      "rows": 7,
+      "new_rows": 8,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 29
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "e21ba6b94cf3fed99361733987872411a3dd84271b8e84dac3a5e5812ebb00cc",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688396.SH",
+      "path": "688396.SH.csv",
+      "rows": 9,
+      "new_rows": 9,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 29
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "8507919d4463c30b3855822a7620d73c8d041679fc9e9cc56d736e141974b223",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688400.SH",
+      "path": "688400.SH.csv",
+      "rows": 25,
+      "new_rows": 26,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 3,
+        "repurchase": 9,
+        "share_float": 6,
+        "dividend": 18
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "2f7ec5ba76f3329527711cd431011abbaf6aff65df977eae3aecc63175faa9d0",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688469.SH",
+      "path": "688469.SH.csv",
+      "rows": 48,
+      "new_rows": 48,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 0,
+        "share_float": 41,
+        "dividend": 10
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "1b34fd0343f08a3423dcc250ecb963fce89a0156364a52ea3f3bf04d1ace442d",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688498.SH",
+      "path": "688498.SH.csv",
+      "rows": 34,
+      "new_rows": 34,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 1,
+        "share_float": 25,
+        "dividend": 20
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "027fb54dc09a5da6ba9bd01d96fb2f8cc9db578eb16da979f065e4f4b1b46faa",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688521.SH",
+      "path": "688521.SH.csv",
+      "rows": 50,
+      "new_rows": 50,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 14,
+        "repurchase": 2,
+        "share_float": 29,
+        "dividend": 18
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "106b2cdc6a1294b9d88ec76888d5bfb889564fa34da81fc2bf58e04d406f2016",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688525.SH",
+      "path": "688525.SH.csv",
+      "rows": 125,
+      "new_rows": 126,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 13,
+        "repurchase": 5,
+        "share_float": 100,
+        "dividend": 15
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "fa451e4db6d0c06bbbf182cfeb153a1e39af2fbd40ab3fdfabdb622414655812",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688535.SH",
+      "path": "688535.SH.csv",
+      "rows": 86,
+      "new_rows": 86,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 7,
+        "repurchase": 9,
+        "share_float": 62,
+        "dividend": 19
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "6bb89e93f38aaf64ddf33b53d380cc3d88c17c02782b9561471dabbc07de8bb0",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688676.SH",
+      "path": "688676.SH.csv",
+      "rows": 12,
+      "new_rows": 13,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 5,
+        "share_float": 0,
+        "dividend": 27
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "dae4f349e15d0d731bd1345d3ca9c2754585298c396110d9d074138a9ce81242",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688686.SH",
+      "path": "688686.SH.csv",
+      "rows": 12,
+      "new_rows": 12,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 4,
+        "share_float": 0,
+        "dividend": 30
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "ae548de9def0815cd01e5042a95557ae99000689e9c041754b7d5b5bb2ff8a5e",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688702.SH",
+      "path": "688702.SH.csv",
+      "rows": 18,
+      "new_rows": 18,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 12,
+        "repurchase": 0,
+        "share_float": 1,
+        "dividend": 9
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "47dcc4740d18fdc5c2e2c0e5ae432d9272a360b2f09ca2d7c81b294ce68bbeb3",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688729.SH",
+      "path": "688729.SH.csv",
+      "rows": 104,
+      "new_rows": 104,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 100,
+        "dividend": 5
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "1970ce6255a5e995fb2e485f31eddd4e11f1fa4daacc8046ae59d48ee12e51df",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688766.SH",
+      "path": "688766.SH.csv",
+      "rows": 8,
+      "new_rows": 8,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 1,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 27
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "6cc76d55012d989bc50013ab22297449b74f4af4c7b9e0a076ad94d15e3d9454",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688795.SH",
+      "path": "688795.SH.csv",
+      "rows": 102,
+      "new_rows": 102,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 100,
+        "dividend": 2
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "96542d5b5a992bb431aebd653db3946048baf7a1c96542aa6037be578a42519c",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688802.SH",
+      "path": "688802.SH.csv",
+      "rows": 102,
+      "new_rows": 102,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 100,
+        "dividend": 2
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "c47e75a242b2d0819982a424ec3e47e84a8787db45c75fba90093fe0c3fc585f",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "688911.SH",
+      "path": "688911.SH.csv",
+      "rows": 0,
+      "new_rows": 0,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 0
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": null,
+      "status": "MISSING"
+    },
+    {
+      "symbol": "688981.SH",
+      "path": "688981.SH.csv",
+      "rows": 7,
+      "new_rows": 7,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 2,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 19
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": "0593e7190ea5f8d2e72fc0f5cbba06db0937fb211ad6c49864600ca3f3125089",
+      "status": "PARTIAL"
+    },
+    {
+      "symbol": "839693.BJ",
+      "path": "839693.BJ.csv",
+      "rows": 0,
+      "new_rows": 0,
+      "coverage": {
+        "forecast": 0,
+        "holdertrade": 0,
+        "repurchase": 0,
+        "share_float": 0,
+        "dividend": 0
+      },
+      "errors": [
+        {
+          "dataset": "forecast",
+          "api_name": "forecast",
+          "error": "CircuitOpen",
+          "reason": "3 cumulative RuntimeError failures in this run"
+        }
+      ],
+      "sha256": null,
+      "status": "MISSING"
+    }
+  ],
+  "circuits": {
+    "forecast": {
+      "api_name": "forecast",
+      "reason": "3 cumulative RuntimeError failures in this run",
+      "opened_at_symbol": "000977.SZ"
+    }
+  },
+  "conflict_policy": "append observations; deduplicate exact dataset/date/payload identity"
+}

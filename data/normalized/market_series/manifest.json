@@ -1,42 +1,15 @@
 {
   "source": "tushare_official_structured_gateway",
+  "generated_at": "2026-07-12T03:52:38.281800+08:00",
   "start_date": "20240101",
   "end_date": "20260711",
   "results": [
     {
-      "dataset": "index_daily",
-      "symbol": "000001.SH",
+      "dataset": "fund_daily",
+      "symbol": "159516.SZ",
       "status": "OK",
-      "rows": 609,
-      "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/index/000001.SH.csv"
-    },
-    {
-      "dataset": "index_daily",
-      "symbol": "000300.SH",
-      "status": "OK",
-      "rows": 609,
-      "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/index/000300.SH.csv"
-    },
-    {
-      "dataset": "index_daily",
-      "symbol": "000905.SH",
-      "status": "OK",
-      "rows": 609,
-      "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/index/000905.SH.csv"
-    },
-    {
-      "dataset": "index_daily",
-      "symbol": "000852.SH",
-      "status": "OK",
-      "rows": 609,
-      "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/index/000852.SH.csv"
-    },
-    {
-      "dataset": "index_daily",
-      "symbol": "000985.CSI",
-      "status": "OK",
-      "rows": 609,
-      "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/index/000985.CSI.csv"
+      "rows": 715,
+      "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/fund/159516.SZ.csv"
     },
     {
       "dataset": "fund_daily",
@@ -128,7 +101,44 @@
       "status": "OK",
       "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/fund/588200.SH.csv"
+    },
+    {
+      "dataset": "index_daily",
+      "symbol": "000001.SH",
+      "status": "OK",
+      "rows": 609,
+      "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/index/000001.SH.csv"
+    },
+    {
+      "dataset": "index_daily",
+      "symbol": "000300.SH",
+      "status": "OK",
+      "rows": 609,
+      "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/index/000300.SH.csv"
+    },
+    {
+      "dataset": "index_daily",
+      "symbol": "000852.SH",
+      "status": "OK",
+      "rows": 609,
+      "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/index/000852.SH.csv"
+    },
+    {
+      "dataset": "index_daily",
+      "symbol": "000905.SH",
+      "status": "OK",
+      "rows": 609,
+      "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/index/000905.SH.csv"
+    },
+    {
+      "dataset": "index_daily",
+      "symbol": "000985.CSI",
+      "status": "OK",
+      "rows": 609,
+      "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/index/000985.CSI.csv"
     }
   ],
-  "status": "OK"
+  "status": "OK",
+  "run_status": "COMPLETE",
+  "merge_policy": "upsert manifest rows by dataset and symbol; never erase unrequested coverage"
 }
