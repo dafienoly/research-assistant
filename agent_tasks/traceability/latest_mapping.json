@@ -459,6 +459,16 @@
       "behavior": "实时 ETF 价格和市场跌幅广度使用同一新鲜 DataHub 快照；不构造 synthetic high/low，不清除进程代理变量，不直连腾讯。"
     },
     {
+      "id": "P0-EVENT-TRUTH-PRESERVE-01",
+      "title": "Event Truth 上游失败时保留旧快照并发布运行断点",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_ingestion/event_truth.py", "function": "EventTruthIngestion", "line": 15},
+        {"file": "commands/tests/test_event_truth_ingestion.py", "function": "test_failed_refresh_preserves_existing_event_truth", "line": 30}
+      ],
+      "expected_keywords": ["IN_PROGRESS", "PRESERVED", "combine_first", "never replace with calculated values"],
+      "behavior": "运行开始及逐标的原子发布 manifest；所有来源失败或无可验证新行时不写 canonical CSV，部分刷新按日期和非空字段合并，保留旧事件真值。"
+    },
+    {
       "id": "INFRA-CORPORATE-EVENTS-01",
       "title": "半导体公司事件统一由 DataHub ingestion 生成",
       "code_locations": [
@@ -468,8 +478,8 @@
         {"file": "commands/scripts/vnext_event_truth_fetch.py", "line": 1},
         {"file": "commands/tests/test_corporate_event_ingestion.py", "line": 1}
       ],
-      "expected_keywords": ["client._query", "normalized/events/corporate_events", "atomic_write_frame", "_load_datahub_events", "corporate_event_truth"],
-      "behavior": "forecast、holder trade、repurchase、share float、dividend 只在 ingestion 层拉取并长表原子发布；研究加载器只读 canonical 数据和交易日历。"
+      "expected_keywords": ["client._query", "normalized/events/corporate_events", "atomic_write_frame", "CircuitOpen", "IN_PROGRESS", "_load_datahub_events", "corporate_event_truth"],
+      "behavior": "forecast、holder trade、repurchase、share float、dividend 只在 ingestion 层拉取并长表原子发布；逐数据集连续失败触发熔断，每个标的后原子更新运行中 manifest，研究加载器只读 canonical 数据和交易日历。"
     },
     {
       "id": "P1-REGULATORY-COVERAGE-01",
@@ -481,10 +491,10 @@
         {"file": "commands/scripts/datahub_regulatory_events.py", "line": 1},
         {"file": "commands/tests/test_regulatory_event_ingestion.py", "line": 1}
       ],
-      "expected_keywords": ["covered_symbols", "failed_symbols", "coverage_policy", "regulatory truth does not cover", "datahub-global.lock"],
-      "behavior": "公告只在 ingestion 层抓取并分类；快照记录成功/失败覆盖，PreTrade 对未覆盖标的 fail-closed，空事件不等于全市场安全。"
+      "expected_keywords": ["covered_symbols", "failed_symbols", "coverage_policy", "no verifiable response", "regulatory truth does not cover", "datahub-global.lock"],
+      "behavior": "公告只在 ingestion 层抓取并分类；快照记录成功/失败覆盖，所有来源吞错后返回空列表时仍判定失败，PreTrade 对未覆盖标的 fail-closed，空事件不等于全市场安全。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-12T02:12:00+08:00"
+  "generated_at": "2026-07-12T04:00:00+08:00"
 }

@@ -25,31 +25,65 @@ EVENT_APIS = {
 class CorporateEventIngestion:
     """Single owner for structured company-event provider calls and persistence."""
 
-    def __init__(self, project_root: str | Path, client: Any | None = None):
+    def __init__(
+        self,
+        project_root: str | Path,
+        client: Any | None = None,
+        *,
+        circuit_breaker_threshold: int = 3,
+    ):
         self.root = Path(project_root).resolve()
         self.output_root = self.root / "data/normalized/events/corporate_events"
         self.client = client
+        if circuit_breaker_threshold < 1:
+            raise ValueError("circuit_breaker_threshold must be positive")
+        self.circuit_breaker_threshold = circuit_breaker_threshold
 
     def fetch(self, symbols: list[str], start_date: str, end_date: str) -> dict:
         client = self.client or self._client()
         observed_at = datetime.now().astimezone().isoformat()
         results = []
+        failures = {dataset: 0 for dataset in EVENT_APIS}
+        circuits: dict[str, dict] = {}
+        manifest_path = self.output_root / "manifest.json"
+        EventTruthIngestion._atomic_json(
+            manifest_path,
+            self._manifest(results, observed_at, start_date, end_date, circuits, "IN_PROGRESS"),
+        )
         for symbol in dict.fromkeys(symbols):
             rows: list[dict] = []
             errors: list[dict] = []
             coverage: dict[str, int] = {}
             for dataset, (api_name, date_candidates) in EVENT_APIS.items():
+                if dataset in circuits:
+                    coverage[dataset] = 0
+                    errors.append({
+                        "dataset": dataset,
+                        "api_name": api_name,
+                        "error": "CircuitOpen",
+                        "reason": circuits[dataset]["reason"],
+                    })
+                    continue
                 try:
                     params = {"ts_code": symbol}
                     if dataset != "dividend":
                         params.update({"start_date": start_date, "end_date": end_date})
                     frame = client._query(api_name, **params)
                     frame = frame if isinstance(frame, pd.DataFrame) else pd.DataFrame()
+                    failures[dataset] = 0
                     coverage[dataset] = len(frame)
                     rows.extend(self._normalize(frame, symbol, dataset, date_candidates, observed_at, start_date, end_date))
                 except Exception as error:
+                    failures[dataset] += 1
                     coverage[dataset] = 0
-                    errors.append({"dataset": dataset, "api_name": api_name, "error": type(error).__name__})
+                    error_name = type(error).__name__
+                    errors.append({"dataset": dataset, "api_name": api_name, "error": error_name})
+                    if failures[dataset] >= self.circuit_breaker_threshold:
+                        circuits[dataset] = {
+                            "api_name": api_name,
+                            "reason": f"{failures[dataset]} consecutive {error_name} failures",
+                            "opened_at_symbol": symbol,
+                        }
             destination = self.output_root / f"{symbol}.csv"
             merged = self._merge_existing(destination, pd.DataFrame(rows))
             if not merged.empty:
@@ -67,18 +101,39 @@ class CorporateEventIngestion:
                 "sha256": content_hash,
                 "status": status,
             })
-        manifest = {
-            "status": "OK" if results and all(row["status"] == "OK" for row in results) else "PARTIAL",
+            EventTruthIngestion._atomic_json(
+                manifest_path,
+                self._manifest(results, observed_at, start_date, end_date, circuits, "IN_PROGRESS"),
+            )
+        manifest = self._manifest(results, observed_at, start_date, end_date, circuits)
+        EventTruthIngestion._atomic_json(manifest_path, manifest)
+        return manifest
+
+    @staticmethod
+    def _manifest(
+        results: list[dict],
+        observed_at: str,
+        start_date: str,
+        end_date: str,
+        circuits: dict[str, dict],
+        run_status: str = "COMPLETE",
+    ) -> dict:
+        return {
+            "status": (
+                "IN_PROGRESS"
+                if run_status == "IN_PROGRESS"
+                else ("OK" if results and all(row["status"] == "OK" for row in results) else "PARTIAL")
+            ),
+            "run_status": run_status,
             "dataset": "normalized/events/corporate_events",
             "generated_at": observed_at,
             "start_date": start_date,
             "end_date": end_date,
             "source": "tushare_official_structured_gateway",
             "results": results,
+            "circuits": circuits,
             "conflict_policy": "append observations; deduplicate exact dataset/date/payload identity",
         }
-        EventTruthIngestion._atomic_json(self.output_root / "manifest.json", manifest)
-        return manifest
 
     @staticmethod
     def _normalize(

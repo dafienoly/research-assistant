@@ -94,4 +94,11 @@ class RegulatoryEventIngestion:
         from provider_matrix import AnnouncementProvider
 
         provider = AnnouncementProvider()
-        return provider.get_all
+
+        def fetch(symbol: str) -> list[dict]:
+            announcements = provider.get_all(symbol)
+            if not announcements:
+                raise RuntimeError("announcement sources returned no verifiable response")
+            return announcements
+
+        return fetch

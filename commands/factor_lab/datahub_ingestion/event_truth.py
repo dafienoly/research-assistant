@@ -21,6 +21,12 @@ class EventTruthIngestion:
     def fetch(self, symbols: list[str], start_date: str, end_date: str) -> dict:
         client = self.client or self._client()
         results = []
+        generated_at = datetime.now().astimezone().isoformat()
+        manifest_path = self.output_root / "manifest.json"
+        self._atomic_json(
+            manifest_path,
+            self._manifest(results, generated_at, start_date, end_date, "IN_PROGRESS"),
+        )
         for symbol in symbols:
             datasets = {}
             errors = []
@@ -41,7 +47,14 @@ class EventTruthIngestion:
                     errors.append({"dataset": dataset, "api_name": api_name, "error": type(exc).__name__})
             merged = self._merge(datasets, start_date, end_date)
             destination = self.output_root / f"{symbol}.csv"
-            self._atomic_frame(destination, merged)
+            fresh_rows = sum(len(frame) for frame in datasets.values())
+            if fresh_rows:
+                merged = self._merge_existing(destination, merged)
+                self._atomic_frame(destination, merged)
+                write_status = "UPDATED"
+            else:
+                merged = self._read_existing(destination)
+                write_status = "PRESERVED" if destination.exists() else "NOT_WRITTEN"
             results.append(
                 {
                     "symbol": symbol,
@@ -49,20 +62,36 @@ class EventTruthIngestion:
                     "rows": len(merged),
                     "coverage": {name: len(frame) for name, frame in datasets.items()},
                     "errors": errors,
+                    "write_status": write_status,
                     "status": "OK" if not errors and len(datasets["stk_limit"]) > 0 and len(datasets["adj_factor"]) > 0 else "PARTIAL",
                 }
             )
-        manifest = {
-            "generated_at": datetime.now().astimezone().isoformat(),
+            self._atomic_json(
+                manifest_path,
+                self._manifest(results, generated_at, start_date, end_date, "IN_PROGRESS"),
+            )
+        manifest = self._manifest(results, generated_at, start_date, end_date, "COMPLETE")
+        self._atomic_json(manifest_path, manifest)
+        return manifest
+
+    @staticmethod
+    def _manifest(
+        results: list[dict], generated_at: str, start_date: str, end_date: str, run_status: str,
+    ) -> dict:
+        return {
+            "generated_at": generated_at,
             "source": "tushare_official_structured_gateway",
             "start_date": start_date,
             "end_date": end_date,
             "results": results,
-            "status": "OK" if results and all(row["status"] == "OK" for row in results) else "PARTIAL",
+            "status": (
+                "IN_PROGRESS"
+                if run_status == "IN_PROGRESS"
+                else ("OK" if results and all(row["status"] == "OK" for row in results) else "PARTIAL")
+            ),
+            "run_status": run_status,
             "conflict_policy": "retain source observation; never replace with calculated values",
         }
-        self._atomic_json(self.output_root / "manifest.json", manifest)
-        return manifest
 
     @staticmethod
     def _client():
@@ -89,6 +118,22 @@ class EventTruthIngestion:
         dates["source_provider"] = "tushare"
         dates["observed_at"] = datetime.now().astimezone().isoformat()
         return dates
+
+    @staticmethod
+    def _read_existing(path: Path) -> pd.DataFrame:
+        if not path.exists():
+            return pd.DataFrame()
+        return pd.read_csv(path, encoding="utf-8-sig", dtype="string")
+
+    @classmethod
+    def _merge_existing(cls, path: Path, fresh: pd.DataFrame) -> pd.DataFrame:
+        existing = cls._read_existing(path)
+        if existing.empty:
+            return fresh
+        old = existing.drop_duplicates("trade_date", keep="last").set_index("trade_date")
+        new = fresh.drop_duplicates("trade_date", keep="last").set_index("trade_date")
+        combined = new.combine_first(old).reset_index()
+        return combined.sort_values("trade_date", kind="stable").reset_index(drop=True)
 
     @staticmethod
     def _atomic_frame(path: Path, frame: pd.DataFrame) -> None:

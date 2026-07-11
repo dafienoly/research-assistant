@@ -45,3 +45,14 @@ def test_pretrade_blocks_symbol_absent_from_regulatory_coverage(tmp_path):
     )
 
     assert "regulatory_truth_unavailable" in result["details"][0]["risk_type"]
+
+
+def test_regulatory_ingestion_does_not_treat_provider_failure_as_empty_coverage(tmp_path):
+    def failed_fetcher(_symbol):
+        raise RuntimeError("all announcement sources failed")
+
+    payload = RegulatoryEventIngestion(tmp_path, failed_fetcher).fetch(["688012.SH"])
+
+    assert payload["status"] == "PARTIAL"
+    assert payload["covered_symbols"] == []
+    assert payload["failed_symbols"] == [{"symbol": "688012", "error": "RuntimeError"}]

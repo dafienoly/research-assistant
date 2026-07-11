@@ -28,6 +28,34 @@ def test_corporate_ingestion_owns_provider_and_publishes_long_events(tmp_path):
     assert json.loads(frame.iloc[0]["payload"])
 
 
+def test_corporate_ingestion_opens_per_dataset_circuit_and_finishes_manifest(tmp_path):
+    class FailingForecastClient:
+        def __init__(self):
+            self.calls = []
+
+        def _query(self, api_name, **params):
+            self.calls.append((api_name, params["ts_code"]))
+            if api_name == "forecast":
+                raise RuntimeError("upstream unavailable")
+            return pd.DataFrame()
+
+    client = FailingForecastClient()
+    symbols = ["688001.SH", "688002.SH", "688003.SH", "688004.SH", "688005.SH"]
+
+    manifest = CorporateEventIngestion(
+        tmp_path, client, circuit_breaker_threshold=2,
+    ).fetch(symbols, "20260701", "20260711")
+
+    assert manifest["run_status"] == "COMPLETE"
+    assert manifest["status"] == "PARTIAL"
+    assert manifest["circuits"]["forecast"]["opened_at_symbol"] == "688002.SH"
+    assert [call for call in client.calls if call[0] == "forecast"] == [
+        ("forecast", "688001.SH"),
+        ("forecast", "688002.SH"),
+    ]
+    assert manifest["results"][-1]["errors"][0]["error"] == "CircuitOpen"
+
+
 def test_semiconductor_engine_reads_canonical_corporate_events(tmp_path, monkeypatch):
     root = tmp_path / "normalized/events/corporate_events"
     root.mkdir(parents=True)
