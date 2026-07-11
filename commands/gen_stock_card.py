@@ -1,12 +1,9 @@
 """用 Pillow 生成股票分析图片 → 推企业微信"""
-import base64
-import hashlib
 import io
 import os
 import time
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
-from factor_lab.notification_transport import post_json
 
 FONT = "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
 OUTPUT = Path("/mnt/d/HermesReports/analysis_images")
@@ -137,19 +134,14 @@ def make_analysis_image(data: dict) -> Image.Image:
     return img
 
 def push_to_wechat(image: Image.Image, webhook_url: str) -> bool:
-    """推送图片到企业微信"""
+    """将股票卡片持久化到 Telegram + 企业微信附件 outbox。"""
     try:
+        from factor_lab.notify import queue_image_notification
+
+        del webhook_url  # compatibility-only; worker owns channel credentials
         buf = io.BytesIO()
         image.save(buf, format="PNG")
-        buf.seek(0)
-        img_b64 = base64.b64encode(buf.getvalue()).decode()
-        md5 = hashlib.md5(buf.getvalue(), usedforsecurity=False).hexdigest()
-        result = post_json(webhook_url, {
-            "msgtype": "image",
-            "image": {"base64": img_b64, "md5": md5}
-        }, timeout=15)
-        response = result.get("response") or {}
-        return bool(result.get("ok") and response.get("errcode") == 0)
+        return queue_image_notification("Hermes 股票分析卡片", buf.getvalue(), "Hermes 股票分析卡片")
     except Exception as e:
         print(f"❌ 推送失败: {e}")
         return False

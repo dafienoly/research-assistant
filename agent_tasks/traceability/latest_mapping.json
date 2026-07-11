@@ -908,6 +908,18 @@
       "behavior": "L2/L3/L4 文本与 Markdown 业务事件不等待企业微信网络；写入 Telegram+企业微信 durable outbox，日志区分 queued 与 sent，只有显式人工连接测试允许同步 transport。"
     },
     {
+      "id": "P1-NOTIFICATION-ATTACHMENT-01",
+      "title": "股票图片卡片使用受控双通道附件 outbox",
+      "code_locations": [
+        {"file": "commands/factor_lab/notify.py", "function": "queue_image_notification", "line": 34},
+        {"file": "commands/factor_lab/notification_transport.py", "function": "_attachment_bytes", "line": 22},
+        {"file": "commands/gen_stock_card.py", "function": "push_to_wechat", "line": 135},
+        {"file": "commands/tests/test_notification_transport.py", "function": "test_attachment_senders_verify_state_root_and_sha", "line": 42}
+      ],
+      "expected_keywords": ["MAX_NOTIFICATION_ATTACHMENT_BYTES", "sha256", "relative_path", "image/png", "sendPhoto", "invalid_attachment", "append_unique_jsonl_batch"],
+      "behavior": "PNG 原子保存为状态根内的不可变内容寻址附件；outbox 只携带相对路径和 SHA；worker 校验根路径、MIME、大小与哈希后分别通过企业微信 image 和 Telegram multipart 发送。"
+    },
+    {
       "id": "P1-REGULATORY-COVERAGE-01",
       "title": "监管公告 ingestion 与逐标的覆盖感知门禁",
       "code_locations": [

@@ -114,6 +114,8 @@ raw → staging → normalized → manifest/conflict/freshness
 
 旧 `WeChatPusher` 的 L2/L3/L4 文本与 Markdown 入口也已迁入相同双通道 outbox；日志新增 `queued` 并保持 `sent=false`，不再把排队成功冒充网络送达。显式 `wechat:test` 仍作为人工连通性诊断调用中央 transport，不属于业务事件发送。
 
+股票图片卡片原来在 CLI 内把 PNG base64 后同步直发企业微信，Telegram 无对应通道。现 PNG 以 SHA-256 内容寻址、原子写入 decision-loop 状态根，outbox 只保存相对路径、SHA、MIME 和大小；worker 发送前强制检查根目录约束、2 MiB 上限与哈希。企业微信使用 image payload，Telegram 使用受 allow-list 保护的 multipart `sendPhoto`，各自生成独立回执；旧附件永不因同名发布被覆盖或删除。
+
 ## 因子与研究审计
 
 - 因子计算存在硬编码 DataHub 路径，缺少统一 snapshot/version 参数。

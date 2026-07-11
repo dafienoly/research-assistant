@@ -15,6 +15,8 @@
     WECHAT_WEBHOOK_URL — 企业微信机器人 webhook (已在 .bashrc 中)
 """
 import hashlib
+import os
+import tempfile
 from datetime import datetime, timezone, timedelta
 
 from factor_lab.decision_loop.storage import DecisionLoopStore
@@ -31,6 +33,67 @@ _SEVERITY_LABELS = {
     "blocker": "🛑 阻断",
 }
 _last_sent: dict = {}  # 冷却缓存 {event_key: timestamp}
+MAX_NOTIFICATION_ATTACHMENT_BYTES = 2 * 1024 * 1024
+
+
+def queue_image_notification(title: str, image_bytes: bytes, caption: str = "") -> bool:
+    """Persist one immutable PNG and queue it for both notification channels."""
+    if not image_bytes or len(image_bytes) > MAX_NOTIFICATION_ATTACHMENT_BYTES:
+        return False
+    if not image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return False
+    digest = hashlib.sha256(image_bytes).hexdigest()
+    event_digest = hashlib.sha256(f"{title}\0{caption}\0{digest}".encode("utf-8")).hexdigest()
+    event_id = f"image_{event_digest[:24]}"
+    queued_at = datetime.now(CST).isoformat()
+    store = DecisionLoopStore()
+    attachment_dir = store.path("notifications/attachments")
+    attachment_dir.mkdir(parents=True, exist_ok=True)
+    attachment = attachment_dir / f"{digest}.png"
+    try:
+        if attachment.exists():
+            if hashlib.sha256(attachment.read_bytes()).hexdigest() != digest:
+                return False
+        else:
+            fd, temporary = tempfile.mkstemp(prefix=f".{digest}.", dir=attachment_dir)
+            try:
+                with os.fdopen(fd, "wb") as stream:
+                    stream.write(image_bytes)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temporary, attachment)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
+        relative_path = str(attachment.relative_to(store.root))
+        payload = {
+            "event_id": event_id,
+            "text": caption or title,
+            "attachment": {
+                "relative_path": relative_path,
+                "sha256": digest,
+                "mime": "image/png",
+                "size": len(image_bytes),
+            },
+        }
+        store.append_unique_jsonl(
+            "notifications/events.jsonl",
+            {"event_id": event_id, "source": "image_notification", "title": title, "generated_at": queued_at},
+            f"event:{event_id}",
+        )
+        store.append_unique_jsonl_batch(
+            "notifications/outbox.jsonl",
+            [
+                (
+                    {"event_id": event_id, "channel": channel, "payload": payload, "queued_at": queued_at, "max_attempts": 5},
+                    f"{event_id}:{channel}",
+                )
+                for channel in ("telegram", "enterprise_wechat")
+            ],
+        )
+        return True
+    except (OSError, TimeoutError, ValueError):
+        return False
 
 
 def _send_wecom_markdown(title: str, content: str) -> bool:
