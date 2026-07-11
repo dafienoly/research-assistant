@@ -218,13 +218,14 @@
     },
     {
       "id": "INFRA-CRON-01",
-      "title": "盘后任务依赖顺序和防重锁",
+      "title": "声明式收盘 DAG、写入所有权和故障续跑",
       "code_locations": [
-        {"file": "commands/scripts/datahub_cron.sh", "line": 1},
+        {"file": "commands/factor_lab/scheduling.py", "function": "ScheduledDagRunner", "line": 137},
+        {"file": "commands/config/scheduled_jobs.json", "line": 1},
         {"file": "commands/scripts/crontab/hermes-crontab", "line": 1}
       ],
-      "expected_keywords": ["data:incremental-update", "data:audit", "data:gap-plan", "flock -n", "factor-pipeline.lock"],
-      "behavior": "15:45 数据增量先于复盘、realized、Event Truth、认证和因子任务；关键任务使用独立锁，周度维护单独调度。"
+      "expected_keywords": ["idempotency_key", "owned_datasets", "depends_on", "retry_attempts", "run_scheduled_dag.py postmarket"],
+      "behavior": "收盘写任务按真实依赖而非时间猜测执行；原子检查点支持重启续跑，数据集锁阻止双写，研究失败不阻止能力状态和 D 盘备份。"
     },
     {
       "id": "INFRA-NOTIFY-01",
@@ -239,14 +240,16 @@
     },
     {
       "id": "INFRA-FACTOR-01",
-      "title": "因子外围统一 DataHub 路径与 Shadow 缺失数据阻断",
+      "title": "因子核心统一 DataHub 路径、schema 与 Shadow 数据阻断",
       "code_locations": [
-        {"file": "commands/factor_lab/datahub_access.py", "function": "daily_kline_path", "line": 34},
+        {"file": "commands/factor_lab/datahub_access.py", "function": "factor_input_locations", "line": 49},
+        {"file": "commands/factor_lab/datahub_access.py", "function": "read_stock_industry_map", "line": 69},
+        {"file": "commands/factor_lab/factor_engine.py", "function": "load_stock_kline", "line": 220},
         {"file": "commands/factor_lab/adaptive/shadow_forward.py", "function": "_compute_stock_returns", "line": 474},
         {"file": "commands/factor_lab/adaptive/shadow_forward.py", "function": "run_daily", "line": 550}
       ],
-      "expected_keywords": ["daily_kline_path", "incomplete_real_market_returns", "missing_symbols", "BLOCKED"],
-      "behavior": "因子验证和 Standing Shadow 通过 DataHub facade 读取日线；缺少标的或基准真实收益时不再填零，而是阻断并输出 null 指标。"
+      "expected_keywords": ["factor_input_locations", "read_stock_industry_map", "trade_date", "schema 不兼容", "incomplete_real_market_returns"],
+      "behavior": "因子核心、验证和 Shadow 统一读取 DataHub；空目录不抢占 canonical 数据，YYYYMMDD 正确解析，市场级 schema 不广播到个股，行业映射不触发外部 provider。"
     },
     {
       "id": "INFRA-EVENT-TRUTH-01",
@@ -302,8 +305,17 @@
       ],
       "expected_keywords": ["stock_basic.csv", "core_partial_datasets", "auxiliary_gate_mode", "historical_research_eligible"],
       "behavior": "DataHub 持久化上市/暂停/退市证券主表；VNext 精确按 active 5530 计算覆盖，核心行情缺口阻断 ML，辅助缺口降为 watch-only，执行仍要求 freshness。"
+    },
+    {
+      "id": "P2-FRONTEND-CHUNKS-01",
+      "title": "前端 vendor 分组拆包",
+      "code_locations": [
+        {"file": "commands/frontend/vite.config.js", "line": 20}
+      ],
+      "expected_keywords": ["codeSplitting", "charts", "antd", "react-platform", "maxSize"],
+      "behavior": "Vite/Rolldown 按主要依赖族拆分生产包，最大块从 1.14 MB 降至约 175 KB，保留路由懒加载且不提高告警阈值掩盖问题。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-11T23:58:00+08:00"
+  "generated_at": "2026-07-11T23:38:42+08:00"
 }

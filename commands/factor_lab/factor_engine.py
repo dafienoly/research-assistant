@@ -1,16 +1,20 @@
 """因子计算引擎 — 加载数据 → 批量算因子"""
-import sys, os
+import os
+import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta, timezone
+
+from factor_lab.datahub_access import daily_kline_path, factor_input_locations, read_stock_industry_map
 
 CST = timezone(timedelta(hours=8))
-KLINE = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline")
+_INPUTS = factor_input_locations()
+KLINE = _INPUTS.daily_kline
 
 # 基本面
-FUND_CSV = Path("/home/ly/.hermes/research-assistant/data/fundamentals/fundamentals_timeseries.csv")
+FUND_CSV = _INPUTS.fundamentals
 FUND_FIELDS = [
     # 原有
     "roe", "net_margin", "gross_margin", "debt_ratio", "eps", "net_profit", "revenue",
@@ -23,23 +27,23 @@ FUND_FIELDS = [
 ]
 
 # 资金流向
-FLOW_CSV = Path("/home/ly/.hermes/research-assistant/data/fundamentals/fund_flow_timeseries.csv")
+FLOW_CSV = _INPUTS.fund_flow
 FLOW_FIELDS = ["net_main_force", "net_super_large", "net_large", "net_medium", "net_small", "days_inflow", "days_outflow"]
 
 # 北向资金
-NORTH_CSV = Path("/home/ly/.hermes/research-assistant/data/north_flow_timeseries.csv")
+NORTH_CSV = _INPUTS.north_flow
 NORTH_FIELDS = ["nb_net_flow", "nb_total_buy", "nb_total_sell", "nb_holding_value", "nb_holding_ratio"]
 
 # 两融
-MARGIN_CSV = Path("/home/ly/.hermes/research-assistant/data/margin_timeseries.csv")
+MARGIN_CSV = _INPUTS.margin
 MARGIN_FIELDS = ["margin_buy", "margin_repay", "margin_balance", "margin_ratio", "sec_lending_volume", "sec_lending_balance"]
 
 # 综合事件
-EVENT_CSV = Path("/home/ly/.hermes/research-assistant/data/event_timeseries.csv")
+EVENT_CSV = _INPUTS.events
 EVENT_FIELDS = ["event_type", "event_desc", "impact_score"]
 
 # 新闻情绪
-SENTIMENT_CSV = Path("/home/ly/.hermes/research-assistant/data/news_sentiment_timeseries.csv")
+SENTIMENT_CSV = _INPUTS.sentiment
 SENTIMENT_FIELDS = ["sentiment_score", "positive_count", "negative_count", "neutral_count"]
 
 
@@ -51,6 +55,15 @@ def _load_csv(path: Path, fields: list[str]) -> pd.DataFrame:
     df = pd.read_csv(path, encoding="utf-8-sig", dtype={"symbol": str})
     if df.empty:
         return df
+    required = {"symbol", "date"}
+    missing_required = required - set(df.columns)
+    available_fields = [field for field in fields if field in df.columns]
+    if missing_required or not available_fields:
+        print(
+            f"  ⚠️ {path.name} schema 不兼容，跳过: "
+            f"missing={sorted(missing_required)}, fields={available_fields}"
+        )
+        return pd.DataFrame()
     df["symbol"] = df["symbol"].str.strip().str.zfill(6)
     # 日期列兼容多种格式:
     #   整数类型(20260705) → 先转 str, 再用 %Y%m%d 解析
@@ -60,9 +73,8 @@ def _load_csv(path: Path, fields: list[str]) -> pd.DataFrame:
     else:
         df["date"] = pd.to_datetime(df["date"], format="mixed", errors="coerce")
     df["date"] = df["date"].dt.normalize()  # 去掉时间分量
-    for col in fields:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+    for col in available_fields:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
 
 
@@ -113,7 +125,7 @@ def load_fundamentals() -> pd.DataFrame:
     missing = [col for col in extra_fields if col not in fund.columns]
     if missing:
         print(f"  ⚠️ 基本面CSV缺少 {len(missing)}/{len(extra_fields)} 个新增字段: {missing}")
-        print(f"    → 这些字段对应的因子将不可用, 请更新数据源后重新拉取")
+        print("    → 这些字段对应的因子将不可用, 请更新数据源后重新拉取")
     else:
         print(f"  ✅ 基本面CSV包含全部 {len(extra_fields)} 个V3.2.2新增字段")
     return fund
@@ -209,19 +221,27 @@ def load_stock_kline(symbols: list, start_date: str = "2025-01-01",
                      end_date: str = "2026-06-30", min_days: int = 60) -> pd.DataFrame:
     rows = []
     for sym in symbols:
-        f = KLINE / f"{sym}.csv"
-        if not f.exists():
+        try:
+            source = daily_kline_path(str(sym), root=KLINE)
+        except FileNotFoundError:
             continue
         try:
-            df = pd.read_csv(f, encoding="utf-8-sig")
+            df = pd.read_csv(source, encoding="utf-8-sig")
+            df = df.rename(columns={"trade_date": "date", "vol": "volume"})
+            if "date" not in df.columns:
+                continue
             df["symbol"] = sym
             rows.append(df)
-        except:
+        except Exception:
             continue
     if not rows:
         return pd.DataFrame()
     all_df = pd.concat(rows, ignore_index=True)
-    all_df["date"] = pd.to_datetime(all_df["date"])
+    raw_dates = all_df["date"].astype("string").str.replace(r"\.0$", "", regex=True)
+    compact = raw_dates.str.fullmatch(r"\d{8}", na=False)
+    parsed_dates = pd.to_datetime(raw_dates, errors="coerce")
+    parsed_dates.loc[compact] = pd.to_datetime(raw_dates.loc[compact], format="%Y%m%d", errors="coerce")
+    all_df["date"] = parsed_dates
     all_df = all_df[(all_df["date"] >= start_date) & (all_df["date"] <= end_date)].copy()
     for col in ["open", "high", "low", "close", "volume", "amount"]:
         if col in all_df.columns:
@@ -257,49 +277,15 @@ def load_stock_kline(symbols: list, start_date: str = "2025-01-01",
 
 
 def _load_industry_map() -> dict:
-    """加载 symbol→行业 映射
-    
-    优先级: 
-    1. /mnt/d/HermesData/industry_map.csv
-    2. tags/ 目录下的标签文件
-    3. baostock 股票基本信息
-    """
-    # 优先级1: 缓存
-    cache = Path("/mnt/d/HermesData/industry_map.csv")
-    if cache.exists():
-        try:
-            mapping_df = pd.read_csv(cache)
-            if "symbol" in mapping_df.columns and "industry" in mapping_df.columns:
-                print(f"  🏭 行业映射加载: {len(mapping_df)} 条 (from {cache})")
-                return dict(zip(mapping_df["symbol"], mapping_df["industry"]))
-        except Exception:
-            pass
-
-    # 优先级2: stock_industry.csv (由 IndustryMapper 维护)
-    ind_csv = Path("/home/ly/.hermes/research-assistant/data/tags/stock_industry.csv")
-    if ind_csv.exists():
-        try:
-            mapping_df = pd.read_csv(ind_csv, encoding="utf-8-sig")
-            if "code" in mapping_df.columns and "industry" in mapping_df.columns:
-                result = dict(zip(mapping_df["code"], mapping_df["industry"]))
-                print(f"  🏭 行业映射加载: {len(result)} 条 (from {ind_csv})")
-                return result
-        except Exception:
-            pass
-
-    # 优先级3: 通过 IndustryMapper
+    """加载 canonical DataHub symbol→行业映射，不在因子层触发外部拉取。"""
     try:
-        from factor_lab.alpha.industry_mapper import IndustryMapper
-        mapper = IndustryMapper()
-        result = mapper.get_industry_map()
-        if result:
-            print(f"  🏭 行业映射加载: {len(result)} 条 (from IndustryMapper)")
-            return result
-    except Exception:
-        pass
+        result = read_stock_industry_map()
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        print(f"  ⚠️ canonical DataHub 行业映射不可用: {exc}")
+        return {}
 
-    print("  ⚠️ 行业映射不可用, 所有股票归入 'unknown'")
-    return {}
+    print(f"  🏭 行业映射加载: {len(result)} 条 (from DataHub stock_basic)")
+    return result
 
 
 def compute_all(kline_df: pd.DataFrame) -> pd.DataFrame:

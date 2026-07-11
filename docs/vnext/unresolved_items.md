@@ -12,15 +12,15 @@
 
 ## 外部运行条件
 
-- Telegram Bot/Chat 凭据未配置；本轮只完成 DRY_RUN 格式、签名审批封套和审计链，没有伪造消息发送。
-- `QMT_BRIDGE_BASE_URL` 未配置；QMT 只读探针为 MISSING，订单通道仍为 DISABLED。
+- Telegram 与企业微信已完成一次真实双通道 HTTP 200 发送；共享确认和单通道失败隔离已通过测试。后续仍需持续运行回执监控，实盘执行不由通知成功自动解锁。
+- QMT Bridge 已配置且行情侧可用，但 `XtQuantTrader connect failed: -1`，账户/持仓不能连续读取；订单通道继续 DISABLED。
 - 应用内浏览器运行时可加载，但本轮 `agent.browsers.list()` 返回空列表；HTTP、DOM、lint、Vitest 和生产构建已通过，真实浏览器 console/点击证据仍 BLOCKED。
 - `scripts/mx_fetch_step.py` 曾包含硬编码高熵凭据，现已改为 `MX_APIKEY` 环境变量；旧凭据必须在提供方撤销/轮换，代码删除不能清除 Git 历史。
 
 ## 供应链与产品化剩余风险
 
-- Python 锁是精确版本 pin，但未包含 wheel/sdist 哈希；`pip-audit` 对 137 个组件未发现已知漏洞，这不等于供应链完整性证明。
-- 前端生产 bundle 主块约 2.99 MB，构建有 chunk-size warning，后续可做路由级 code splitting。
+- Core Python 使用 `requirements/core.hashed.lock` 和 `--require-hashes`；隔离研究/sidecar 锁仍需逐步补齐制品哈希，SBOM/许可证报告不能替代来源完整性证明。
+- 前端已完成路由懒加载和 Rolldown vendor 分组，最大生产块约 175 KB且无 chunk-size warning；应用内浏览器不可用导致真实 console/点击/截图仍待验收。
 - vectorbt 受 Apache-2.0 + Commons Clause 约束，仅批准隔离内部研究；商业托管或分发前需重新审查。
 - vn.py、OpenBB、FinRL/FinRL-X、Qbot 均未装入 Core；comment-only lock 表示“未安装”，不能宣称对应运行时已适配完成。
 - 无真实订单发送实现；任何未来 Live 通道必须另行授权、安全评审、Paper/Shadow 稳定性证明和小额白名单验收。

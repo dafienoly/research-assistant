@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "dags": {
+    "postmarket": [
+      "datahub_daily",
+      "postmarket_review",
+      "realized_observations",
+      "event_truth",
+      "execution_certification",
+      "factor_pipeline",
+      "capability_status",
+      "data_backup"
+    ],
+    "weekly_datahub": [
+      "datahub_weekly"
+    ]
+  },
+  "jobs": [
+    {
+      "job_id": "datahub_daily",
+      "command": ["bash", "{root}/commands/scripts/datahub_cron.sh", "daily-incremental"],
+      "depends_on": [],
+      "owned_datasets": ["normalized/daily", "normalized/valuation", "normalized/moneyflow", "normalized/fina_indicator", "normalized/reference", "normalized/market_series"],
+      "writer_id": "datahub_ingestion",
+      "timeout_seconds": 7200,
+      "retry_attempts": 3,
+      "backoff_seconds": [120, 300]
+    },
+    {
+      "job_id": "postmarket_review",
+      "command": ["{python}", "{root}/commands/scripts/decision_postmarket.py"],
+      "depends_on": ["datahub_daily"],
+      "owned_datasets": ["decision_loop/reviews"],
+      "writer_id": "decision_loop_review",
+      "timeout_seconds": 900,
+      "retry_attempts": 2,
+      "backoff_seconds": [60],
+      "environment": {"PYTHONPATH": "{root}/commands"}
+    },
+    {
+      "job_id": "realized_observations",
+      "command": ["{python}", "{root}/commands/scripts/vnext_realized_collect.py"],
+      "depends_on": ["postmarket_review"],
+      "owned_datasets": ["vnext/realized_observations"],
+      "writer_id": "vnext_realized_collector",
+      "timeout_seconds": 900,
+      "retry_attempts": 2,
+      "backoff_seconds": [60],
+      "environment": {"PYTHONPATH": "{root}/commands"}
+    },
+    {
+      "job_id": "event_truth",
+      "command": ["{python}", "{root}/commands/scripts/vnext_event_truth_fetch.py"],
+      "depends_on": ["datahub_daily"],
+      "owned_datasets": ["normalized/events/event_truth"],
+      "writer_id": "datahub_event_truth_ingestion",
+      "timeout_seconds": 1800,
+      "retry_attempts": 2,
+      "backoff_seconds": [120],
+      "environment": {"PYTHONPATH": "{root}/commands"}
+    },
+    {
+      "job_id": "execution_certification",
+      "command": ["{python}", "{root}/commands/scripts/decision_certify.py"],
+      "depends_on": ["postmarket_review", "event_truth"],
+      "owned_datasets": ["decision_loop/certification"],
+      "writer_id": "decision_loop_certification",
+      "timeout_seconds": 900,
+      "retry_attempts": 1,
+      "environment": {"PYTHONPATH": "{root}/commands"}
+    },
+    {
+      "job_id": "factor_pipeline",
+      "command": ["{python}", "{root}/commands/scripts/daily_factor_pipeline.py"],
+      "depends_on": ["execution_certification"],
+      "owned_datasets": ["factor_lab/pipeline", "factor_lab/shadow"],
+      "writer_id": "factor_pipeline",
+      "timeout_seconds": 7200,
+      "retry_attempts": 1,
+      "environment": {"PYTHONPATH": "{root}/commands"}
+    },
+    {
+      "job_id": "capability_status",
+      "command": ["{python}", "{root}/commands/scripts/generate_capability_status.py"],
+      "depends_on": [],
+      "owned_datasets": ["docs/generated/capabilities", "decision_loop/archive"],
+      "writer_id": "capability_status_generator",
+      "timeout_seconds": 900,
+      "retry_attempts": 2,
+      "backoff_seconds": [60],
+      "environment": {"PYTHONPATH": "{root}/commands"}
+    },
+    {
+      "job_id": "data_backup",
+      "command": ["bash", "{root}/scripts/backup_data_to_d.sh"],
+      "depends_on": [],
+      "owned_datasets": ["backup/d_drive"],
+      "writer_id": "data_backup",
+      "timeout_seconds": 10800,
+      "retry_attempts": 2,
+      "backoff_seconds": [300]
+    },
+    {
+      "job_id": "datahub_weekly",
+      "command": ["bash", "{root}/commands/scripts/datahub_cron.sh", "weekly-maintenance"],
+      "depends_on": [],
+      "owned_datasets": ["normalized/concept", "normalized/industry", "normalized/etf_holdings"],
+      "writer_id": "datahub_ingestion",
+      "timeout_seconds": 10800,
+      "retry_attempts": 3,
+      "backoff_seconds": [300, 900]
+    }
+  ]
+}
