@@ -100,8 +100,8 @@ def _load_universes() -> dict:
     """加载 universes.json"""
     if not UNIVERSES_FILE.exists():
         raise FileNotFoundError(
-            f"universes.json 不存在, 请先运行 universe:build\n"
-            f"  python3 hermes_cli.py universe:build"
+            "universes.json 不存在, 请先运行 universe:build\n"
+            "  python3 hermes_cli.py universe:build"
         )
     with open(UNIVERSES_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -121,8 +121,7 @@ def _get_universe_codes(universe_name: str) -> list[str]:
         codes: list[str] = []
         for s in u1.get("stocks", []):
             if s.get("tradable_by_user", False):
-                ts_code = s.get("ts_code", "")
-                symbol = ts_code.split(".")[0] if "." in ts_code else ts_code
+                symbol = _a_share_symbol(s.get("ts_code", ""))
                 if symbol:
                     codes.append(symbol)
         return sorted(set(codes))
@@ -136,8 +135,7 @@ def _get_universe_codes(universe_name: str) -> list[str]:
 
     if universe_name in ("U0", "U1", "U2", "U3"):
         for s in stocks:
-            ts_code = s.get("ts_code", "")
-            symbol = ts_code.split(".")[0] if "." in ts_code else ts_code
+            symbol = _a_share_symbol(s.get("ts_code", ""))
             if symbol:
                 codes.append(symbol)
 
@@ -145,8 +143,7 @@ def _get_universe_codes(universe_name: str) -> list[str]:
         # U4 结构: stock 有 matched_stocks (list)
         for s in stocks:
             for m in s.get("matched_stocks", []):
-                ts_code = m.get("ts_code", "")
-                symbol = ts_code.split(".")[0] if "." in ts_code else ts_code
+                symbol = _a_share_symbol(m.get("ts_code", ""))
                 if symbol:
                     codes.append(symbol)
 
@@ -156,18 +153,32 @@ def _get_universe_codes(universe_name: str) -> list[str]:
         stocks = u1.get("stocks", u1.get("members", u1.get("items", [])))
         for s in stocks:
             if isinstance(s, dict) and s.get("tradable_by_user", False):
-                symbol = s.get("symbol") or s.get("ts_code", "")
+                symbol = _a_share_symbol(s.get("symbol") or s.get("ts_code", ""))
                 if symbol:
                     codes.append(symbol)
 
     elif universe_name == "ETF":
         for s in stocks:
-            ts_code = s.get("ts_code", "")
-            symbol = ts_code.split(".")[0] if "." in ts_code else ts_code
+            symbol = _a_share_symbol(s.get("ts_code", ""))
             if symbol:
                 codes.append(symbol)
 
     return sorted(set(codes))
+
+
+def _a_share_symbol(value: object) -> str | None:
+    """Resolve a six-digit mainland listing from plain or composite security codes."""
+    for token in str(value or "").replace("/", " ").split():
+        normalized = token.strip().upper()
+        if "." in normalized:
+            code, exchange = normalized.split(".", 1)
+            if exchange not in {"SH", "SZ", "BJ"}:
+                continue
+        else:
+            code = normalized
+        if len(code) == 6 and code.isdigit():
+            return code
+    return None
 
 
 @lru_cache(maxsize=2048)
@@ -435,7 +446,7 @@ def compute_benchmark_projection(
         if universe_key == "ETF":
             logger.info("  → ETF池数据为空 (可能无对应K线文件)")
         else:
-            logger.warning(f"  → 返回空序列")
+            logger.warning("  → 返回空序列")
 
     return returns
 

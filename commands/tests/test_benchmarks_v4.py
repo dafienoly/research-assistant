@@ -240,12 +240,9 @@ class TestGetUniverseCodes:
         """U3 池返回的代码不为空"""
         codes = _get_universe_codes("U3")
         assert len(codes) > 0, "U3 半导体核心池不应为空"
-        # 检查代码为数字 (长度可能不同, 部分ETF/指数代码为4位)
-        for c in codes:
-            assert c.isdigit() or c == "", f"代码 {c} 应为数字"
-        # 至少有些代码是6位 (正常股票)
-        six_digit = [c for c in codes if len(c) == 6]
-        assert len(six_digit) > 0, "U3 中应有6位股票代码"
+        assert all(code.isdigit() and len(code) == 6 for code in codes)
+        assert "688981" in codes
+        assert "0981" not in codes
 
     def test_etf_codes(self):
         """ETF 池返回代码"""
