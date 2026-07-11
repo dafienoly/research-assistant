@@ -100,6 +100,37 @@ class DecisionLoopStore:
             self._bump_version(name)
         return target, True
 
+    def append_unique_jsonl_batch(
+        self,
+        name: str,
+        records: list[tuple[dict, str]],
+    ) -> tuple[Path, int]:
+        """Append multiple idempotent records under one cross-process lock and fsync."""
+        target = self.path(name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with self._lock(target):
+            existing: set[str] = set()
+            if target.exists():
+                existing = {
+                    str(json.loads(line).get("idempotency_key"))
+                    for line in target.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                }
+            pending = [
+                {"idempotency_key": key, **payload}
+                for payload, key in records
+                if key not in existing
+            ]
+            if not pending:
+                return target, 0
+            with target.open("a", encoding="utf-8") as stream:
+                for record in pending:
+                    stream.write(json.dumps(record, ensure_ascii=False, sort_keys=True, default=str) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            self._bump_version(name)
+        return target, len(pending)
+
     def read_jsonl(self, name: str, limit: int | None = None) -> list[dict[str, Any]]:
         target = self.path(name)
         if not target.exists():

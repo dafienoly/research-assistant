@@ -876,6 +876,17 @@
       "behavior": "个股资金流兼容接口只读 canonical 分区并按交易日历报告来源、观测日期和 OK/STALE 状态；没有 owned dataset 的市场汇总明确 MISSING，不允许业务层浏览器或外部 provider fallback。"
     },
     {
+      "id": "P1-LEGACY-NOTIFICATION-OUTBOX-01",
+      "title": "遗留业务通知统一写入双通道 durable outbox",
+      "code_locations": [
+        {"file": "commands/factor_lab/notify.py", "function": "_send_wecom_markdown", "line": 31},
+        {"file": "commands/factor_lab/decision_loop/storage.py", "function": "append_unique_jsonl_batch", "line": 100},
+        {"file": "commands/tests/test_legacy_notify_transport.py", "line": 1}
+      ],
+      "expected_keywords": ["DecisionLoopStore", "append_unique_jsonl_batch", "telegram", "enterprise_wechat", "max_attempts", "legacy_notify"],
+      "behavior": "kill switch、risk sentinel 和盘中监控等遗留业务调用不执行网络请求；内容哈希事件以单次加锁批量方式写入 Telegram 与企业微信 outbox，重复调用幂等，worker 独立重试并 dead-letter。"
+    },
+    {
       "id": "P1-REGULATORY-COVERAGE-01",
       "title": "监管公告 ingestion 与逐标的覆盖感知门禁",
       "code_locations": [

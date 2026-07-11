@@ -110,7 +110,7 @@ raw → staging → normalized → manifest/conflict/freshness
 
 第三轮整改将调度 DAG 的最终 FAILED/BLOCKED 状态写入 `scheduler/alerts.jsonl` 和现有双通道 durable outbox；调度进程不等待网络，通知 worker 负责幂等重试和 dead-letter。相同 `dag_id+trading_date` 不会重复创建消息，运维告警账本纳入 90 日归档。
 
-遗留 `factor_lab.notify` 的 blast radius 为 CRITICAL（27 个符号、kill switch/risk sentinel/盘中监控三条流程）。第一阶段已保持函数签名、布尔返回、冷却和 Markdown 格式不变，将重复的 urllib/webhook/.bashrc 网络实现迁移到 allow-list 中央 transport；234 项相关回归通过。第二阶段“所有遗留通知只创建 durable intent”仍需单独迁移，不能把第一阶段描述成完整异步化。
+遗留 `factor_lab.notify` 第一轮 blast radius 为 CRITICAL（27 个符号）；本轮对实际网络汇聚点 `_send_wecom_markdown` 复核为 HIGH（4 个直接调用方，kill switch/risk sentinel/盘中监控三条流程）。现保持函数签名、布尔返回、冷却和 Markdown 截断不变，但业务调用只向 Telegram＋企业微信 durable outbox 写入带内容哈希的幂等 intent；每分钟 worker 负责网络、重试和 dead-letter，盘中风险调用不再同步等待 webhook。布尔 `True` 的语义明确为“持久化成功”，不是“已送达”。
 
 ## 因子与研究审计
 

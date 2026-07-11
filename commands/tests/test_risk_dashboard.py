@@ -9,10 +9,9 @@
   - 边界条件: 空 sentinel、未检查
 """
 
-import json
 import os
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import timezone, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -20,10 +19,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from factor_lab.api_server.main import app
-from factor_lab.api_server.routes_risk import _get_sentinel, _reset_sentinel
+from factor_lab.api_server.routes_risk import _reset_sentinel
 from factor_lab.risk import (
-    RiskSentinel, KillSwitch, IncidentLog,
-    RiskRule, RuleCategory, RuleSeverity,
+    IncidentLog,
+    RiskRule,
+    RiskSentinel,
 )
 
 CST = timezone(timedelta(hours=8))
@@ -90,7 +90,11 @@ def reset_sentinel():
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    test_client = TestClient(app)
+    token = os.environ.get("HERMES_UI_TOKEN", "").strip()
+    if token:
+        test_client.headers.update({"Authorization": f"Bearer {token}"})
+    return test_client
 
 
 # ═══════════════════════════════════════════════════════════════════

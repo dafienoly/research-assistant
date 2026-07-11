@@ -14,9 +14,10 @@
 环境变量:
     WECHAT_WEBHOOK_URL — 企业微信机器人 webhook (已在 .bashrc 中)
 """
+import hashlib
 from datetime import datetime, timezone, timedelta
 
-from factor_lab.notification_transport import enterprise_wechat_sender
+from factor_lab.decision_loop.storage import DecisionLoopStore
 
 CST = timezone(timedelta(hours=8))
 
@@ -33,14 +34,14 @@ _last_sent: dict = {}  # 冷却缓存 {event_key: timestamp}
 
 
 def _send_wecom_markdown(title: str, content: str) -> bool:
-    """发送企业微信 Markdown 消息（通用函数）。
+    """将遗留通知持久化到 Telegram + 企业微信 outbox。
 
     Args:
         title: 消息标题（仅用于日志，企业微信 markdown 中不单独显示标题）
         content: Markdown 正文内容（最大 4096 字节）
 
     Returns:
-        True 发送成功，False 发送失败或无 webhook 配置。
+        True 已持久化（含幂等重复），False 持久化失败。
     """
     # 企业微信 Markdown 消息最大 4096 字节，超长截断
     content_bytes = content.encode("utf-8")
@@ -48,12 +49,43 @@ def _send_wecom_markdown(title: str, content: str) -> bool:
         # 截断到 4000 字节再补截断标记
         content = content_bytes[:4000].decode("utf-8", errors="ignore") + "\n\n> ⚠️ 内容已截断（原消息超 4096 字节）"
 
-    result = enterprise_wechat_sender({"text": content, "format": "markdown"})
-    if result.get("ok"):
-        print(f"✅ 企业微信通知已发送: {title}")
+    digest = hashlib.sha256(f"{title}\0{content}".encode("utf-8")).hexdigest()
+    event_id = f"legacy_{digest[:24]}"
+    queued_at = datetime.now(CST).isoformat()
+    store = DecisionLoopStore()
+    try:
+        store.append_unique_jsonl(
+            "notifications/events.jsonl",
+            {
+                "event_id": event_id,
+                "source": "legacy_notify",
+                "title": title,
+                "text": content,
+                "generated_at": queued_at,
+            },
+            f"event:{event_id}",
+        )
+        store.append_unique_jsonl_batch(
+            "notifications/outbox.jsonl",
+            [
+                (
+                    {
+                    "event_id": event_id,
+                    "channel": channel,
+                    "payload": {"event_id": event_id, "text": content, "format": "markdown"},
+                    "queued_at": queued_at,
+                    "max_attempts": 5,
+                    },
+                    f"{event_id}:{channel}",
+                )
+                for channel in ("telegram", "enterprise_wechat")
+            ],
+        )
+        print(f"✅ 双通道通知已入队: {title} ({event_id})")
         return True
-    print(f"⚠️ 企业微信通知失败 ({title}): {result.get('error', 'unknown_error')}")
-    return False
+    except (OSError, TimeoutError, ValueError) as exc:
+        print(f"⚠️ 通知持久化失败 ({title}): {type(exc).__name__}")
+        return False
 
 
 def _check_cooldown(event_key: str, cooldown_seconds: int = 300) -> bool:
