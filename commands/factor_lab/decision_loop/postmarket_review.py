@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime
 
+from .benchmark import BenchmarkMatcher
 from .models import Book, ReviewRecord
 from .review import calculate_review
 from .storage import DecisionLoopStore
@@ -27,6 +28,7 @@ class PostMarketReviewService:
                 if evidence and evidence[0].get("last_price"):
                     price_paths.setdefault(card.get("symbol"), []).append(float(evidence[0]["last_price"]))
         records = []
+        benchmark_matcher = BenchmarkMatcher.from_durable_registry()
         for row in self.store.read_jsonl("execution/audit.jsonl"):
             timestamp = str(row.get("timestamp", ""))
             if not timestamp.startswith(trading_date):
@@ -40,6 +42,8 @@ class PostMarketReviewService:
             exit_price = float(payload.get("limit_price") or entry)
             quantity = int(payload.get("quantity") or 0)
             path = price_paths.get(symbol) or ([entry, exit_price] if entry > 0 else [])
+            instrument_type = str(position.get("instrument_type") or "stock")
+            benchmark = benchmark_matcher.match_instrument(symbol, instrument_type)
             metrics = None
             if entry > 0 and exit_price > 0 and quantity > 0:
                 metrics = calculate_review(
@@ -74,8 +78,8 @@ class PostMarketReviewService:
                 book=Book(payload.get("book", "swing")),
                 execution_status=row.get("status", "unknown"),
                 metrics=metrics,
-                benchmark_symbol=None,
-                benchmark_missing_reason="no reliable dynamic mapping in durable tag registry",
+                benchmark_symbol=benchmark.primary,
+                benchmark_missing_reason=None if benchmark.primary else benchmark.reason,
                 created_at=datetime.now().astimezone(),
             )
             self.store.append_unique_jsonl("reviews/records.jsonl", record.model_dump(mode="json"), record.review_id)
@@ -90,6 +94,7 @@ class PostMarketReviewService:
         candidates = []
         false_alerts = [row for row in reviews if (row.get("metrics") or {}).get("attribution", {}).get("risk_alert") == "false_positive"]
         if len(false_alerts) >= 5:
+            lineage = false_alerts[-1]
             evidence = {"week_id": week_id, "false_alert_count": len(false_alerts), "reviews": [row.get("review_id") for row in false_alerts]}
             candidate = {
                 "parameter": "profit_giveback_warning_points",
@@ -99,6 +104,9 @@ class PostMarketReviewService:
                 "status": "candidate",
                 "oos_status": "pending",
                 "human_status": "pending",
+                "decision_id": lineage.get("decision_id"),
+                "event_id": lineage.get("event_id"),
+                "order_id": lineage.get("order_id"),
             }
             self.store.append_unique_jsonl("parameters/weekly_candidates.jsonl", candidate, f"{week_id}:profit_giveback_warning_points")
             candidates.append(candidate)

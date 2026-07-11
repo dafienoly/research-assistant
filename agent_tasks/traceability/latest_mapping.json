@@ -173,8 +173,39 @@
       ],
       "expected_keywords": ["FINAL_COMPLETE", "sha256sum -c", "data:incremental-update", "data writer is active"],
       "behavior": "备份只在无写入进程时定稿并生成全量 SHA-256；缺口触发时先验证和恢复 D 盘快照，再执行增量拉取。"
+    },
+    {
+      "id": "DATA-SAFETY-03",
+      "title": "全量拉取原子落盘、staging 与断点续传",
+      "code_locations": [
+        {"file": "commands/data_pipeline.py", "function": "_append_to_csv", "line": 128},
+        {"file": "commands/data_pipeline.py", "function": "full_init_by_trade_date", "line": 839}
+      ],
+      "expected_keywords": ["NamedTemporaryFile", "os.replace", "completed_batches", "merged", "full_init_staging"],
+      "behavior": "正式 CSV 使用同目录临时文件原子替换；全量拉取先持久化可验证批次和 checkpoint，完成后每个 symbol 仅归并正式文件一次。"
+    },
+    {
+      "id": "DATA-AUDIT-01",
+      "title": "可信日期解析和空 Universe 诚实降级",
+      "code_locations": [
+        {"file": "commands/data_audit.py", "function": "_normalize_trade_date", "line": 104},
+        {"file": "commands/data_pipeline.py", "function": "run_data_audit", "line": 733}
+      ],
+      "expected_keywords": ["%Y%m%d", "future_date_stocks", "universe_status", "run_all_audits"],
+      "behavior": "整数 YYYYMMDD 不再误解析为 1970；未来日期显式报告；U0 空响应返回 UNKNOWN；data:audit 同步重建四份 health 报告。"
+    },
+    {
+      "id": "P0-P1-RUNTIME-FIXES",
+      "title": "QMT 状态 fail-closed 与复盘链路动态基准",
+      "code_locations": [
+        {"file": "commands/factor_lab/vnext/execution.py", "function": "MiniQMTReadOnlyBroker", "line": 325},
+        {"file": "commands/factor_lab/decision_loop/postmarket_review.py", "function": "generate", "line": 18},
+        {"file": "commands/factor_lab/decision_loop/postmarket_review.py", "function": "propose_weekly_candidates", "line": 92}
+      ],
+      "expected_keywords": ["xttrader_connected", "account_readable", "BenchmarkMatcher.from_durable_registry", "decision_id"],
+      "behavior": "QMT 健康端点可达但交易器断连时保持 PARTIAL；ReviewRecord 使用可信动态基准，周参数候选继承 decision/event/order 标识。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-11T18:33:00+08:00"
+  "generated_at": "2026-07-11T21:48:00+08:00"
 }

@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import tempfile
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -143,7 +145,9 @@ def _append_to_csv(
                 new_rows[col] = new_rows[col].astype(str)
                 existing[col] = existing[col].astype(str)
         combined = pd.concat([existing, new_rows], ignore_index=True)
-        combined = combined.drop_duplicates(subset=dedup_cols, keep="last")
+    available_dedup = [col for col in dedup_cols if col in combined.columns]
+    if available_dedup:
+        combined = combined.drop_duplicates(subset=available_dedup, keep="last")
     if sort_cols:
         ok_cols = [c for c in sort_cols if c in combined.columns]
         if ok_cols:
@@ -152,9 +156,27 @@ def _append_to_csv(
                 combined[c] = combined[c].astype(str)
             combined = combined.sort_values(ok_cols).reset_index(drop=True)
     filepath.parent.mkdir(parents=True, exist_ok=True)
-    combined.to_csv(filepath, index=False, encoding="utf-8-sig")
-    # fsync: 强制数据落盘，防止 WSL page cache 丢失
-    _fsync_file(filepath)
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8-sig",
+            newline="",
+            prefix=f".{filepath.name}.",
+            suffix=".tmp",
+            dir=filepath.parent,
+            delete=False,
+        ) as handle:
+            temp_path = Path(handle.name)
+            combined.to_csv(handle, index=False)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, filepath)
+        temp_path = None
+        _fsync_directory(filepath.parent)
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
     added = len(combined) - len(existing)
     return max(added, 0)
 
@@ -176,6 +198,43 @@ def _fsync_file(path: Path) -> None:
             _os.close(dfd)
     except Exception:
         pass  # fsync 失败不应阻断流程
+
+
+def _fsync_directory(path: Path) -> None:
+    """持久化目录项；不支持目录 fsync 的文件系统上安全降级。"""
+    try:
+        fd = os.open(str(path), os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        logger.warning("directory fsync unavailable: %s", path, exc_info=True)
+
+
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    """原子写 checkpoint，防止进程中断留下半截 JSON。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+            delete=False,
+        ) as handle:
+            temp_path = Path(handle.name)
+            json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, path)
+        temp_path = None
+        _fsync_directory(path.parent)
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -685,10 +744,18 @@ def run_data_audit() -> dict:
         dgr = DataGapReporter()
         gaps = dgr.report()
 
+        from data_audit import run_all_audits
+
+        health_reports = run_all_audits()
         print(f"\n  新鲜度: {fresh.get('status', 'unknown')}")
         print(f"  缺口:   {gaps['summary']['total_gaps']} 总, {gaps['summary']['blocking_gaps']} 阻塞")
 
-        return {"status": "ok", "freshness": fresh, "gaps": gaps}
+        return {
+            "status": "ok",
+            "freshness": fresh,
+            "gaps": gaps,
+            "health_reports": health_reports,
+        }
     except Exception as e:
         print(f"  ❌ 审计失败: {e}")
         return {"status": "error", "error": str(e)}
@@ -797,58 +864,102 @@ def full_init_by_trade_date() -> dict:
     errors: list[str] = []
     _ensure_dirs()
 
-    def _process_batch(
-        batch_days: list[str],
+    staging_root = RECOVERY_AUDIT_DIR / "full_init_staging"
+    checkpoint_path = staging_root / "checkpoint.json"
+    try:
+        checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        checkpoint = {"version": 1, "datasets": {}}
+
+    def _process_dataset(
+        name: str,
         api_name: str,
         fields: str,
         out_dir: Path,
         file_prefix: str = "",
-        sort_key: str = "trade_date",
-    ) -> int:
-        """处理一批交易日：集中查询+分批写入，返回新增行数"""
-        all_parts: list[pd.DataFrame] = []
-        for day in batch_days:
-            try:
+    ) -> tuple[int, int]:
+        """先持久化所有 API 批次，再对每个 symbol 仅归并一次。"""
+        dataset_dir = staging_root / name
+        dataset_dir.mkdir(parents=True, exist_ok=True)
+        state = checkpoint.setdefault("datasets", {}).setdefault(
+            name, {"completed_batches": [], "merged": False}
+        )
+        completed = set(state.get("completed_batches", []))
+        batch_paths: list[Path] = []
+
+        for offset in range(0, len(days), BATCH_TRADE_DAYS):
+            batch_days = days[offset:offset + BATCH_TRADE_DAYS]
+            batch_id = f"{batch_days[0]}-{batch_days[-1]}"
+            batch_path = dataset_dir / f"{batch_id}.csv"
+            batch_paths.append(batch_path)
+            valid_staged = False
+            if batch_id in completed and batch_path.exists():
+                try:
+                    staged = pd.read_csv(batch_path, encoding="utf-8-sig")
+                    valid_staged = {"ts_code", "trade_date"}.issubset(staged.columns)
+                except Exception:
+                    valid_staged = False
+            if valid_staged:
+                continue
+
+            all_parts: list[pd.DataFrame] = []
+            for day in batch_days:
                 kwargs = {"trade_date": day}
                 if fields:
                     kwargs["fields"] = fields
-                df = tc._query(api_name, **kwargs)
-                if df is not None and not df.empty:
-                    all_parts.append(df)
-            except Exception as e:
-                errors.append(f"{api_name} {day}: {e}")
-        if not all_parts:
-            return 0
-        combined = pd.concat(all_parts, ignore_index=True)
+                try:
+                    frame = tc._query(api_name, **kwargs)
+                except Exception as exc:
+                    state["merged"] = False
+                    _atomic_write_json(checkpoint_path, checkpoint)
+                    raise RuntimeError(f"{api_name} {day}: {exc}") from exc
+                if frame is not None and not frame.empty:
+                    all_parts.append(frame)
+            staged = pd.concat(all_parts, ignore_index=True) if all_parts else pd.DataFrame(
+                columns=["ts_code", "trade_date"]
+            )
+            # staging 可随时重建；损坏批次必须整体替换，不能与坏内容拼接。
+            batch_path.unlink(missing_ok=True)
+            _append_to_csv(batch_path, staged, ["ts_code", "trade_date"], ["ts_code", "trade_date"])
+            completed.add(batch_id)
+            state["completed_batches"] = sorted(completed)
+            state["merged"] = False
+            _atomic_write_json(checkpoint_path, checkpoint)
+
+        # API 阶段完成不等于正式成功；只有所有 staging 完整且逐股归并结束才标记 merged。
+        state["merged"] = False
+        _atomic_write_json(checkpoint_path, checkpoint)
+        staged_frames = [pd.read_csv(path, encoding="utf-8-sig") for path in batch_paths]
+        combined = pd.concat(staged_frames, ignore_index=True) if staged_frames else pd.DataFrame()
         rows_added = 0
-        for ts_code, group in combined.groupby("ts_code"):
-            try:
-                group = group.reset_index(drop=True)
-                fname = f"{file_prefix}{ts_code}.csv" if file_prefix else f"{ts_code}.csv"
-                out = out_dir / fname
-                rows_added += _append_to_csv(out, group, dedup_cols=["trade_date"], sort_cols=[sort_key])
-            except Exception as e:
-                errors.append(f"{ts_code}: {e}")
-        return rows_added
+        if not combined.empty:
+            for ts_code, group in combined.groupby("ts_code"):
+                fname = f"{file_prefix}{ts_code}.csv"
+                rows_added += _append_to_csv(
+                    out_dir / fname,
+                    group.reset_index(drop=True),
+                    dedup_cols=["trade_date"],
+                    sort_cols=["trade_date"],
+                )
+        state["merged"] = True
+        state["merged_at"] = datetime.now(CST).isoformat()
+        _atomic_write_json(checkpoint_path, checkpoint)
+        files = len(list(out_dir.glob(f"{file_prefix}*.csv")))
+        return rows_added, files
 
     # ─── 日线 ──────────────────────────────────────────────
     print(f"{'='*40}")
     print("📊 日线 — 按交易日遍历（批处理）")
     print(f"{'='*40}")
     daily_start = time.time()
-    daily_rows = 0
-    num_batches = (len(days) + BATCH_TRADE_DAYS - 1) // BATCH_TRADE_DAYS
-    for b in range(0, len(days), BATCH_TRADE_DAYS):
-        batch = days[b:b + BATCH_TRADE_DAYS]
-        batch_num = b // BATCH_TRADE_DAYS + 1
-        r = _process_batch(batch, "daily",
-                           "ts_code,trade_date,open,high,low,close,pre_close,change,pct_chg,vol,amount",
-                           DAILY_DIR)
-        daily_rows += r
-        elapsed = time.time() - daily_start
-        print(f"    日线: 批 {batch_num}/{num_batches} ({len(batch)}天)  +{r}行  ({elapsed:.0f}s)")
-
-    daily_files = len([p for p in DAILY_DIR.glob("*.csv") if not p.name.startswith("valuation_")])
+    try:
+        daily_rows, daily_files = _process_dataset(
+            "daily", "daily",
+            "ts_code,trade_date,open,high,low,close,pre_close,change,pct_chg,vol,amount",
+            DAILY_DIR,
+        )
+    except RuntimeError as exc:
+        return {"status": "error", "errors": [str(exc)], "checkpoint": str(checkpoint_path)}
     results["daily"] = {"status": "ok", "files": daily_files, "rows": daily_rows}
     elapsed_daily = time.time() - daily_start
     print(f"   ✅ 日线完成: {daily_files} 只 / {daily_rows} 行 / {elapsed_daily:.0f}s")
@@ -859,17 +970,14 @@ def full_init_by_trade_date() -> dict:
     print("📈 估值 — 按交易日遍历（批处理）")
     print(f"{'='*40}")
     val_start = time.time()
-    val_rows = 0
-    for b in range(0, len(days), BATCH_TRADE_DAYS):
-        batch = days[b:b + BATCH_TRADE_DAYS]
-        batch_num = b // BATCH_TRADE_DAYS + 1
-        r = _process_batch(batch, "daily_basic",
-                           "ts_code,trade_date,pe,pe_ttm,pb,total_mv,circ_mv,turnover_rate,volume_ratio",
-                           VALUATION_DIR, file_prefix="valuation_")
-        val_rows += r
-        print(f"    估值: 批 {batch_num}/{num_batches} ({len(batch)}天)  +{r}行")
-
-    val_files = len(list(VALUATION_DIR.glob("valuation_*.csv")))
+    try:
+        val_rows, val_files = _process_dataset(
+            "valuation", "daily_basic",
+            "ts_code,trade_date,pe,pe_ttm,pb,total_mv,circ_mv,turnover_rate,volume_ratio",
+            VALUATION_DIR, file_prefix="valuation_",
+        )
+    except RuntimeError as exc:
+        return {"status": "error", "errors": [str(exc)], "checkpoint": str(checkpoint_path)}
     results["valuation"] = {"status": "ok", "files": val_files, "rows": val_rows}
     elapsed_val = time.time() - val_start
     print(f"   ✅ 估值完成: {val_files} 只 / {val_rows} 行 / {elapsed_val:.0f}s")
@@ -880,16 +988,12 @@ def full_init_by_trade_date() -> dict:
     print("💰 资金流向 — 按交易日遍历（批处理）")
     print(f"{'='*40}")
     ff_start = time.time()
-    ff_rows = 0
-    for b in range(0, len(days), BATCH_TRADE_DAYS):
-        batch = days[b:b + BATCH_TRADE_DAYS]
-        batch_num = b // BATCH_TRADE_DAYS + 1
-        r = _process_batch(batch, "moneyflow", "",
-                           FUND_FLOW_DIR)
-        ff_rows += r
-        print(f"    资金流: 批 {batch_num}/{num_batches} ({len(batch)}天)  +{r}行")
-
-    ff_files = len(list(FUND_FLOW_DIR.glob("*.csv")))
+    try:
+        ff_rows, ff_files = _process_dataset(
+            "fund_flow", "moneyflow", "", FUND_FLOW_DIR
+        )
+    except RuntimeError as exc:
+        return {"status": "error", "errors": [str(exc)], "checkpoint": str(checkpoint_path)}
     results["fund_flow"] = {"status": "ok", "files": ff_files, "rows": ff_rows}
     elapsed_ff = time.time() - ff_start
     print(f"   ✅ 资金流完成: {ff_files} 只 / {ff_rows} 行 / {elapsed_ff:.0f}s")

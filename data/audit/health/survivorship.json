@@ -1,0 +1,14 @@
+{
+  "report_type": "survivorship",
+  "generated_at": "2026-07-11T21:36:53+08:00",
+  "data_dir": "/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline",
+  "total_pulled": 5740,
+  "normal_stocks": 5740,
+  "delisted_stocks": 0,
+  "st_stocks": 0,
+  "suspended_stocks": 0,
+  "survivorship_bias_risk": 0.0,
+  "delisted_list": [],
+  "st_list": [],
+  "note": "生存偏差风险: 若仅分析当前上市股票而忽略已退市/ST股票，回测结果会被高估。建议保留所有历史数据。"
+}

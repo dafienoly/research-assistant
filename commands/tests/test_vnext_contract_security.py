@@ -25,6 +25,7 @@ from factor_lab.vnext.execution import (
     GovernedExecutionEngine,
     NonceRegistry,
     PaperBroker,
+    QMTProbeBroker,
     SafetyContext,
     TelegramApprovalGate,
 )
@@ -303,6 +304,29 @@ def test_execution_status_merges_read_only_qmt_probe_without_enabling_orders(tmp
     assert status["no_live_trade"] is True
     assert status["live_enabled"] is False
     assert status["trading_mode"] == "PAPER"
+
+
+def test_qmt_probe_fails_closed_when_trader_or_read_endpoints_are_unavailable():
+    class DisconnectedClient:
+        def health(self):
+            return {
+                "status": "ok",
+                "data": {"connected": True, "xttrader_connected": False},
+            }
+
+        def get_account(self):
+            return {"status": "error", "error": "trader unavailable"}
+
+        def get_positions(self):
+            return {"status": "error", "error": "trader unavailable"}
+
+    result = QMTProbeBroker(DisconnectedClient()).probe()
+
+    assert result["status"] == "PARTIAL"
+    assert result["connected"] is False
+    assert result["account_readable"] is False
+    assert result["positions_readable"] is False
+    assert result["order_channel_enabled"] is False
 
 
 def test_paper_cli_accepts_signed_envelope_only_and_replay_is_blocked(tmp_path, monkeypatch, capsys):

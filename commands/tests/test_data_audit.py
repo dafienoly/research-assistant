@@ -30,7 +30,7 @@ _commands_dir = os.path.dirname(_test_dir)
 if _commands_dir not in sys.path:
     sys.path.insert(0, _commands_dir)
 
-from data_audit import (
+from data_audit import (  # noqa: E402
     coverage,
     freshness,
     missing,
@@ -40,7 +40,7 @@ from data_audit import (
     cmd_survivorship,
     DAILY_DIR,
     HEALTH_DIR,
-    FINA_DIR,
+    _normalize_trade_date,
 )
 
 CST = timezone(timedelta(hours=8))
@@ -158,6 +158,13 @@ def mock_u0_universe(monkeypatch):
 
 
 class TestCoverage:
+    def test_integer_yyyymmdd_is_not_parsed_as_unix_nanoseconds(self):
+        frame = _normalize_trade_date(pd.DataFrame({"trade_date": [20260710, "20260709"]}))
+        assert frame["trade_date"].dt.strftime("%Y-%m-%d").tolist() == [
+            "2026-07-10",
+            "2026-07-09",
+        ]
+
     def test_basic_coverage(self, sample_daily_files):
         report = coverage()
 
@@ -219,6 +226,12 @@ class TestCoverage:
 
 
 class TestFreshness:
+    def test_future_dates_are_reported_explicitly(self):
+        _create_daily_csv("999999.SZ", n_rows=1, start_date="2099-01-01")
+        report = freshness()
+        assert report["future_date_count"] == 1
+        assert report["future_date_stocks"][0]["ts_code"] == "999999.SZ"
+
     def test_basic_freshness(self, sample_daily_files):
         report = freshness()
 

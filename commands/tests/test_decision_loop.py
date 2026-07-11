@@ -9,6 +9,7 @@ from factor_lab.decision_loop.authorization import AuthorizationService
 from factor_lab.decision_loop.benchmark import BenchmarkMatcher
 from factor_lab.decision_loop.calendar import TradingCalendarGate
 from factor_lab.decision_loop.data_gate import evaluate_data_gate
+from factor_lab.decision_loop import data_health
 from factor_lab.decision_loop.execution import GovernedExecutionGateway
 from factor_lab.decision_loop.models import (
     AdviceMode,
@@ -28,6 +29,7 @@ from factor_lab.decision_loop.portfolio import (
     evaluate_portfolio_risk,
     validate_allocations,
 )
+from factor_lab.decision_loop.postmarket_review import PostMarketReviewService
 from factor_lab.decision_loop.position_ingestion import (
     PositionIngestionService,
     parse_delimited,
@@ -648,3 +650,71 @@ def test_parameter_promotion_requires_oos_and_human_review(tmp_path):
     assert promoted.status == "promoted"
     production = service.store.read_json("parameters/production.json")
     assert production["values"]["giveback_reduce_points"] == 2.8
+
+
+def test_postmarket_review_uses_verified_dynamic_benchmark(tmp_path, monkeypatch):
+    review_store = store(tmp_path)
+    review_store.write_json("opportunities/current.json", {"decision_id": "decision-1"})
+    review_store.write_json(
+        "positions/current.json",
+        {"positions": [{"symbol": "600000.SH", "instrument_type": "stock", "cost_price": 10}]},
+    )
+    review_store.append_jsonl(
+        "execution/audit.jsonl",
+        {
+            "timestamp": "2026-07-11T15:01:00+08:00",
+            "status": "filled",
+            "payload": {"symbol": "600000.SH", "book": "swing", "quantity": 100, "limit_price": 11, "event_id": "event-1", "order_id": "order-1"},
+            "broker_response": {"filled_quantity": 100, "fees": 5},
+        },
+    )
+    matcher = BenchmarkMatcher(
+        {"600000.SH": {"benchmark": "512480.SH", "source": "verified-registry"}},
+        {},
+    )
+    monkeypatch.setattr(BenchmarkMatcher, "from_durable_registry", classmethod(lambda cls: matcher))
+    records = PostMarketReviewService(review_store).generate("2026-07-11")
+    assert records[0].benchmark_symbol == "512480.SH"
+    assert records[0].benchmark_missing_reason is None
+
+
+def test_weekly_candidate_inherits_review_lineage(tmp_path):
+    review_store = store(tmp_path)
+    for index in range(5):
+        review_store.append_jsonl(
+            "reviews/records.jsonl",
+            {
+                "review_id": f"review-{index}",
+                "decision_id": "decision-1",
+                "event_id": f"event-{index}",
+                "order_id": f"order-{index}",
+                "metrics": {"attribution": {"risk_alert": "false_positive"}},
+            },
+        )
+    candidate = PostMarketReviewService(review_store).propose_weekly_candidates("2026-W28")[0]
+    assert candidate["decision_id"] == "decision-1"
+    assert candidate["event_id"] == "event-4"
+    assert candidate["order_id"] == "order-4"
+
+
+def test_auxiliary_gate_reads_durable_source_time_and_conflicts(tmp_path, monkeypatch):
+    monkeypatch.setattr(data_health, "BASE", tmp_path)
+    fund_flow = tmp_path / "data/normalized/fund_flow/600000.csv"
+    fund_flow.parent.mkdir(parents=True)
+    fund_flow.write_text(
+        "trade_date,source_provider\n20260711,tushare\n", encoding="utf-8"
+    )
+    conflict_log = tmp_path / "data/audit/source_conflicts.jsonl"
+    conflict_log.parent.mkdir(parents=True)
+    conflict_log.write_text(
+        '{"dataset":"capital_flow","source_a":"tushare","source_b":"backup"}\n',
+        encoding="utf-8",
+    )
+    now = datetime.fromisoformat("2026-07-11T16:00:00+08:00")
+    items, conflicts, manifest = data_health.load_auxiliary_gate(now)
+    capital_flow = next(item for item in items if item.name == "capital_flow")
+    assert capital_flow.available is True
+    assert capital_flow.fresh is True
+    assert capital_flow.source == "tushare"
+    assert conflicts[0]["dataset"] == "capital_flow"
+    assert manifest["datasets"]["capital_flow"]["conflict_count"] == 1

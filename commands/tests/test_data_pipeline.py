@@ -15,10 +15,9 @@ from __future__ import annotations
 import json
 import sys
 import os
-import time
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import pandas as pd
@@ -29,8 +28,8 @@ _commands_dir = os.path.dirname(_test_dir)
 if _commands_dir not in sys.path:
     sys.path.insert(0, _commands_dir)
 
-import data_pipeline as data_pipeline_module
-from data_pipeline import (
+import data_pipeline as data_pipeline_module  # noqa: E402
+from data_pipeline import (  # noqa: E402
     batch_daily,
     batch_fina,
     batch_valuation,
@@ -40,9 +39,133 @@ from data_pipeline import (
     DAILY_DIR,
     FINA_DIR,
     VALUATION_DIR,
-    BATCH_SIZE,
-    BATCH_SLEEP,
 )
+
+
+class TestAtomicCsvPersistence:
+    def test_replace_failure_preserves_original_and_cleans_temp(self, tmp_path, monkeypatch):
+        output = tmp_path / "symbol.csv"
+        output.write_text("trade_date,close\n20260101,10\n", encoding="utf-8")
+        original = output.read_bytes()
+
+        def fail_replace(_source, _target):
+            raise OSError("injected replace failure")
+
+        monkeypatch.setattr(data_pipeline_module.os, "replace", fail_replace)
+        with pytest.raises(OSError, match="injected replace failure"):
+            data_pipeline_module._append_to_csv(
+                output,
+                pd.DataFrame([{"trade_date": "20260102", "close": 11}]),
+                ["trade_date"],
+            )
+
+        assert output.read_bytes() == original
+        assert list(tmp_path.glob(".symbol.csv.*.tmp")) == []
+
+    def test_csv_serialization_failure_preserves_original(self, tmp_path, monkeypatch):
+        output = tmp_path / "symbol.csv"
+        output.write_text("trade_date,close\n20260101,10\n", encoding="utf-8")
+        original = output.read_bytes()
+
+        def fail_write(*_args, **_kwargs):
+            raise RuntimeError("injected write failure")
+
+        monkeypatch.setattr(pd.DataFrame, "to_csv", fail_write)
+        with pytest.raises(RuntimeError, match="injected write failure"):
+            data_pipeline_module._append_to_csv(
+                output,
+                pd.DataFrame([{"trade_date": "20260102", "close": 11}]),
+                ["trade_date"],
+            )
+
+        assert output.read_bytes() == original
+        assert list(tmp_path.glob(".symbol.csv.*.tmp")) == []
+
+
+class TestTradeDateStaging:
+    @staticmethod
+    def _frame(day: str) -> pd.DataFrame:
+        return pd.DataFrame(
+            [
+                {"ts_code": "000001.SZ", "trade_date": day, "close": 10.0},
+                {"ts_code": "000001.SZ", "trade_date": day, "close": 11.0},
+                {"ts_code": "600000.SH", "trade_date": day, "close": 8.0},
+            ]
+        )
+
+    def test_batches_stage_then_merge_each_symbol_once(self, monkeypatch):
+        days = ["20260101", "20260102", "20260103", "20260104"]
+        client = MagicMock()
+        client._query.side_effect = lambda _api, **kwargs: self._frame(kwargs["trade_date"])
+        monkeypatch.setattr(data_pipeline_module, "BATCH_TRADE_DAYS", 2)
+        monkeypatch.setattr(data_pipeline_module, "_get_trade_days", lambda _start: days)
+        monkeypatch.setattr(data_pipeline_module, "_get_ts_client", lambda: client)
+        original_append = data_pipeline_module._append_to_csv
+        official_writes: list[Path] = []
+
+        def track_append(path, *args, **kwargs):
+            path = Path(path)
+            if "full_init_staging" not in path.parts:
+                official_writes.append(path)
+            return original_append(path, *args, **kwargs)
+
+        monkeypatch.setattr(data_pipeline_module, "_append_to_csv", track_append)
+        result = data_pipeline_module.full_init_by_trade_date()
+
+        assert result["status"] == "ok"
+        # 3 datasets x 2 symbols: no per-batch rewrite of official symbol files.
+        assert len(official_writes) == 6
+        durable = pd.read_csv(data_pipeline_module.DAILY_DIR / "000001.SZ.csv")
+        assert len(durable) == 4
+        assert durable["trade_date"].nunique() == 4
+
+    def test_interrupted_batch_resumes_without_refetching_completed_batch(self, monkeypatch):
+        days = ["20260101", "20260102", "20260103", "20260104"]
+        calls: list[str] = []
+        fail = {"enabled": True}
+        client = MagicMock()
+
+        def query(_api, **kwargs):
+            day = kwargs["trade_date"]
+            calls.append(day)
+            if day == "20260103" and fail["enabled"]:
+                raise RuntimeError("injected API interruption")
+            return self._frame(day)
+
+        client._query.side_effect = query
+        monkeypatch.setattr(data_pipeline_module, "BATCH_TRADE_DAYS", 2)
+        monkeypatch.setattr(data_pipeline_module, "_get_trade_days", lambda _start: days)
+        monkeypatch.setattr(data_pipeline_module, "_get_ts_client", lambda: client)
+
+        first = data_pipeline_module.full_init_by_trade_date()
+        assert first["status"] == "error"
+        assert not list(data_pipeline_module.DAILY_DIR.glob("*.csv"))
+
+        calls.clear()
+        fail["enabled"] = False
+        second = data_pipeline_module.full_init_by_trade_date()
+        assert second["status"] == "ok"
+        # First two days came from verified staging; the failed batch is retried.
+        assert calls[:2] == ["20260103", "20260104"]
+
+    def test_corrupt_completed_staging_is_refetched(self, monkeypatch):
+        days = ["20260101", "20260102"]
+        client = MagicMock()
+        client._query.side_effect = lambda _api, **kwargs: self._frame(kwargs["trade_date"])
+        monkeypatch.setattr(data_pipeline_module, "BATCH_TRADE_DAYS", 2)
+        monkeypatch.setattr(data_pipeline_module, "_get_trade_days", lambda _start: days)
+        monkeypatch.setattr(data_pipeline_module, "_get_ts_client", lambda: client)
+
+        assert data_pipeline_module.full_init_by_trade_date()["status"] == "ok"
+        staged = next(
+            (data_pipeline_module.RECOVERY_AUDIT_DIR / "full_init_staging" / "daily").glob("*.csv")
+        )
+        staged.write_text("corrupt", encoding="utf-8")
+        client.reset_mock()
+
+        assert data_pipeline_module.full_init_by_trade_date()["status"] == "ok"
+        # Only daily's corrupt batch is fetched again; valid valuation/fund-flow staging is reused.
+        assert client._query.call_count == 2
 
 
 # ═════════════════════════════════════════════════════════════════════════

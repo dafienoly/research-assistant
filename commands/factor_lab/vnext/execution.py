@@ -13,7 +13,7 @@ import re
 import secrets
 import threading
 import uuid
-from dataclasses import asdict, dataclass, replace
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping, Protocol
@@ -342,12 +342,29 @@ class MiniQMTReadOnlyBroker:
             health = self.client.health() if hasattr(self.client, "health") else {"status": "unknown"}
             account = self.client.get_account() if hasattr(self.client, "get_account") else None
             positions = self.client.get_positions() if hasattr(self.client, "get_positions") else None
-            healthy = not isinstance(health, dict) or health.get("status") not in {"error", "unavailable"}
+            health_status = str(health.get("status", "")).lower() if isinstance(health, dict) else "ok"
+            healthy = health_status in {"ok", "partial"}
+            health_data = health.get("data") if isinstance(health, dict) else None
+            if isinstance(health_data, dict):
+                if "xttrader_connected" in health_data:
+                    healthy = healthy and bool(health_data["xttrader_connected"])
+                elif "connected" in health_data:
+                    healthy = healthy and bool(health_data["connected"])
+            account_readable = (
+                isinstance(account, dict)
+                and str(account.get("status", "")).lower() == "ok"
+                and isinstance(account.get("data"), dict)
+            )
+            positions_readable = (
+                isinstance(positions, dict)
+                and str(positions.get("status", "")).lower() == "ok"
+                and isinstance(positions.get("data"), list)
+            )
             return {
-                "status": DataStatus.OK.value if healthy else DataStatus.PARTIAL.value,
+                "status": DataStatus.OK.value if healthy and account_readable and positions_readable else DataStatus.PARTIAL.value,
                 "connected": healthy,
-                "account_readable": account is not None,
-                "positions_readable": positions is not None,
+                "account_readable": account_readable,
+                "positions_readable": positions_readable,
                 "order_channel_enabled": False,
                 "health": health,
             }

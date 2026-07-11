@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Optional
@@ -107,7 +106,12 @@ def _normalize_trade_date(df: pd.DataFrame) -> pd.DataFrame:
         if column in df.columns:
             if column != "trade_date":
                 df = df.rename(columns={column: "trade_date"})
-            df["trade_date"] = pd.to_datetime(df["trade_date"], errors="coerce")
+            raw = df["trade_date"].astype("string").str.strip().str.replace(r"\.0$", "", regex=True)
+            compact = raw.str.fullmatch(r"\d{8}", na=False)
+            parsed = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns]")
+            parsed.loc[compact] = pd.to_datetime(raw.loc[compact], format="%Y%m%d", errors="coerce")
+            parsed.loc[~compact] = pd.to_datetime(raw.loc[~compact], errors="coerce")
+            df["trade_date"] = parsed
             return df
     return df
 
@@ -262,6 +266,7 @@ def freshness() -> dict[str, Any]:
     max_lag_code = ""
     min_lag = 999999
     min_lag_code = ""
+    future_date_stocks: list[dict[str, Any]] = []
 
     for f in daily_files:
         ts_code = _code_from_path(f)
@@ -276,6 +281,13 @@ def freshness() -> dict[str, Any]:
 
             count_with_data += 1
             lag_days = (today - latest_date).days
+
+            if lag_days < 0:
+                future_date_stocks.append({
+                    "ts_code": ts_code,
+                    "latest_date": latest_date.strftime("%Y-%m-%d"),
+                    "days_in_future": abs(lag_days),
+                })
 
             total_lag_days += lag_days
             if lag_days > max_lag:
@@ -328,6 +340,8 @@ def freshness() -> dict[str, Any]:
         "max_lag_code": max_lag_code,
         "min_lag_days": min_lag if min_lag != 999999 else 0,
         "min_lag_code": min_lag_code,
+        "future_date_count": len(future_date_stocks),
+        "future_date_stocks": future_date_stocks[:20],
         "freshness_distribution": {
             "fresh (<=7d)": fresh_count,
             "stale (8-30d)": stale_count,
@@ -435,6 +449,8 @@ def missing() -> dict[str, Any]:
         "data_dir": str(DAILY_DIR),
         "u0_total": u0_total,
         "u0_codes_in_universe": len(u0_codes),
+        "universe_status": "OK" if u0_codes else "UNKNOWN",
+        "universe_missing_reason": None if u0_codes else "U0 unavailable or empty; missing coverage cannot be asserted",
         "pulled_stocks": pulled_count,
         "missing_stocks": missing_count,
         "extra_stocks_outside_u0": len(extra_codes),
