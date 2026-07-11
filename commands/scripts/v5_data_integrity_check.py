@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-"""V5 Data Integrity Check — 修复后验证 K线新鲜度、schema、U1过滤、市值字段"""
-import json, os, sys, csv, glob
+"""V5 compatibility integrity report backed by canonical DataHub audits."""
+import json
+import os
+import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 OUTPUT = None
 for i, a in enumerate(sys.argv):
@@ -10,98 +13,50 @@ for i, a in enumerate(sys.argv):
 
 BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # project root (root, not commands/)
 DATA_DIR = os.path.join(BASE, "data")
-KLINE_DIR = os.path.join(DATA_DIR, "market", "daily_kline")
+HEALTH_DIR = Path(DATA_DIR) / "audit" / "health"
 UNIVERSE_FILE = os.path.join(DATA_DIR, "universes.json")
 CST = timezone(timedelta(hours=8))
 TODAY = datetime.now(CST)
 
 def check_kline():
-    """检查K线 freshness 和 schema"""
-    checks = {}
-    if not os.path.isdir(KLINE_DIR):
-        return {"status": "FAIL", "detail": f"Kline dir not found: {KLINE_DIR}"}
-    
-    files = [f for f in os.listdir(KLINE_DIR) if f.endswith(".csv") and not f.startswith(".")]
-    kline_files = [f for f in files if "_daily_kline" in f]
-    hist_files = [f for f in files if "_hist" in f]
-    
-    latest_date = None
-    schema_ok = True
-    schema_errors = []
-    zero_volume_anomalies = 0
-    
-    for fname in kline_files:
-        fpath = os.path.join(KLINE_DIR, fname)
-        with open(fpath, "r") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-            if not rows:
-                continue
-            # Check schema
-            fields = list(rows[0].keys())
-            if "code" not in fields:
-                schema_errors.append(f"{fname}: missing 'code' column, fields={fields}")
-                schema_ok = False
-            expected = {"code", "timeString", "open", "high", "low", "close", "volume", "amount"}
-            missing = expected - set(fields)
-            if missing:
-                schema_errors.append(f"{fname}: missing columns {missing}")
-                schema_ok = False
-            # Check latest date
-            dates = sorted([r.get("timeString", "") for r in rows])
-            if dates:
-                fd = dates[-1]
-                if latest_date is None or fd > latest_date:
-                    latest_date = fd
-            # Zero volume anomalies
-            for r in rows:
-                try:
-                    v = float(r.get("volume", 0))
-                    c = float(r.get("close", 0))
-                    o = float(r.get("open", 0))
-                    if v == 0 and abs(c - o) < 0.01:
-                        zero_volume_anomalies += 1
-                except:
-                    pass
-    
-    # Check duplicates
-    duplicates = []
-    for hf in hist_files:
-        base = hf.replace("_hist.csv", "")
-        pair = [f for f in kline_files if base in f]
-        if pair:
-            hpath = os.path.join(KLINE_DIR, hf)
-            ppath = os.path.join(KLINE_DIR, pair[0])
-            with open(hpath) as f1, open(ppath) as f2:
-                if f1.read() == f2.read():
-                    duplicates.append(hf)
-    
-    stale_days = 999
-    if latest_date:
-        for fmt in ("%Y-%m-%d", "%Y%m%d"):
-            try:
-                ld = datetime.strptime(latest_date[:10], fmt)
-                stale_days = (TODAY - ld).days
-                break
-            except:
-                continue
-    
-    status = "PASS"
-    if stale_days > 3:
-        status = "FAIL"
-    if not schema_ok:
-        status = "FAIL"
-    
+    """Validate canonical coverage, freshness and row-level integrity reports."""
+    reports = {}
+    errors = []
+    for name in ("coverage", "freshness", "integrity"):
+        path = HEALTH_DIR / f"{name}.json"
+        try:
+            report = json.loads(path.read_text(encoding="utf-8"))
+            generated = datetime.fromisoformat(str(report["generated_at"]))
+            age_hours = (TODAY - generated.astimezone(CST)).total_seconds() / 3600
+            if age_hours > 24:
+                errors.append(f"{name} stale ({age_hours:.1f}h)")
+            reports[name] = report
+        except (OSError, KeyError, ValueError, json.JSONDecodeError) as exc:
+            errors.append(f"{name} unavailable: {type(exc).__name__}")
+    coverage = reports.get("coverage", {})
+    freshness = reports.get("freshness", {})
+    integrity = reports.get("integrity", {})
+    passed = (
+        not errors
+        and coverage.get("universe_status") == "OK"
+        and coverage.get("active_missing_files") == 0
+        and coverage.get("empty_files") == 0
+        and coverage.get("stocks_with_data") == coverage.get("total_stocks")
+        and freshness.get("status") == "OK"
+        and freshness.get("blocking_stock_count") == 0
+        and integrity.get("status") == "OK"
+        and integrity.get("problematic_file_count") == 0
+    )
     return {
-        "status": status,
-        "kline_file_count": len(kline_files),
-        "hist_file_count": len(hist_files),
-        "latest_date": latest_date or "N/A",
-        "stale_days": stale_days,
-        "schema_ok": schema_ok,
-        "schema_errors": schema_errors[:5],
-        "duplicate_hist_files": duplicates,
-        "zero_volume_anomalies": zero_volume_anomalies,
+        "status": "PASS" if passed else "FAIL",
+        "source": "canonical_datahub_audits",
+        "kline_file_count": coverage.get("stocks_with_data", 0),
+        "expected_file_count": coverage.get("total_stocks", 0),
+        "latest_date": coverage.get("latest_date", "N/A"),
+        "freshness_status": freshness.get("status", "MISSING"),
+        "integrity_status": integrity.get("status", "MISSING"),
+        "problematic_file_count": integrity.get("problematic_file_count"),
+        "errors": errors,
     }
 
 def check_universe():

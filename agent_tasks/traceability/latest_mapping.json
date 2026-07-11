@@ -851,6 +851,16 @@
       "behavior": "旧脚本的全量与增量入口只委托 canonical daily owner；不再拥有行情、估值、资金流或财务 provider，不创建目录或写 CSV。"
     },
     {
+      "id": "INFRA-V5-INTEGRITY-CANONICAL-01",
+      "title": "V5 完整性检查复用 canonical DataHub 审计",
+      "code_locations": [
+        {"file": "commands/scripts/v5_data_integrity_check.py", "function": "check_kline", "line": 23},
+        {"file": "commands/tests/test_v5_integrity_datahub.py", "line": 1}
+      ],
+      "expected_keywords": ["HEALTH_DIR", "coverage", "freshness", "integrity", "canonical_datahub_audits", "age_hours > 24"],
+      "behavior": "兼容完整性报告不扫描旧 K 线副本或自定义 schema；只接受 24 小时内且全部通过的 canonical coverage/freshness/integrity，缺失或过期 fail-closed。"
+    },
+    {
       "id": "INFRA-STOCK-CONTEXT-DATAHUB-01",
       "title": "股票研究上下文只读 canonical DataHub",
       "code_locations": [
