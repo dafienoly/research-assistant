@@ -584,6 +584,28 @@
       "behavior": "五类公司事件只在 ingestion 层拉取并原子发布；累计三次异常触发熔断；合法空结果标记 EMPTY 而非 MISSING；每个标的后原子更新运行中 manifest。"
     },
     {
+      "id": "INFRA-BAOSTOCK-FACADE-RETIRE-01",
+      "title": "退役 Baostock 平行数据与特征写入系统",
+      "code_locations": [
+        {
+          "file": "commands/baostock_data.py",
+          "function": "run_all",
+          "line": 27
+        },
+        {
+          "file": "commands/tests/test_baostock_facade_retired.py",
+          "line": 1
+        }
+      ],
+      "expected_keywords": [
+        "datahub_cron.sh",
+        "daily-incremental",
+        "FactorInputProjection",
+        "legacy per-code Baostock refresh retired"
+      ],
+      "behavior": "baostock_data 文件仅保留脚本兼容入口，调用一次 canonical daily ingestion 和 fundamentals projection；原 Baostock 登录、基本面/行业/指数/宏观 provider、特征工程和 CSV 写入函数全部物理删除。"
+    },
+    {
       "id": "P0-DIVE-SUPPLEMENT-DATAHUB-01",
       "title": "跳水预测补充入口退役直连 provider 与破坏性写入",
       "code_locations": [
