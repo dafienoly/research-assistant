@@ -6,7 +6,6 @@ BACKUP_ROOT="${HERMES_BACKUP_ROOT:-/mnt/d/HermesBackups}"
 STAMP="${1:-$(date +%Y%m%d_%H%M%S)}"
 DEST="$BACKUP_ROOT/research-assistant-data_$STAMP"
 LATEST_FILE="$BACKUP_ROOT/LATEST-research-assistant-data.txt"
-KEEP="${HERMES_BACKUP_KEEP:-7}"
 
 mkdir -p "$BACKUP_ROOT"
 exec 9>"$BACKUP_ROOT/.research-assistant-data.lock"
@@ -53,12 +52,5 @@ sync_tree "/mnt/c/Users/ly/.codex/data/a-share-data-hub" "$DEST/shared-data-hub"
 } > "$DEST/metadata/manifest.env"
 
 printf '%s\n' "$DEST" > "$LATEST_FILE"
-
-mapfile -t snapshots < <(find "$BACKUP_ROOT" -maxdepth 1 -mindepth 1 -type d -name 'research-assistant-data_*' -printf '%T@ %p\n' | sort -rn | cut -d' ' -f2-)
-if ((${#snapshots[@]} > KEEP)); then
-  for snapshot in "${snapshots[@]:KEEP}"; do
-    [[ "$snapshot" == "$BACKUP_ROOT"/research-assistant-data_* ]] && rm -rf -- "$snapshot"
-  done
-fi
 
 echo "$DEST"

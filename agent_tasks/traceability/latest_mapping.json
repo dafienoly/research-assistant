@@ -175,6 +175,16 @@
       "behavior": "备份只在无写入进程时定稿并生成全量 SHA-256；缺口触发时先验证和恢复 D 盘快照，再执行增量拉取。"
     },
     {
+      "id": "DATA-SAFETY-02B",
+      "title": "D 盘快照只增不删",
+      "code_locations": [
+        {"file": "scripts/backup_data_to_d.sh", "function": "sync_tree", "line": 26},
+        {"file": "commands/tests/test_backup_retention_safety.py", "function": "test_backup_never_deletes_older_snapshots", "line": 7}
+      ],
+      "expected_keywords": ["--link-dest", "FINAL_COMPLETE", "rm -rf", "HERMES_BACKUP_KEEP"],
+      "behavior": "自动备份仅新增硬链接增量快照，不执行保留期清理或 rm；旧快照必须由用户明确决定是否清理。"
+    },
+    {
       "id": "DATA-SAFETY-03",
       "title": "全量拉取原子落盘、staging 与断点续传",
       "code_locations": [
@@ -317,5 +327,5 @@
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-11T23:38:42+08:00"
+  "generated_at": "2026-07-11T23:56:48+08:00"
 }
