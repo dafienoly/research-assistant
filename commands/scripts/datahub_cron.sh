@@ -13,11 +13,15 @@ set -euo pipefail
 DIR="/home/ly/.hermes/research-assistant/commands"
 VENV="/home/ly/.hermes/research-assistant/.venv_quant/bin/activate"
 LOG="/home/ly/.hermes/research-assistant/data/audit/datahub_cron.log"
+LOCK_DIR="${HERMES_LOCK_DIR:-$HOME/.hermes/locks}"
 TS=$(date '+%Y-%m-%d %H:%M:%S')
 
 log() { echo "[$TS] $*"; }
 
 mkdir -p "$(dirname "$LOG")"
+mkdir -p "$LOCK_DIR"
+exec 8>"$LOCK_DIR/datahub-global.lock"
+flock -n 8 || { echo "another DataHub writer/recovery/backup is active" >&2; exit 75; }
 cd "$DIR"
 source "$VENV"
 

@@ -304,6 +304,76 @@ def test_dual_channel_independent_receipts_and_shared_ack(tmp_path):
     assert set(ack["closes_channels"]) == {"telegram", "enterprise_wechat"}
 
 
+def test_notification_outbox_enqueue_has_no_network_and_delivery_is_idempotent(tmp_path):
+    calls = []
+
+    def sender(payload):
+        calls.append(payload["event_id"])
+        return {"ok": True}
+
+    notifier = DualChannelNotifier(store(tmp_path), {"telegram": sender})
+    event = ProfitGuard(store(tmp_path))._card(
+        position(), quote(107, datetime.now().astimezone()), "L3", "reduce_half",
+        7, 10, 3, AdviceMode.EXECUTABLE, "test", 500,
+    )
+    queued = notifier.enqueue(event)
+    assert queued["delivery"] == "outbox_queued"
+    assert calls == []
+    first = notifier.deliver_pending(event_id=event.event_id)
+    second = notifier.deliver_pending(event_id=event.event_id)
+    assert first["channels"]["telegram"]["delivered"] is True
+    assert second["channels"]["telegram"]["delivered"] is True
+    assert calls == [event.event_id]
+
+
+def test_l2_digest_keeps_failed_channel_cursor_for_retry(tmp_path):
+    attempts = {"telegram": 0, "enterprise_wechat": 0}
+
+    def telegram(_):
+        attempts["telegram"] += 1
+        return {"ok": True}
+
+    def wechat(_):
+        attempts["enterprise_wechat"] += 1
+        return {"ok": False, "error": "down"}
+
+    notifier = DualChannelNotifier(
+        store(tmp_path), {"telegram": telegram, "enterprise_wechat": wechat}
+    )
+    event = ProfitGuard(store(tmp_path))._card(
+        position(), quote(108, datetime.now().astimezone()), "L2", "warn",
+        8, 10, 2, AdviceMode.EXECUTABLE, "test",
+    )
+    notifier.enqueue(event)
+    first = notifier.flush_l2_digest()
+    second = notifier.flush_l2_digest()
+    assert first["status"] == "partial"
+    assert second["count"] == 1
+    assert attempts == {"telegram": 1, "enterprise_wechat": 2}
+
+
+def test_acknowledge_rejects_unknown_event(tmp_path):
+    notifier = DualChannelNotifier(store(tmp_path), {"telegram": lambda _: {"ok": True}})
+    assert notifier.acknowledge("evt_missing", "ly")["status"] == "not_found"
+
+
+def test_archive_understands_runtime_timestamps_and_keeps_undated_rows(tmp_path):
+    archive_store = store(tmp_path)
+    old = datetime.now().astimezone() - timedelta(days=120)
+    recent = datetime.now().astimezone() - timedelta(days=1)
+    archive_store.append_jsonl("notifications/receipts.jsonl", {"id": "old", "attempted_at": old.isoformat()})
+    archive_store.append_jsonl("notifications/receipts.jsonl", {"id": "recent", "started_at": recent.isoformat()})
+    archive_store.append_jsonl("notifications/receipts.jsonl", {"id": "undated"})
+    archived = archive_store.archive_jsonl(
+        "notifications/receipts.jsonl", datetime.now().astimezone() - timedelta(days=90)
+    )
+    assert archived is not None
+    assert [row["id"] for row in archive_store.read_jsonl("notifications/receipts.jsonl")] == [
+        "recent",
+        "undated",
+    ]
+
+
 def test_l2_is_queued_for_digest(tmp_path):
     notifier = DualChannelNotifier(
         store(tmp_path), {"telegram": lambda _: {"ok": True}}

@@ -8,6 +8,9 @@ DEST="$BACKUP_ROOT/research-assistant-data_$STAMP"
 LATEST_FILE="$BACKUP_ROOT/LATEST-research-assistant-data.txt"
 
 mkdir -p "$BACKUP_ROOT"
+mkdir -p "${HERMES_LOCK_DIR:-$HOME/.hermes/locks}"
+exec 8>"${HERMES_LOCK_DIR:-$HOME/.hermes/locks}/datahub-global.lock"
+flock -n 8 || { echo "DataHub writer or recovery is active; backup deferred" >&2; exit 75; }
 exec 9>"$BACKUP_ROOT/.research-assistant-data.lock"
 flock -n 9 || { echo "another Hermes data backup is running" >&2; exit 75; }
 pgrep -f 'data:full-init|data:pull-|data:incremental-update' >/dev/null && {

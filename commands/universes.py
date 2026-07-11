@@ -15,7 +15,7 @@ V4.1 分层股票池 U0-U4 + ETF替代池
     audit()           → 返回审计 dict
 
 数据来源:
-    - Tushare Pro (stock_basic, daily_basic, stk_limit, suspend_d, namechange)
+    - DataHub canonical (stock_basic, daily, valuation, calendar, suspend_d)
     - pool.csv (315 只 AI 图谱候选)
     - ai_chainmap_watchlist_tags.csv (AI 产业链标签)
     - 硬编码 ETF 清单 (半导体/AI 主题)
@@ -26,9 +26,9 @@ from __future__ import annotations
 import csv
 import json
 import logging
-import math
 import os
 import random
+import tempfile
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Optional
@@ -36,22 +36,23 @@ from typing import Any, Optional
 import pandas as pd
 import numpy as np
 
-from factor_lab.data import tushare_client as _ts_client_mod
+from factor_lab.datahub_access import DATAHUB_ROOT
+from factor_lab.datahub_universe import UniverseDataHubSnapshot
 
 logger = logging.getLogger(__name__)
-
-# 使用函数封装 get_ts_client 以便测试可以 patch 模块级别
-def _get_ts_client():
-    """获取 TushareClient 单例"""
-    return _ts_client_mod.get_ts_client()
 
 # ─── 路径 ────────────────────────────────────────────────────────────
 BASE = Path(__file__).resolve().parent.parent  # research-assistant/
 DATA_DIR = BASE / "data"
 OUTPUT_FILE = DATA_DIR / "universes.json"
+NORMALIZED_DIR = DATAHUB_ROOT
+STOCK_BASIC_CSV = NORMALIZED_DIR / "reference" / "stock_basic.csv"
+TRADE_CALENDAR_CSV = NORMALIZED_DIR / "calendar" / "trade_calendar.csv"
+SUSPENSION_CSV = NORMALIZED_DIR / "suspend" / "records.csv"
+MARKET_DIR = NORMALIZED_DIR / "market"
 
 # Windows Data Hub (只读)
-CODEX_DATA = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub")
+CODEX_DATA = Path(os.environ.get("HERMES_SHARED_DATAHUB_ROOT", "/mnt/c/Users/ly/.codex/data/a-share-data-hub"))
 POOL_CSV = CODEX_DATA / "market" / "pool.csv"
 AI_CHAINMAP_CSV = CODEX_DATA / "tags" / "ai_chainmap_watchlist_tags.csv"
 SEMICONDUCTOR_CHAIN_CSV = CODEX_DATA / "tags" / "semiconductor_chain_tags.csv"
@@ -96,6 +97,42 @@ def _read_csv_safe(path: Path) -> list[dict[str, str]]:
     except Exception as e:
         logger.error(f"读取 {path} 失败: {e}")
         return []
+
+
+def _new_datahub_snapshot() -> UniverseDataHubSnapshot:
+    return UniverseDataHubSnapshot(
+        stock_basic_path=STOCK_BASIC_CSV,
+        trade_calendar_path=TRADE_CALENDAR_CSV,
+        suspension_path=SUSPENSION_CSV,
+        market_dir=MARKET_DIR,
+    )
+
+
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _as_iso_date(value: Any) -> str:
+    if value is None or pd.isna(value):
+        return ""
+    text = str(value).strip().replace(".0", "")
+    parsed = pd.to_datetime(text, format="%Y%m%d", errors="coerce")
+    return parsed.strftime("%Y-%m-%d") if pd.notna(parsed) else ""
 
 
 def _ts_code_to_symbol(ts_code: str) -> str:
@@ -149,67 +186,17 @@ def _is_st_from_name(name: str) -> bool:
 # U0 全 A 基础池
 # ══════════════════════════════════════════════════════════════════════
 
-def build_u0() -> dict[str, Any]:
+def build_u0(snapshot: UniverseDataHubSnapshot | None = None) -> dict[str, Any]:
     """构建 U0 全 A 基础池
 
-    数据来源: Tushare stock_basic + daily_basic + concept
+    数据来源: canonical DataHub stock_basic + valuation
     字段:
         ts_code, symbol, name, exchange, board, list_date, delist_date,
         is_listed, industry, concepts, total_mv, float_mv
     """
-    tc = _get_ts_client()
-
-    # 1) stock_basic — 全 A 上市股票
-    stocks = tc.stock_basic(list_status="L")
-    if stocks.empty:
-        raise RuntimeError("Tushare stock_basic 返回空，无法构建 U0")
-
-    # 获取退市/暂停股票
-    stocks_delist = tc.stock_basic(list_status="D")
-    stocks_pause = tc.stock_basic(list_status="P")
-    stocks_all = pd.concat([stocks, stocks_delist, stocks_pause], ignore_index=True)
-
-    # 2) 去重保留最新状态
-    stocks_all = stocks_all.drop_duplicates(subset=["ts_code"], keep="first")
-
-    # 3) 获取最新交易日 daily_basic (市值)
-    latest_trade_date = ""
-    try:
-        cal = tc.trade_cal(start_date="20260601", end_date=_now_str()[:10].replace("-", ""))
-        if not cal.empty:
-            open_days = cal[cal["is_open"] == 1].sort_values("cal_date")
-            if not open_days.empty:
-                latest_trade_date = open_days["cal_date"].iloc[-1].strftime("%Y%m%d")
-    except Exception:
-        pass
-
-    daily_basic_df = pd.DataFrame()
-    if latest_trade_date:
-        try:
-            daily_basic_df = tc._query(
-                "daily_basic",
-                trade_date=latest_trade_date,
-                fields="ts_code,total_mv,circ_mv",
-            )
-        except Exception as e:
-            logger.warning(f"daily_basic 查询失败: {e}")
-
-    # 4) 概念板块 — 获取所有概念并映射到股票
-    concepts_map: dict[str, list[str]] = {}
-    try:
-        concept_df = tc.concept()
-        if not concept_df.empty and "code" in concept_df.columns:
-            for _, row in concept_df.iterrows():
-                ccode = row.get("code", "")
-                cname = row.get("name", "")
-                if ccode:
-                    detail = tc.concept_detail(concept_code=ccode)
-                    if not detail.empty and "ts_code" in detail.columns:
-                        concepts_map[cname] = detail["ts_code"].tolist()
-    except Exception as e:
-        logger.warning(f"概念板块查询失败: {e}")
-
-    # 5) 构建每只股票的信息
+    datahub = snapshot or _new_datahub_snapshot()
+    stocks_all = datahub.stock_reference()
+    datahub.load_valuations(stocks_all["ts_code"].tolist())
     records: list[dict[str, Any]] = []
     for _, row in stocks_all.iterrows():
         ts_code = str(row.get("ts_code", ""))
@@ -219,42 +206,27 @@ def build_u0() -> dict[str, Any]:
         name = str(row.get("name", ""))
         market = str(row.get("market", ""))
         board = _parse_board(market)
-        list_date = row.get("list_date", pd.NaT)
-        delist_date = row.get("delist_date", pd.NaT)
-        is_listed = (
-            ts_code in stocks["ts_code"].values
-            if not stocks.empty
-            else True
-        )
-
-        # 行业
-        industry = str(row.get("industry", ""))
-
-        # 概念
-        concepts = [cname for cname, codes in concepts_map.items() if ts_code in codes]
-
-        # 总市值 / 流通市值
-        total_mv = None
-        float_mv = None
-        if not daily_basic_df.empty and ts_code in daily_basic_df["ts_code"].values:
-            match = daily_basic_df[daily_basic_df["ts_code"] == ts_code]
-            if not match.empty:
-                total_mv = float(match.iloc[0].get("total_mv", 0))
-                float_mv = float(match.iloc[0].get("circ_mv", 0))
+        exchange = {"SH": "SSE", "SZ": "SZSE", "BJ": "BSE"}.get(ts_code.rsplit(".", 1)[-1], "")
+        status = str(row.get("list_status", "")).upper()
+        valuation = datahub.valuation(ts_code)
+        raw_industry = row.get("industry")
+        industry = "" if raw_industry is None or pd.isna(raw_industry) else str(raw_industry).strip()
 
         records.append({
             "ts_code": ts_code,
             "symbol": symbol,
             "name": name,
-            "exchange": market,
+            "exchange": exchange,
             "board": board,
-            "list_date": str(list_date)[:10] if pd.notna(list_date) else "",
-            "delist_date": str(delist_date)[:10] if pd.notna(delist_date) else "",
-            "is_listed": is_listed,
+            "list_date": _as_iso_date(row.get("list_date")),
+            "delist_date": _as_iso_date(row.get("delist_date")),
+            "list_status": status,
+            "is_listed": status == "L",
             "industry": industry,
-            "concepts": concepts,
-            "total_mv": total_mv,
-            "float_mv": float_mv,
+            "concepts": [],
+            "concepts_missing_reason": "canonical DataHub concept membership unavailable",
+            "total_mv": valuation.get("total_mv"),
+            "float_mv": valuation.get("float_mv"),
         })
 
     return {
@@ -262,7 +234,11 @@ def build_u0() -> dict[str, Any]:
         "label": "全A基础池",
         "description": "全A所有上市股票（含非上市状态标记）",
         "built_at": _now_str(),
-        "data_sources": ["Tushare stock_basic", "Tushare daily_basic", "Tushare concept"],
+        "data_sources": [
+            "DataHub reference/stock_basic.csv",
+            "DataHub market/valuation_<ts_code>.csv",
+        ],
+        "source_mode": "read_only_canonical_datahub",
         "total_stocks": len(records),
         "stocks": records,
     }
@@ -296,107 +272,45 @@ def _is_delisted(u0_stock: dict) -> bool:
     return False
 
 
-def build_u1() -> dict[str, Any]:
+def build_u1(
+    snapshot: UniverseDataHubSnapshot | None = None,
+    u0: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """构建 U1 用户可交易池
 
     U1 是 U0 的严格子集，过滤规则:
       - 退市（is_listed=False 或 delist_date 非空）
       - name 含 "退"
-      - ST/*ST（namechange 记录或名称前缀）
-      - 停牌（suspend_d 当日停牌）
+      - ST/*ST（canonical 当前名称前缀）
+      - 停牌（DataHub suspend_d 真值）
       - 北交所
       - 科创板（如 EXCLUDE_STAR=True）
       - 创业板（如 EXCLUDE_CHINEXT=True）
 
     扩展字段:
-      - daily_basic: total_mv, float_mv, turnover_rate, amount, pe, pb
+      - DataHub valuation/daily: total_mv, float_mv, turnover_rate, amount, pe, pb
       - industry: 有数据填行业，无数据为 null + missing_reason
       - concepts: 空数组（行权限制，见 lineage）
     """
-    u0 = build_u0()
-    tc = _get_ts_client()
+    datahub = snapshot or _new_datahub_snapshot()
+    u0 = u0 or build_u0(datahub)
     stocks = u0["stocks"]
-
-    # 获取最新交易日
-    latest_trade_date = ""
-    try:
-        cal = tc.trade_cal(start_date="20260601", end_date=_now_str()[:10].replace("-", ""))
-        if not cal.empty:
-            open_days = cal[cal["is_open"] == 1].sort_values("cal_date")
-            if not open_days.empty:
-                latest_trade_date = open_days["cal_date"].iloc[-1].strftime("%Y%m%d")
-    except Exception:
-        pass
-
-    # 1) suspend_d — 停牌
-    suspended_set: set[str] = set()
-    if latest_trade_date:
-        try:
-            suspend_df = tc._query("suspend_d", trade_date=latest_trade_date)
-            if not suspend_df.empty and "ts_code" in suspend_df.columns:
-                suspended_set = set(suspend_df["ts_code"].tolist())
-        except Exception as e:
-            logger.warning(f"suspend_d 查询失败: {e}")
-
-    # 2) namechange — ST 判断（取最近一条）
+    latest_trade_date = datahub.latest_open_trade_date(datetime.now(CST))
+    suspended_set = datahub.suspended_on(latest_trade_date)
     st_set: set[str] = set()
-    try:
-        namechange_df = tc._query(
-            "namechange",
-            start_date="20000101",
-            end_date=_now_str()[:10].replace("-", ""),
-        )
-        if not namechange_df.empty and "ts_code" in namechange_df.columns:
-            # 取每只股票最新的 namechange 记录
-            namechange_df = namechange_df.sort_values("start_date")
-            latest_per_code = namechange_df.groupby("ts_code").last().reset_index()
-            for _, r in latest_per_code.iterrows():
-                reason = str(r.get("change_reason", ""))
-                if "ST" in reason or "st" in reason or "*ST" in reason:
-                    st_set.add(r["ts_code"])
-    except Exception as e:
-        logger.warning(f"namechange 查询失败: {e}")
 
-    # 3) daily_basic — 近 20 日均成交额 + 最新市值/换手率
     amount_20d_map: dict[str, float] = {}
-    daily_basic_latest: dict[str, dict] = {}  # ts_code → {total_mv, float_mv, turnover_rate, amount}
-    if latest_trade_date:
-        try:
-            # 起算日期前推40天确保有20个交易日
-            dt = datetime.strptime(latest_trade_date, "%Y%m%d")
-            past_40 = (dt - timedelta(days=40)).strftime("%Y%m%d")
-            basic_df = tc._query(
-                "daily_basic",
-                start_date=past_40,
-                end_date=latest_trade_date,
-                fields="ts_code,trade_date,total_mv,circ_mv,turnover_rate,amount,pe,pb",
-            )
-            if not basic_df.empty and "ts_code" in basic_df.columns:
-                basic_df["trade_date"] = pd.to_datetime(
-                    basic_df["trade_date"], format="%Y%m%d", errors="coerce"
-                )
-                # 最新 trading day 数据
-                latest_basic = basic_df[basic_df["trade_date"] == basic_df["trade_date"].max()]
-                for _, row in latest_basic.iterrows():
-                    tc_code = row["ts_code"]
-                    daily_basic_latest[tc_code] = {
-                        "total_mv": float(row["total_mv"]) if pd.notna(row.get("total_mv")) else None,
-                        "float_mv": float(row["circ_mv"]) if pd.notna(row.get("circ_mv")) else None,
-                        "turnover_rate": float(row["turnover_rate"]) if pd.notna(row.get("turnover_rate")) else None,
-                        "amount": float(row["amount"]) if pd.notna(row.get("amount")) else None,
-                        "pe": float(row["pe"]) if pd.notna(row.get("pe")) else None,
-                        "pb": float(row["pb"]) if pd.notna(row.get("pb")) else None,
-                    }
-
-                # 近 20 日均成交额
-                for ts_code in basic_df["ts_code"].unique():
-                    sub = basic_df[basic_df["ts_code"] == ts_code].sort_values("trade_date")
-                    if len(sub) > 20:
-                        sub = sub.tail(20)
-                    avg_amount = sub["amount"].mean()
-                    amount_20d_map[ts_code] = float(avg_amount) if pd.notna(avg_amount) else 0.0
-        except Exception as e:
-            logger.warning(f"daily_basic 查询失败: {e}")
+    daily_basic_latest: dict[str, dict[str, float | None]] = {}
+    codes = [stock["ts_code"] for stock in stocks]
+    datahub.load_valuations(codes)
+    datahub.load_liquidity(codes)
+    for stock in stocks:
+        ts_code = stock["ts_code"]
+        valuation = dict(datahub.valuation(ts_code))
+        latest_amount, average_amount = datahub.liquidity(ts_code)
+        valuation["amount"] = latest_amount
+        daily_basic_latest[ts_code] = valuation
+        amount_20d_map[ts_code] = average_amount
 
     # 4) 过滤 + 构建记录
     records: list[dict[str, Any]] = []
@@ -480,7 +394,7 @@ def build_u1() -> dict[str, Any]:
             industry_missing_reason = None
         else:
             industry_val = None
-            industry_missing_reason = "Tushare stock_basic 未返回行业信息"
+            industry_missing_reason = "DataHub stock_basic 未返回行业信息"
 
         # concepts — 暂无数据时返回空数组
         concepts_val = s.get("concepts", [])
@@ -524,9 +438,12 @@ def build_u1() -> dict[str, Any]:
         "description": "U0 严格子集，过滤退市/ST/*ST/停牌/北交所/科创创业，补充市值/换手/行业",
         "built_at": _now_str(),
         "data_sources": [
-            "U0", "Tushare suspend_d", "Tushare namechange",
-            "Tushare daily_basic (total_mv, circ_mv, turnover_rate, amount, pe, pb)",
+            "U0 (DataHub)",
+            "DataHub suspend/records.csv",
+            "DataHub market daily + valuation CSV",
         ],
+        "latest_trade_date": latest_trade_date,
+        "source_mode": "read_only_canonical_datahub",
         "total_stocks": len(records),
         "filtered_counts": filtered_counts,
         "stocks": records,
@@ -537,7 +454,7 @@ def build_u1() -> dict[str, Any]:
 # U2 AI/半导体广义池
 # ══════════════════════════════════════════════════════════════════════
 
-def build_u2() -> dict[str, Any]:
+def build_u2(u0: dict[str, Any] | None = None) -> dict[str, Any]:
     """构建 U2 AI/半导体广义池
 
     数据来源: pool.csv (315 只) + ai_chainmap_watchlist_tags.csv
@@ -574,7 +491,7 @@ def build_u2() -> dict[str, Any]:
     # 合并所有代码
     all_codes = set(pool_codes.keys()) | set(chain_data.keys())
     # 用 U0 验证是否存在 + 获取名称映射
-    u0 = build_u0()
+    u0 = u0 or build_u0()
     u0_codes = {s["ts_code"] for s in u0["stocks"]}
     u0_names = {s["ts_code"]: s.get("name", "") for s in u0["stocks"]}
 
@@ -753,13 +670,16 @@ def _compute_supply_chain_position(
     return list(set(positions))  # 去重
 
 
-def build_u3() -> dict[str, Any]:
+def build_u3(
+    u2: dict[str, Any] | None = None,
+    u0: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """构建 U3 半导体核心池
 
     从 U2 中筛选半导体核心标的，补充细分方向/核心度/国产替代/供应链位置
     """
-    u2 = build_u2()
-    u0 = build_u0()
+    u0 = u0 or build_u0()
+    u2 = u2 or build_u2(u0)
 
     u0_map: dict[str, dict] = {s["ts_code"]: s for s in u0["stocks"]}
 
@@ -835,7 +755,16 @@ def build_u3() -> dict[str, Any]:
 # U4 匹配对照池
 # ══════════════════════════════════════════════════════════════════════
 
-def build_u4(min_matches: int = 2, max_matches: int = 5) -> dict[str, Any]:
+def build_u4(
+    min_matches: int = 2,
+    max_matches: int = 5,
+    *,
+    snapshot: UniverseDataHubSnapshot | None = None,
+    u0: dict[str, Any] | None = None,
+    u1: dict[str, Any] | None = None,
+    u2: dict[str, Any] | None = None,
+    u3: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """构建 U4 匹配对照池
 
     对 U3 每只股票按 float_mv ±20%、avg_amount_20d ±30%、volatility_60d ±20% 匹配非半导体标的
@@ -844,13 +773,14 @@ def build_u4(min_matches: int = 2, max_matches: int = 5) -> dict[str, Any]:
         min_matches: 每只 U3 股票最少匹配数
         max_matches: 每只 U3 股票最多匹配数
     """
-    u3 = build_u3()
-    u0 = build_u0()
-    u1 = build_u1()
+    datahub = snapshot or _new_datahub_snapshot()
+    u0 = u0 or build_u0(datahub)
+    u1 = u1 or build_u1(datahub, u0)
+    u2 = u2 or build_u2(u0)
+    u3 = u3 or build_u3(u2, u0)
 
     u0_map: dict[str, dict] = {s["ts_code"]: s for s in u0["stocks"]}
     u1_map: dict[str, dict] = {s["ts_code"]: s for s in u1["stocks"]}
-    u2 = build_u2()
     u2_codes = {s["ts_code"] for s in u2["stocks"]}
     u3_codes = {s["ts_code"] for s in u3["stocks"]}
 
@@ -862,32 +792,13 @@ def build_u4(min_matches: int = 2, max_matches: int = 5) -> dict[str, Any]:
             continue
         candidate_pool.append(s)
 
-    # 计算波动率 (60日)
+    # 计算波动率 (60日 canonical DataHub daily)
     volatility_map: dict[str, float] = {}
-    tc = _get_ts_client()
-    try:
-        # 用 daily 数据算 60 日波动率
-        u3_codes_list = list(u3_codes)
-        all_search_codes = list(set(list(u3_codes)[:50] + [cs["ts_code"] for cs in candidate_pool[:200]]))
-        # 取最近 120 天数据
-        today = _now_str()[:10].replace("-", "")
-        dt = datetime.strptime(today, "%Y%m%d")
-        past_120 = (dt - timedelta(days=120)).strftime("%Y%m%d")
-
-        if all_search_codes:
-            # 批次查询，每次最多 10 只
-            for i in range(0, len(all_search_codes), 10):
-                batch = all_search_codes[i : i + 10]
-                for code in batch:
-                    df = tc._query("daily", ts_code=code, start_date=past_120, end_date=today)
-                    if not df.empty and "pct_chg" in df.columns:
-                        # 取最近 60 个交易日
-                        if len(df) > 60:
-                            df = df.tail(60)
-                        vol = df["pct_chg"].std()
-                        volatility_map[code] = float(vol) if pd.notna(vol) else 0.0
-    except Exception as e:
-        logger.warning(f"波动率计算失败: {e}")
+    all_search_codes = set(list(u3_codes)[:50] + [stock["ts_code"] for stock in candidate_pool[:200]])
+    for code in all_search_codes:
+        value = datahub.daily_volatility(code)
+        if value is not None:
+            volatility_map[code] = value
 
     # 构建匹配
     matches: list[dict] = []
@@ -1034,7 +945,7 @@ def build_u4(min_matches: int = 2, max_matches: int = 5) -> dict[str, Any]:
         "label": "匹配对照池",
         "description": "对 U3 每只股票按大/中/小三种风格匹配非半导体对照标的",
         "built_at": _now_str(),
-        "data_sources": ["U3", "U0", "U1", "Tushare daily"],
+        "data_sources": ["U3", "U0", "U1", "DataHub market daily CSV"],
         "total_stocks": len(matches),
         "matched_total": sum(m["match_count"] for m in matches),
         "stocks": matches,
@@ -1048,7 +959,7 @@ def build_u4(min_matches: int = 2, max_matches: int = 5) -> dict[str, Any]:
 def build_etf_pool() -> dict[str, Any]:
     """构建 ETF 替代池
 
-    返回硬编码的半导体/AI 相关 ETF 清单，可通过 Tushare fund_daily 补充实时数据
+    返回硬编码的半导体/AI 相关 ETF 清单；实时数据由 DataHub ingestion 单独维护
     """
     records: list[dict[str, Any]] = []
     for etf in ETF_REPLACEMENT_POOL:
@@ -1073,7 +984,7 @@ def build_etf_pool() -> dict[str, Any]:
         "label": "ETF替代池",
         "description": "半导体/AI 主题相关 ETF，用于无法直接买入科创/创业板个股时的替代",
         "built_at": _now_str(),
-        "data_sources": ["手动维护", "Tushare fund_daily (可选扩展)"],
+        "data_sources": ["手动维护", "DataHub market_series (运行时行情)"],
         "total_stocks": len(unique_records),
         "stocks": unique_records,
     }
@@ -1103,10 +1014,30 @@ def build_all() -> dict[str, Any]:
         },
         "universes": {},
     }
-    for name, builder in BUILDERS.items():
+    snapshot = _new_datahub_snapshot()
+    built: dict[str, dict[str, Any]] = {}
+    builders = (
+        ("U0", lambda: build_u0(snapshot)),
+        ("U1", lambda: build_u1(snapshot, built["U0"])),
+        ("U2", lambda: build_u2(built["U0"])),
+        ("U3", lambda: build_u3(built["U2"], built["U0"])),
+        (
+            "U4",
+            lambda: build_u4(
+                snapshot=snapshot,
+                u0=built["U0"],
+                u1=built["U1"],
+                u2=built["U2"],
+                u3=built["U3"],
+            ),
+        ),
+        ("ETF", build_etf_pool),
+    )
+    for name, builder in builders:
         logger.info(f"构建 {name}...")
         try:
             universe = builder()
+            built[name] = universe
             result["universes"][name] = universe
             logger.info(f"  {name}: {universe.get('total_stocks', 0)} 只股票")
         except Exception as e:
@@ -1119,9 +1050,7 @@ def build_all() -> dict[str, Any]:
             }
 
     # 写入文件
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
+    _atomic_write_json(OUTPUT_FILE, result)
 
     logger.info(f"✅ 所有股票池已写入 {OUTPUT_FILE}")
     return result

@@ -24,6 +24,8 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
+from factor_lab.datahub_access import read_stock_name_map
+
 # ─── 模块路径 ──────────────────────────────────────────────
 _HERE = Path(__file__).parent.parent          # factor_lab/
 sys.path.insert(0, str(_HERE.parent))         # commands/  (含 strategy_lab)
@@ -47,52 +49,15 @@ class Ret5Ma20GateSignalGenerator:
         self._name_cache: dict[str, str] = {}
 
     def _get_stock_name(self, symbol: str) -> str:
-        """根据6位代码返回股票名称（首次调用时通过 akshare 缓存全市场映射）"""
+        """根据6位代码返回 canonical DataHub 股票名称。"""
         if symbol in self._name_cache:
             return self._name_cache[symbol]
         try:
-            import pandas as pd
-            from pathlib import Path
-            # 1) 优先使用 stock_industry.csv（行业标签表有完整代码-名称）
-            tags_path = Path(__file__).parent.parent.parent / "data" / "tags" / "stock_industry.csv"
-            if not self._name_cache and tags_path.exists():
-                df = pd.read_csv(tags_path, dtype={"code": str, "name": str})
-                for _, r in df.iterrows():
-                    c = str(r.get("code", "")).strip()
-                    n = str(r.get("name", "")).strip()
-                    if c and n and n != "nan":
-                        self._name_cache[c] = n
-                if symbol in self._name_cache:
-                    return self._name_cache[symbol]
-            # 2) 通过 akshare 获取全量 A 股代码-名称（缓存到文件）
-            cache_path = Path(__file__).parent.parent.parent / "data" / "tags" / "stock_names_cache.csv"
-            if cache_path.exists():
-                df = pd.read_csv(cache_path, dtype={"code": str, "name": str})
-                for _, r in df.iterrows():
-                    c = str(r.get("code", "")).strip()
-                    n = str(r.get("name", "")).strip()
-                    if c and n and n != "nan":
-                        self._name_cache[c] = n
-                if symbol in self._name_cache:
-                    return self._name_cache[symbol]
-            # 3) 远程拉取
-            try:
-                import akshare as ak
-                df = ak.stock_info_a_code_name()
-                df.columns = [c.lower() for c in df.columns]
-                cache_path.parent.mkdir(parents=True, exist_ok=True)
-                df.to_csv(cache_path, index=False, encoding="utf-8-sig")
-                for _, r in df.iterrows():
-                    c = str(r.get("code", "")).strip()
-                    n = str(r.get("name", "")).strip()
-                    if c and n and n != "nan":
-                        self._name_cache[c] = n
-            except Exception:
-                pass
+            self._name_cache.update(read_stock_name_map())
             if symbol in self._name_cache:
                 return self._name_cache[symbol]
-        except Exception:
-            pass
+        except (FileNotFoundError, OSError, UnicodeError, ValueError, pd.errors.ParserError):
+            self._name_cache[symbol] = symbol
         self._name_cache[symbol] = symbol
         return symbol
 

@@ -69,6 +69,13 @@ jobs:
           commands/tests/test_data_audit.py
           commands/tests/test_data_manager.py
           commands/tests/test_data_pipeline.py
+          commands/tests/test_datahub_integrity.py
+          commands/tests/test_datahub_architecture.py
+          commands/tests/test_benchmark_projection.py
+          commands/tests/test_universes.py
+          commands/tests/test_scheduling.py
+          commands/tests/test_backup_retention_safety.py
+          commands/tests/test_risk_datahub_contract.py
           commands/tests/test_test_data_isolation.py
           commands/tests/test_routes_vnext.py
           commands/tests/test_decision_loop.py

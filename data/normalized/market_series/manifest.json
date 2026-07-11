@@ -1,132 +1,132 @@
 {
   "source": "tushare_official_structured_gateway",
-  "start_date": "20260101",
+  "start_date": "20240101",
   "end_date": "20260711",
   "results": [
     {
       "dataset": "index_daily",
       "symbol": "000001.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/index/000001.SH.csv"
     },
     {
       "dataset": "index_daily",
       "symbol": "000300.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/index/000300.SH.csv"
     },
     {
       "dataset": "index_daily",
       "symbol": "000905.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/index/000905.SH.csv"
     },
     {
       "dataset": "index_daily",
       "symbol": "000852.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/index/000852.SH.csv"
     },
     {
       "dataset": "index_daily",
       "symbol": "000985.CSI",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/index/000985.CSI.csv"
     },
     {
       "dataset": "fund_daily",
       "symbol": "159928.SZ",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/fund/159928.SZ.csv"
     },
     {
       "dataset": "fund_daily",
       "symbol": "510230.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/fund/510230.SH.csv"
     },
     {
       "dataset": "fund_daily",
       "symbol": "510880.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/fund/510880.SH.csv"
     },
     {
       "dataset": "fund_daily",
       "symbol": "511010.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/fund/511010.SH.csv"
     },
     {
       "dataset": "fund_daily",
       "symbol": "512400.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/fund/512400.SH.csv"
     },
     {
       "dataset": "fund_daily",
       "symbol": "512480.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/fund/512480.SH.csv"
     },
     {
       "dataset": "fund_daily",
       "symbol": "512660.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/fund/512660.SH.csv"
     },
     {
       "dataset": "fund_daily",
       "symbol": "513100.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/fund/513100.SH.csv"
     },
     {
       "dataset": "fund_daily",
       "symbol": "513180.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/fund/513180.SH.csv"
     },
     {
       "dataset": "fund_daily",
       "symbol": "515000.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/fund/515000.SH.csv"
     },
     {
       "dataset": "fund_daily",
       "symbol": "515070.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/fund/515070.SH.csv"
     },
     {
       "dataset": "fund_daily",
       "symbol": "518880.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/fund/518880.SH.csv"
     },
     {
       "dataset": "fund_daily",
       "symbol": "588200.SH",
       "status": "OK",
-      "rows": 124,
+      "rows": 609,
       "path": "/home/ly/.hermes/research-assistant/data/normalized/market_series/fund/588200.SH.csv"
     }
   ],

@@ -353,57 +353,43 @@ def find_etf_substitute(
 
 
 def build_etf_universe() -> pd.DataFrame:
-    """使用 akshare 构建 A 股 ETF 数据库
-
-    尝试从 akshare 获取实时 ETF 列表, 如果失败则回退到内置注册表。
+    """从 canonical DataHub fund 序列和内置参考注册表构建 ETF 数据库。
 
     Returns:
         pd.DataFrame with columns: [代码, 名称, 最新价, 成交额, 市值, 跟踪指数]
     """
-    try:
-        import akshare as ak
-
-        etf = ak.fund_etf_spot_em()
-        if etf.empty:
-            raise ValueError("akshare 返回空数据")
-
-        # 选择常用字段并标准化列名
-        col_map = {
-            "代码": "etf_code",
-            "名称": "etf_name",
-            "最新价": "price",
-            "成交额": "amount",
-            "市值": "aum",
-            "跟踪指数": "tracked_index",
-            "日涨跌幅": "pct_chg",
-        }
-        available = {k: v for k, v in col_map.items() if k in etf.columns}
-        df = etf[list(available.keys())].rename(columns=available)
-
-        # 过滤无效代码
-        df = df[df["etf_code"].astype(str).str.match(r"^\d{6}$")].copy()
-        df["etf_code"] = df["etf_code"].astype(str)
-
-        return df
-
-    except ImportError:
-        pass  # akshare 未安装, 回退
-    except Exception:
-        pass  # 其他获取失败, 回退
-
-    # 回退: 从内置注册表构建
-    import pandas as pd
+    from factor_lab.datahub_access import DATAHUB_ROOT
 
     registry = load_etf_registry()
+    fund_root = DATAHUB_ROOT / "market_series" / "fund"
+    by_code = {path.name.split(".", 1)[0]: path for path in fund_root.glob("*.csv")}
     rows = []
     for e in registry:
+        code = str(e.get("etf_code", ""))
+        source = by_code.get(code)
+        latest = {}
+        status = "MISSING"
+        if source is not None:
+            try:
+                frame = pd.read_csv(source, encoding="utf-8-sig")
+                if not frame.empty and {"close", "trade_date"}.issubset(frame.columns):
+                    latest = frame.iloc[-1].to_dict()
+                    status = "OK"
+                else:
+                    status = "INVALID"
+            except (OSError, UnicodeError, pd.errors.ParserError, pd.errors.EmptyDataError):
+                status = "INVALID"
         rows.append({
-            "etf_code": e.get("etf_code", ""),
+            "etf_code": code,
             "etf_name": e.get("etf_name", ""),
-            "price": None,
-            "amount": e.get("avg_amount_20d"),
+            "price": latest.get("close"),
+            "amount": latest.get("amount") if latest else e.get("avg_amount_20d"),
             "aum": e.get("aum"),
             "tracked_index": e.get("tracked_index", ""),
             "theme": e.get("theme", ""),
+            "pct_chg": latest.get("pct_chg"),
+            "as_of": latest.get("trade_date"),
+            "data_status": status,
+            "source": "DataHub market_series/fund" if source else "registry_metadata_only",
         })
     return pd.DataFrame(rows)

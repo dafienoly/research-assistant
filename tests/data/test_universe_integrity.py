@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 # 添加 commands 到路径
-BASE = Path(__file__).resolve().parent.parent  # research-assistant/
+BASE = Path(__file__).resolve().parents[2]  # research-assistant/
 COMMANDS_DIR = BASE / "commands"
 if str(COMMANDS_DIR) not in sys.path:
     sys.path.insert(0, str(COMMANDS_DIR))
@@ -230,8 +230,8 @@ def test_u1_data_sources():
     """U1 数据来源声明"""
     universes = _load_or_build()
     u1 = universes.get("U1", {})
-    assert "Tushare daily_basic" in " ".join(u1.get("data_sources", [])), \
-        "U1 缺少 daily_basic 数据来源声明"
+    assert "DataHub market daily + valuation CSV" in " ".join(u1.get("data_sources", [])), \
+        "U1 缺少 canonical DataHub 数据来源声明"
 
 
 def test_u1_board_matches_ts_code():

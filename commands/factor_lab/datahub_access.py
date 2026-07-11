@@ -83,6 +83,22 @@ def read_stock_industry_map(path: Path | None = None) -> dict[str, str]:
     return dict(zip(usable["symbol"], usable["industry"], strict=False))
 
 
+def read_stock_name_map(path: Path | None = None) -> dict[str, str]:
+    """Read symbol-to-name mapping from canonical DataHub reference data."""
+    source = path or STOCK_BASIC_PATH
+    if not source.exists():
+        raise FileNotFoundError(f"canonical DataHub stock reference missing: {source}")
+    frame = pd.read_csv(source, encoding="utf-8-sig", dtype={"symbol": "string", "name": "string"})
+    required = {"symbol", "name"}
+    if not required.issubset(frame.columns):
+        raise ValueError(f"canonical stock reference missing columns: {sorted(required - set(frame.columns))}")
+    usable = frame.loc[:, ["symbol", "name"]].dropna()
+    usable["symbol"] = usable["symbol"].str.strip().str.zfill(6)
+    usable["name"] = usable["name"].str.strip()
+    usable = usable[(usable["symbol"] != "") & (usable["name"] != "")]
+    return dict(zip(usable["symbol"], usable["name"], strict=False))
+
+
 def daily_kline_root() -> Path:
     for candidate in _daily_kline_candidates():
         if _contains_daily_kline(candidate):
@@ -106,6 +122,19 @@ def daily_kline_path(symbol: str, root: Path | None = None) -> Path:
     if exchange_qualified:
         return exchange_qualified[0]
     raise FileNotFoundError(f"canonical DataHub daily kline missing for {normalized}")
+
+
+def daily_kline_index(root: Path | None = None) -> dict[str, Path]:
+    """Scan a daily dataset once for batch consumers instead of globbing per symbol."""
+    source_root = root or daily_kline_root()
+    index: dict[str, Path] = {}
+    for path in source_root.iterdir():
+        if not path.is_file() or path.suffix.lower() != ".csv" or path.name.startswith("valuation_"):
+            continue
+        code = path.name.split(".", 1)[0].replace("_daily_kline", "").strip()
+        if code and code not in index:
+            index[code] = path
+    return index
 
 
 def read_trade_calendar(path: Path | None = None) -> pd.DataFrame:

@@ -7,6 +7,8 @@
 - 数据审计仍为 `PARTIAL`：按 U0 代码集合核对，资金流匹配 5,401/5,530、缺 129，财务匹配 5,528/5,530、缺 2；精确补拉对这些代码得到上游空结果。概念 409/380、行业 511/80 已转为 OK；另有 3 个标签文件缺失。
 - Canonical DataHub 核心新鲜度已为 OK：活跃股票 5,530/5,530，5,526 只最新至 2026-07-10，另 4 只由官方 `suspend_d` 解释；正式 ML 和 Shadow 数据门禁为 OK。生产 BUY OrderDraft 仍因资金流/财务/标签辅助缺口保持 BLOCKED，保护性 SELL 数据门禁为 OK。
 - Event Truth 缺官方 `stk_limit`、`suspend_d`、现金分红事件和复权因子；当前只能 `PARTIAL/BACKTEST_ONLY`。
+- 行级完整性审计当前为 OK（活跃 5,530 文件、0 问题行）；曾污染的 3 个文件已从最早干净 D 盘快照恢复，污染原件保留在 `quarantine_polluted_market_20260712_0134`。该事件说明备份恢复已生效，但恢复后的连续每日门禁仍需观察。
+- 监管公告 canonical snapshot 尚未生成；PreTrade BUY 现在会明确报 `regulatory_truth_unavailable` 并 fail-closed。不得恢复业务层 AkShare/Eastmoney 自动 fallback 来解除阻断。
 - Antifragile Review 缺 realized Regime/Semi/Style 标签、滚动模型衰减历史及连续 Paper/Shadow 权益曲线，因此相关六项指标为 null。
 - vectorbt 第二个 OOS fold 收益为 -6.03%，不得用第一段或样本内结果替代。
 
@@ -24,3 +26,4 @@
 - vectorbt 受 Apache-2.0 + Commons Clause 约束，仅批准隔离内部研究；商业托管或分发前需重新审查。
 - vn.py、OpenBB、FinRL/FinRL-X、Qbot 均未装入 Core；comment-only lock 表示“未安装”，不能宣称对应运行时已适配完成。
 - 无真实订单发送实现；任何未来 Live 通道必须另行授权、安全评审、Paper/Shadow 稳定性证明和小额白名单验收。
+- `intraday_monitor.py`、`etf_dive_warning.py`、`monitor_588710.py`、部分 dive predictor 与 `semiconductor_events.py` 仍存在生产可达的外部 provider 旁路；在统一 RealtimeQuoteEngine/Event Truth ingestion 前不得作为 Core 执行门禁证据。

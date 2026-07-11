@@ -20,3 +20,16 @@ def test_restore_is_non_destructive_unless_exact_is_explicit() -> None:
     assert "((EXACT)) && args+=(--delete-delay)" in script
     assert "sha256sum -c" in script
     assert "dry run only" in script
+
+
+def test_all_data_mutation_and_recovery_scripts_share_global_lock() -> None:
+    scripts = [
+        ROOT / "commands/scripts/datahub_cron.sh",
+        ROOT / "scripts/backup_data_to_d.sh",
+        ROOT / "scripts/data_recovery_guard.sh",
+        ROOT / "scripts/restore_data_from_d.sh",
+    ]
+    for path in scripts:
+        source = path.read_text(encoding="utf-8")
+        assert "datahub-global.lock" in source, path
+        assert "flock -n" in source, path

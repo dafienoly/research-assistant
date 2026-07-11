@@ -151,7 +151,7 @@ class MinuteDecisionCycle:
             cards = self.service.guard.evaluate(effective, quote, gate.mode)
             for card in cards:
                 all_cards.append(card)
-                receipts.append(self.service.notifications.notify(card))
+                receipts.append(self.service.notifications.enqueue(card))
                 if card.action in {"reduce_half", "exit_remaining"} and card.quantity:
                     executions.append(self._execute_card(card, quote, effective, gate.mode, risk, auth, started))
         gate_payload = last_gate.model_dump(mode="json") if last_gate else {"mode": "blocked", "reasons": ["no_valid_quotes"], "manifest": manifest}

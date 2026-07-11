@@ -6,10 +6,9 @@
   - CSI1000 (中证 1000)
   - CSI_ALL (中证全指)
 
-数据源（按优先级）:
-  1) akshare.stock_zh_index_daily_tx — 腾讯证券日K线 (默认, 代理无关)
-  2) baostock.query_history_k_data_plus — 备用 (30 天分片)
-  3) synthetic — 仅作为降级 fallback (标记 deprecation)
+数据源:
+  1) canonical DataHub market_series/index
+  2) synthetic — 仅允许测试显式调用 (标记 deprecation)
 
 变更记录:
   V6.5 — 从合成随机数据改为真实 A 股指数行情数据
@@ -26,6 +25,7 @@ import numpy as np
 import pandas as pd
 
 from factor_lab.portfolio.spec import BenchmarkSpec
+from factor_lab.datahub_access import DATAHUB_ROOT
 
 logger = logging.getLogger(__name__)
 
@@ -62,22 +62,15 @@ BENCHMARK_META = {
 
 VALID_BENCHMARK_NAMES = set(BENCHMARK_META.keys())
 
-# 标准指数代码 → akshare stock_zh_index_daily_tx symbol 映射
-_INDEX_AKSHARE_MAP = {
-    "000300.SH": "sh000300",
-    "000905.SH": "sh000905",
-    "000852.SH": "sh000852",
-    "000985.SH": "sh000985",
+# 标准指数代码 → canonical DataHub 文件代码映射
+_INDEX_DATAHUB_MAP = {
+    "000300.SH": "000300.SH",
+    "000905.SH": "000905.SH",
+    "000852.SH": "000852.SH",
+    "000985.SH": "000985.CSI",
 }
 
 # ─── 数据获取 ──────────────────────────────────────────────────
-
-
-def _get_proxy_bypass():
-    """延迟导入 proxy_bypass (避免模块级依赖)"""
-    from dive_prediction.proxy_bypass import call_no_proxy
-
-    return call_no_proxy
 
 
 def fetch_index_kline(
@@ -87,8 +80,7 @@ def fetch_index_kline(
 ) -> pd.DataFrame:
     """获取 A 股指数日行情数据
 
-    使用 akshare 的腾讯数据源 (stock_zh_index_daily_tx) 获取，
-    自动绕过 Clash proxy。
+    只读 canonical DataHub 指数序列，禁止研究和回测模块自行联网。
 
     Args:
         index_code: 标准指数代码, 如 "000300.SH", "000905.SH"
@@ -102,13 +94,11 @@ def fetch_index_kline(
         ValueError: 不支持的指数代码
         RuntimeError: 数据获取失败
     """
-    if index_code not in _INDEX_AKSHARE_MAP:
+    if index_code not in _INDEX_DATAHUB_MAP:
         raise ValueError(
             f"不支持的指数代码 '{index_code}', "
-            f"可选: {list(_INDEX_AKSHARE_MAP.keys())}"
+            f"可选: {list(_INDEX_DATAHUB_MAP.keys())}"
         )
-
-    akshare_sym = _INDEX_AKSHARE_MAP[index_code]
 
     # 默认日期范围: 最近 3 年
     if end_date is None:
@@ -117,111 +107,37 @@ def fetch_index_kline(
         dt = datetime.now(CST) - timedelta(days=3 * 365)
         start_date = dt.strftime("%Y%m%d")
 
-    # 尝试 akshare (腾讯数据源, 代理友好)
+    source_code = _INDEX_DATAHUB_MAP[index_code]
+    source_path = DATAHUB_ROOT / "market_series" / "index" / f"{source_code}.csv"
+    if not source_path.exists():
+        raise RuntimeError(f"canonical DataHub 指数行情缺失: {source_path}")
     try:
-        call_no_proxy = _get_proxy_bypass()
-        df = call_no_proxy(
-            __import__("akshare", fromlist=["stock_zh_index_daily_tx"]).stock_zh_index_daily_tx,
-            symbol=akshare_sym,
-            start_date=start_date,
-            end_date=end_date,
-        )
-    except Exception as e:
-        logger.warning(f"akshare index_daily_tx 失败 ({e}), 尝试 baostock 降级")
-        df = _fetch_index_kline_baostock(index_code, start_date, end_date)
+        df = pd.read_csv(source_path, encoding="utf-8-sig")
+    except (OSError, UnicodeError, pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
+        raise RuntimeError(f"canonical DataHub 指数行情不可读: {source_path}: {exc}") from exc
 
     if df is None or df.empty:
         raise RuntimeError(
-            f"无法获取指数行情: {index_code} ({akshare_sym}), "
+            f"canonical DataHub 指数行情为空: {index_code}, "
             f"日期范围 {start_date}~{end_date}"
         )
 
-    # 统一列名: amount → volume (腾讯数据源用 amount 表示成交额)
     df = df.copy()
-    if "amount" in df.columns and "volume" not in df.columns:
-        df = df.rename(columns={"amount": "volume"})
+    required = {"trade_date", "open", "high", "low", "close"}
+    if not required.issubset(df.columns):
+        raise RuntimeError(f"canonical DataHub 指数行情字段缺失: {sorted(required - set(df.columns))}")
+    df = df.rename(columns={"trade_date": "date", "vol": "volume"})
 
-    # 确保 date 列为 datetime
-    if "date" in df.columns and not pd.api.types.is_datetime64_any_dtype(df["date"]):
-        df["date"] = pd.to_datetime(df["date"])
+    df["date"] = pd.to_datetime(df["date"].astype("string").str.replace(r"\.0$", "", regex=True), format="%Y%m%d", errors="coerce")
+    start = pd.to_datetime(start_date, format="%Y%m%d")
+    end = pd.to_datetime(end_date, format="%Y%m%d")
+    df = df[df["date"].between(start, end)].dropna(subset=["date", "close"])
 
     # 数值列转为 float
     for col in ["open", "close", "high", "low", "volume"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    return df.sort_values("date").reset_index(drop=True)
-
-
-def _fetch_index_kline_baostock(
-    index_code: str,
-    start_date: str,
-    end_date: str,
-) -> Optional[pd.DataFrame]:
-    """使用 baostock 备用获取指数行情 (30 天分片, 避免大区间超时)
-
-    Args:
-        index_code: 标准指数代码 "000300.SH" 等
-        start_date: "YYYYMMDD"
-        end_date: "YYYYMMDD"
-
-    Returns:
-        DataFrame or None
-    """
-    try:
-        import baostock as bs
-    except ImportError:
-        logger.warning("baostock 未安装, 跳过")
-        return None
-
-    # baostock 格式: "sh.000300"
-    bs_code = index_code.replace(".SH", "").replace(".SZ", "")
-    bs_code = f"sh.{bs_code}" if ".SH" in index_code else f"sz.{bs_code}"
-
-    all_rows = []
-    lg = bs.login()
-    if lg.error_code != "0":
-        logger.warning(f"baostock 登录失败: {lg.error_msg}")
-        return None
-
-    try:
-        # 分片查询 (30 天一批, 避免大区间连接断开)
-        s = datetime.strptime(start_date, "%Y%m%d")
-        e = datetime.strptime(end_date, "%Y%m%d")
-        chunk_start = s
-        while chunk_start < e:
-            chunk_end = min(chunk_start + timedelta(days=30), e)
-            cs = chunk_start.strftime("%Y-%m-%d")
-            ce = chunk_end.strftime("%Y-%m-%d")
-            rs = bs.query_history_k_data_plus(
-                bs_code,
-                fields="date,open,high,low,close,volume",
-                start_date=cs,
-                end_date=ce,
-                frequency="d",
-                adjustflag="3",  # 不复权 (指数无需复权)
-            )
-            while rs.error_code == "0" and rs.next():
-                row = rs.get_row_data()
-                all_rows.append(
-                    {
-                        "date": row[0],
-                        "open": float(row[1]),
-                        "high": float(row[2]),
-                        "low": float(row[3]),
-                        "close": float(row[4]),
-                        "volume": float(row[5]),
-                    }
-                )
-            chunk_start = chunk_end + timedelta(days=1)
-    finally:
-        bs.logout()
-
-    if not all_rows:
-        return None
-
-    df = pd.DataFrame(all_rows)
-    df["date"] = pd.to_datetime(df["date"])
     return df.sort_values("date").reset_index(drop=True)
 
 

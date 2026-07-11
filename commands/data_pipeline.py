@@ -748,23 +748,33 @@ def run_data_audit() -> dict:
 
         health_reports = run_all_audits()
         canonical_freshness = {}
+        canonical_integrity = {}
         try:
             canonical_freshness = json.loads(Path(health_reports["freshness"]).read_text(encoding="utf-8"))
         except (KeyError, OSError, json.JSONDecodeError):
             pass
+        try:
+            canonical_integrity = json.loads(Path(health_reports["integrity"]).read_text(encoding="utf-8"))
+        except (KeyError, OSError, json.JSONDecodeError):
+            pass
         core_status = canonical_freshness.get("status", "UNKNOWN")
+        integrity_status = canonical_integrity.get("status", "UNKNOWN")
         overall_status = (
             "ok"
-            if core_status == "OK" and not gaps["summary"].get("blocking_codex", False)
+            if core_status == "OK"
+            and integrity_status == "OK"
+            and not gaps["summary"].get("blocking_codex", False)
             else "partial"
         )
         print(f"\n  核心新鲜度: {core_status}")
+        print(f"  行级完整性: {integrity_status}")
         print(f"  辅助快照:   {fresh.get('overall_status', 'unknown')}")
         print(f"  缺口:   {gaps['summary']['total_gaps']} 总, {gaps['summary']['blocking_gaps']} 阻塞")
 
         return {
             "status": overall_status,
             "canonical_freshness": canonical_freshness,
+            "canonical_integrity": canonical_integrity,
             "auxiliary_freshness": fresh,
             "gaps": gaps,
             "health_reports": health_reports,
@@ -1836,7 +1846,9 @@ def cmd_weekly_refresh(args: list[str]) -> None:
 
 def cmd_data_audit(args: list[str]) -> None:
     """处理 data:audit 命令"""
-    run_data_audit()
+    result = run_data_audit()
+    if result.get("status") == "error" or result.get("canonical_integrity", {}).get("status") != "OK":
+        raise SystemExit(2)
 
 
 def cmd_full_init(args: list[str]) -> None:

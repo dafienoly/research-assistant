@@ -193,6 +193,10 @@ def run_pretrade_risk_check(
          "status", "details": [{symbol, risk_type, detail}, ...]}
     """
     details = []
+    st_watchlist = st_watchlist or STWatchlist()
+    regulatory_watchlist = regulatory_watchlist or RegulatoryWatchlist()
+    st_available = st_watchlist.load_cache()
+    regulatory_available = regulatory_watchlist.load_cache()
 
     # 筛选 signal_date 数据
     day_data = df[df["date"] == signal_date] if "date" in df.columns else df
@@ -210,18 +214,21 @@ def run_pretrade_risk_check(
 
         # ────────── 1. ST 检查 ──────────
         is_st = False
-        if st_watchlist is not None:
-            is_st = st_watchlist.is_st(sym)
+        if not st_available:
+            risk_flags.append("st_truth_unavailable")
+            risk_details.append(st_watchlist.error or "ST truth unavailable")
         else:
-            # 回退: symbol 后缀推断
-            is_st = bool(sym.endswith("ST")) or bool("*ST" in sym) or str(r.get("symbol", "")).endswith("ST")
+            is_st = st_watchlist.is_st(sym)
 
         if is_st:
             risk_flags.append("ST")
             risk_details.append("ST/*ST 股票")
 
         # ────────── 2. 监管事件检查 ──────────
-        if regulatory_watchlist is not None:
+        if not regulatory_available:
+            risk_flags.append("regulatory_truth_unavailable")
+            risk_details.append(regulatory_watchlist.error or "regulatory truth unavailable")
+        else:
             if regulatory_watchlist.is_blacklisted(sym):
                 risk_flags.append("regulatory_blacklist")
                 risk_details.append("严重监管事件(立案调查/行政处罚)")
@@ -288,6 +295,7 @@ def run_pretrade_risk_check(
         1 for d in details
         if "regulatory_blacklist" in d["risk_type"] or "regulatory_warning" in d["risk_type"]
     )
+    n_data_unavailable = sum(1 for detail in details if "truth_unavailable" in detail["risk_type"])
 
     total_flags = len(details)
     if total_flags == 0:
@@ -306,6 +314,7 @@ def run_pretrade_risk_check(
         "n_consecutive_up_flagged": n_consecutive_up,
         "n_high_return_flagged": n_ret5,
         "n_regulatory_flagged": n_regulatory,
+        "n_data_unavailable": n_data_unavailable,
         "total_risk_flags": total_flags,
         "n_candidates_checked": len(candidates),
         "status": status,

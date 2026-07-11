@@ -8,6 +8,11 @@ THRESHOLD_PCT="${HERMES_RECOVERY_THRESHOLD_PCT:-90}"
 FORCE=0
 [[ "${1:-}" == "--force" ]] && FORCE=1
 
+mkdir -p "${HERMES_LOCK_DIR:-$HOME/.hermes/locks}"
+exec 8>"${HERMES_LOCK_DIR:-$HOME/.hermes/locks}/datahub-global.lock"
+flock -n 8 || { echo "DataHub writer, backup, or recovery is active; recovery deferred" >&2; exit 75; }
+export HERMES_DATA_LOCK_HELD=1
+
 [[ -f "$LATEST_FILE" ]] || { echo "no finalized D-drive backup pointer; recovery skipped"; exit 0; }
 backup="$(head -n 1 "$LATEST_FILE")"
 [[ -d "$backup" ]] || { echo "latest backup directory is missing" >&2; exit 2; }
@@ -39,7 +44,7 @@ if ((!FORCE && !catastrophic)); then
   exit 0
 fi
 
-pgrep -f 'data:full-init|data:pull-|data:incremental-update' >/dev/null && {
+pgrep -f 'data:full-init|data:pull-|data:incremental-update|datahub_reference_fetch|datahub_market_series_fetch|datahub_suspension_fetch' >/dev/null && {
   echo "data writer is active; recovery deferred" >&2
   exit 75
 }

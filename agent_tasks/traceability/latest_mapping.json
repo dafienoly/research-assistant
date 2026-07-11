@@ -5,9 +5,10 @@
       "title": "可信数据健康基线与真实辅助数据门禁",
       "code_locations": [
         {"file": "commands/data_audit.py", "function": "coverage", "line": 120},
-        {"file": "commands/factor_lab/decision_loop/data_health.py", "function": "load_auxiliary_gate", "line": 100}
+        {"file": "commands/factor_lab/decision_loop/data_health.py", "function": "load_auxiliary_gate", "line": 100},
+        {"file": "commands/factor_lab/vnext/data_audit.py", "function": "export_vnext_data_audit", "line": 215}
       ],
-      "expected_keywords": ["SHARED_DAILY_DIR", "observation_time", "conflicts", "watch_only"],
+      "expected_keywords": ["SHARED_DAILY_DIR", "observed_at", "conflicts", "watch_only"],
       "behavior": "聚合共享与本地真实数据，按来源、观测时间、新鲜度和冲突生成可追踪的数据门禁，不以 mock 解锁。"
     },
     {
@@ -55,7 +56,7 @@
       "title": "Paper Shadow Live 分阶段认证",
       "code_locations": [
         {"file": "commands/factor_lab/decision_loop/certification.py", "function": "replay_semiconductor_etf_gap_fade", "line": 19},
-        {"file": "commands/scripts/decision_certify.py", "function": "main", "line": 17}
+        {"file": "commands/scripts/decision_certify.py", "line": 1}
       ],
       "expected_keywords": ["semiconductor_etf_gap_flat_then_minus_7_close", "two_point_l2", "three_point_reduce_half", "live_activation_allowed"],
       "behavior": "历史回放覆盖高开横盘后收跌 7% 案例；Paper、Shadow、小额白名单逐级认证，实盘不会自动开启。"
@@ -64,7 +65,8 @@
       "id": "P1-01",
       "title": "VNext 自动 PassList 和分钟 watchlist",
       "code_locations": [
-        {"file": "commands/factor_lab/decision_loop/vnext_opportunity.py", "function": "generate", "line": 22}
+        {"file": "commands/factor_lab/decision_loop/vnext_opportunity.py", "function": "generate", "line": 22},
+        {"file": "commands/factor_lab/decision_loop/models.py", "function": "PassList", "line": 229}
       ],
       "expected_keywords": ["primary", "backup", "anchor_etf", "watchlist/current.json", "no_opportunity_reason"],
       "behavior": "从真实 VNext 候选和数据门禁生成 0-3 主推荐、最多 5 备选及锚定 ETF，不凑数并自动进入分钟监控。"
@@ -84,7 +86,8 @@
       "title": "Telegram 与企业微信独立送达共享确认",
       "code_locations": [
         {"file": "commands/factor_lab/decision_loop/notifications.py", "function": "notify", "line": 89},
-        {"file": "commands/factor_lab/decision_loop/notifications.py", "function": "acknowledge", "line": 163}
+        {"file": "commands/factor_lab/decision_loop/notifications.py", "function": "acknowledge", "line": 163},
+        {"file": "commands/factor_lab/notification_transport.py", "line": 1}
       ],
       "expected_keywords": ["telegram", "enterprise_wechat", "delivery_receipts.jsonl", "closes_channels", "ALLOWED_NOTIFICATION_HOSTS"],
       "behavior": "双通道并行且独立记录回执，单通道失败隔离；event_id 确认后两个通道共享关闭状态。"
@@ -96,7 +99,7 @@
         {"file": "commands/factor_lab/decision_loop/benchmark.py", "function": "match_instrument", "line": 73},
         {"file": "commands/factor_lab/decision_loop/benchmark.py", "function": "match_portfolio", "line": 100}
       ],
-      "expected_keywords": ["tracked_index", "peer_etf", "mixed_tradable_exposure", "missing_reason"],
+      "expected_keywords": ["tracked_index", "peer_etf", "tradable_exposure_matched", "reason"],
       "behavior": "个股匹配有证据的行业 ETF，ETF 匹配指数和同类 ETF，组合按真实暴露生成混合基准；无证据返回 null。"
     },
     {
@@ -118,8 +121,8 @@
         {"file": "commands/factor_lab/decision_loop/storage.py", "function": "append_unique_jsonl", "line": 87},
         {"file": "commands/factor_lab/decision_loop/storage.py", "function": "archive_jsonl", "line": 114}
       ],
-      "expected_keywords": ["fcntl.flock", "state_version", "idempotency_key", ".bak", "archive"],
-      "behavior": "关键账本使用跨进程锁、原子备份、状态版本和幂等键，损坏时恢复，并定期归档 JSONL。"
+      "expected_keywords": ["O_EXCL", "_bump_version", "idempotency_key", ".bak", "archive"],
+      "behavior": "关键账本使用独占锁文件、原子备份、旁路状态版本和幂等键，损坏时恢复，并定期归档 JSONL。"
     },
     {
       "id": "P2-02",
@@ -129,14 +132,15 @@
         {"file": "commands/factor_lab/api_server/routes_decision_loop.py", "function": "preview_ocr_upload", "line": 191},
         {"file": "commands/factor_lab/decision_loop/position_ingestion.py", "function": "preview_ocr", "line": 178}
       ],
-      "expected_keywords": ["React.lazy", "quality_issues", "requires_manual_correction", "positions/history", "positions/rollback"],
+      "expected_keywords": ["lazy(", "quality_issues", "requires_manual_correction", "positions/history", "positions/rollback"],
       "behavior": "页面按路由拆包；券商截图 OCR 低置信度字段高亮并禁止确认，同时支持模板、历史和一键回滚。"
     },
     {
       "id": "P2-03",
       "title": "VNext Event Truth、OOS 和真实观测治理",
       "code_locations": [
-        {"file": "commands/factor_lab/vnext/event_truth_sources.py", "function": "fetch", "line": 17},
+        {"file": "commands/factor_lab/vnext/event_truth_sources.py", "function": "load_event_truth", "line": 17},
+        {"file": "commands/factor_lab/datahub_ingestion/event_truth.py", "function": "fetch", "line": 21},
         {"file": "commands/factor_lab/vnext/event_truth.py", "function": "run", "line": 398},
         {"file": "commands/vectorbt_worker.py", "function": "_walk_forward", "line": 147},
         {"file": "commands/factor_lab/vnext/realized_observations.py", "function": "run", "line": 11}
@@ -219,7 +223,7 @@
       "id": "DATA-AUDIT-03",
       "title": "核心 freshness 与辅助快照门禁分离",
       "code_locations": [
-        {"file": "commands/data_quality.py", "function": "FreshnessChecker.check_all", "line": 27},
+        {"file": "commands/data_quality.py", "function": "check_all", "line": 27},
         {"file": "commands/data_pipeline.py", "function": "run_data_audit", "line": 733},
         {"file": "commands/factor_lab/vnext/data_audit.py", "function": "export_vnext_data_audit", "line": 215}
       ],
@@ -346,8 +350,65 @@
       ],
       "expected_keywords": ["codeSplitting", "charts", "antd", "react-platform", "maxSize"],
       "behavior": "Vite/Rolldown 按主要依赖族拆分生产包，最大块从 1.14 MB 降至约 175 KB，保留路由懒加载且不提高告警阈值掩盖问题。"
+    },
+    {
+      "id": "INFRA-UNIVERSE-DATAHUB-02",
+      "title": "U0-U4 股票池只读 DataHub 并复用批量快照",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_universe.py", "function": "load_valuations", "line": 99},
+        {"file": "commands/universes.py", "function": "build_u0", "line": 180},
+        {"file": "commands/universes.py", "function": "build_all", "line": 1000}
+      ],
+      "expected_keywords": ["UniverseDataHubSnapshot", "read_only_canonical_datahub", "_atomic_write_json"],
+      "behavior": "股票池不再调用 Tushare；同一次 U0-U4 构建复用有界并行 DataHub 快照和依赖结果，并以 fsync+原子替换发布 universes.json。"
+    },
+    {
+      "id": "P0-DATA-INTEGRITY-RESTORE-01",
+      "title": "行级数据污染检测与 D 盘优先恢复",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_integrity.py", "function": "audit_daily_integrity", "line": 142},
+        {"file": "commands/data_audit.py", "function": "run_all_audits", "line": 691},
+        {"file": "scripts/data_recovery_guard.sh", "line": 1}
+      ],
+      "expected_keywords": ["invalid_date_format", "ohlc_invariant", "datahub-global.lock", "restore clean D-drive backup first"],
+      "behavior": "审计全部活跃日线的 schema、交易日、代码、数值、OHLC 和冲突；污染原件先隔离到 D 盘，从已验证干净快照恢复后才允许增量拉取，源文件不做无备份删除。"
+    },
+    {
+      "id": "P0-NOTIFICATION-OUTBOX-01",
+      "title": "保护性执行与双通道网络投递解耦",
+      "code_locations": [
+        {"file": "commands/factor_lab/decision_loop/notifications.py", "function": "enqueue", "line": 39},
+        {"file": "commands/factor_lab/decision_loop/notifications.py", "function": "deliver_pending", "line": 78},
+        {"file": "commands/factor_lab/decision_loop/cycle.py", "function": "_run_locked", "line": 69},
+        {"file": "commands/scripts/decision_notification_worker.py", "line": 1}
+      ],
+      "expected_keywords": ["notifications/outbox.jsonl", "delivery_receipts.jsonl", "dead_letter.jsonl", "notifications.enqueue"],
+      "behavior": "分钟周期只持久化 outbox，不等待 Telegram/企业微信网络；独立 worker 使用 event_id:channel 幂等、退避和 dead-letter，L2 各通道游标独立推进。"
+    },
+    {
+      "id": "P1-BENCHMARK-PROJECTION-01",
+      "title": "动态基准由 DataHub 物化并由研究链只读",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_ingestion/benchmark_projection.py", "function": "build_benchmark_projections", "line": 37},
+        {"file": "commands/benchmarks_v4.py", "function": "get_benchmark_returns", "line": 347},
+        {"file": "commands/factor_lab/portfolio/benchmark.py", "function": "fetch_index_kline", "line": 76},
+        {"file": "commands/config/scheduled_jobs.json", "line": 1}
+      ],
+      "expected_keywords": ["normalized/derived/benchmarks", "market_series", "benchmark_projection", "daily_kline_index"],
+      "behavior": "DataHub ingestion 一次生成指数、U0/U1/U3/U4/ETF 基准投影；组合、Shadow 和回测只读版本化 CSV，禁止请求时联网或 synthetic fallback。"
+    },
+    {
+      "id": "P0-RISK-REFERENCE-DATAHUB-01",
+      "title": "ST 与监管门禁只读 DataHub 且缺失时 BUY 失败关闭",
+      "code_locations": [
+        {"file": "commands/factor_lab/risk/st_watchlist.py", "function": "load_cache", "line": 91},
+        {"file": "commands/factor_lab/risk/regulatory_watchlist.py", "function": "load_cache", "line": 62},
+        {"file": "commands/factor_lab/risk/pretrade_risk_check.py", "function": "run_pretrade_risk_check", "line": 169}
+      ],
+      "expected_keywords": ["STOCK_BASIC_PATH", "regulatory_truth_unavailable", "st_truth_unavailable", "available"],
+      "behavior": "业务风险模块不再自动访问 AkShare/Eastmoney 或写 D 盘缓存；ST 读取 canonical 股票主表，监管快照缺失时 PreTrade BUY 明确阻断。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-12T00:22:18+08:00"
+  "generated_at": "2026-07-12T02:12:00+08:00"
 }

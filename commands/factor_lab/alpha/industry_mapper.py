@@ -2,10 +2,9 @@
 
 为 Industry Relative Alpha Pack 提供股票→行业映射。
 支持数据源:
-1. Baostock query_stock_industry (首选)
-2. 本地缓存的 stock_industry.csv
-3. tag_features.csv 中 style/tags 的 fallback
-4. 所有股票归入 "unknown" (兜底)
+1. canonical DataHub reference/stock_basic.csv
+2. tag_features.csv 中 style/tags 的 fallback
+3. 所有股票归入 "unknown" (兜底)
 
 用法:
     from factor_lab.alpha.industry_mapper import IndustryMapper
@@ -20,6 +19,8 @@ import json
 import os
 from pathlib import Path
 from typing import Optional
+
+from factor_lab.datahub_access import read_stock_industry_map
 
 # ─── 路径常量 ──────────────────────────────────────────────
 DATA_HUB = Path(os.environ.get("DATA_HUB", "/mnt/c/Users/ly/.codex/data/a-share-data-hub"))
@@ -54,24 +55,17 @@ class IndustryMapper:
     # ─── 加载 ────────────────────────────────────────────
 
     def load(self) -> dict[str, str]:
-        """加载行业映射, 优先顺序: baostock → 缓存CSV → fallback"""
-        if self._try_load_from_baostock():
-            pass
-        elif self._try_load_from_cache():
-            pass
-        else:
+        """加载行业映射, 优先顺序: canonical DataHub → fallback。"""
+        if not self._try_load_from_datahub():
             self._try_load_from_tag_features()
         self._build_index()
         return self._mapping
 
-    def _try_load_from_baostock(self) -> bool:
-        """尝试从 baostock 拉取行业数据"""
+    def _try_load_from_datahub(self) -> bool:
+        """从 canonical DataHub 股票主表读取行业映射。"""
         try:
-            from baostock_data import fetch_stock_industry
-            _, errors = fetch_stock_industry()
-            if errors == 0 and STOCK_INDUSTRY_CSV.exists():
-                return self._try_load_from_cache()
-            return False
+            self._mapping.update(read_stock_industry_map())
+            return bool(self._mapping)
         except Exception:
             return False
 

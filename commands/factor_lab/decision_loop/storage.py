@@ -119,11 +119,32 @@ class DecisionLoopStore:
             rows = [json.loads(line) for line in target.read_text(encoding="utf-8").splitlines() if line.strip()]
             old, current = [], []
             for row in rows:
-                raw_time = row.get("timestamp") or row.get("generated_at") or row.get("created_at")
+                raw_time = next(
+                    (
+                        row.get(key)
+                        for key in (
+                            "timestamp",
+                            "generated_at",
+                            "created_at",
+                            "attempted_at",
+                            "started_at",
+                            "completed_at",
+                            "acknowledged_at",
+                            "updated_at",
+                            "as_of",
+                            "restored_at",
+                            "revoked_at",
+                            "activated_at",
+                        )
+                        if row.get(key)
+                    ),
+                    None,
+                )
                 try:
                     parsed = datetime.fromisoformat(str(raw_time))
                 except (TypeError, ValueError):
-                    parsed = before
+                    current.append(row)
+                    continue
                 (old if parsed < before else current).append(row)
             if not old:
                 return None

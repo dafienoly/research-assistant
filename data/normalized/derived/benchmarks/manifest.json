@@ -1,0 +1,44 @@
+{
+  "datasets": {
+    "etf_basket_ew": {
+      "path": "etf_basket_ew.csv",
+      "rows": 608,
+      "sha256": "05ceb80c0cb703adbbe73044265fce57295ba82a9d3647813b45384f3f3229b9",
+      "status": "OK"
+    },
+    "ew_a_share": {
+      "path": "ew_a_share.csv",
+      "rows": 1335,
+      "sha256": "f3da7acc7f95c5a328e7bfc4a9659af6030e32be95626bff09ce6bd041a9abcb",
+      "status": "OK"
+    },
+    "ew_tradable": {
+      "path": "ew_tradable.csv",
+      "rows": 1335,
+      "sha256": "84ac0f41e7b32e8933d7ce3ecdddc832322e54beb9bfa4e7314aaca09aa63e93",
+      "status": "OK"
+    },
+    "matched_control_ew": {
+      "path": "matched_control_ew.csv",
+      "rows": 1335,
+      "sha256": "be921f10d20715e379ed56f5e4a975ebd881b95415bb9c64415f614d35f28a0f",
+      "status": "OK"
+    },
+    "semiconductor_core_ew": {
+      "path": "semiconductor_core_ew.csv",
+      "rows": 1335,
+      "sha256": "56a8db7968dab971e8441e512e33dee90ab67534ea0056370675e8da5e449c73",
+      "status": "OK"
+    },
+    "semiconductor_ew": {
+      "path": "semiconductor_ew.csv",
+      "rows": 1335,
+      "sha256": "56a8db7968dab971e8441e512e33dee90ab67534ea0056370675e8da5e449c73",
+      "status": "OK"
+    }
+  },
+  "generated_at": "2026-07-12T02:32:56.921847+08:00",
+  "max_history_rows_per_symbol": 2000,
+  "source": "canonical_datahub_daily_plus_universes",
+  "status": "OK"
+}

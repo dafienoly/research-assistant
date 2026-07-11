@@ -3,6 +3,7 @@
   "dags": {
     "postmarket": [
       "datahub_daily",
+      "benchmark_projection",
       "postmarket_review",
       "realized_observations",
       "event_truth",
@@ -27,9 +28,20 @@
       "backoff_seconds": [120, 300]
     },
     {
+      "job_id": "benchmark_projection",
+      "command": ["{python}", "{root}/commands/scripts/datahub_benchmark_projection.py"],
+      "depends_on": ["datahub_daily"],
+      "owned_datasets": ["normalized/derived/benchmarks"],
+      "writer_id": "datahub_benchmark_projection",
+      "timeout_seconds": 1800,
+      "retry_attempts": 2,
+      "backoff_seconds": [120],
+      "environment": {"PYTHONPATH": "{root}/commands"}
+    },
+    {
       "job_id": "postmarket_review",
       "command": ["{python}", "{root}/commands/scripts/decision_postmarket.py"],
-      "depends_on": ["datahub_daily"],
+      "depends_on": ["benchmark_projection"],
       "owned_datasets": ["decision_loop/reviews"],
       "writer_id": "decision_loop_review",
       "timeout_seconds": 900,
@@ -82,7 +94,7 @@
     {
       "job_id": "capability_status",
       "command": ["{python}", "{root}/commands/scripts/generate_capability_status.py"],
-      "depends_on": [],
+      "depends_on": ["datahub_daily"],
       "owned_datasets": ["docs/generated/capabilities", "decision_loop/archive"],
       "writer_id": "capability_status_generator",
       "timeout_seconds": 900,
@@ -93,7 +105,7 @@
     {
       "job_id": "data_backup",
       "command": ["bash", "{root}/scripts/backup_data_to_d.sh"],
-      "depends_on": [],
+      "depends_on": ["datahub_daily"],
       "owned_datasets": ["backup/d_drive"],
       "writer_id": "data_backup",
       "timeout_seconds": 10800,

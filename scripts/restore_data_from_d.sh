@@ -27,6 +27,12 @@ grep -qx 'status=FINAL_COMPLETE' "$BACKUP/metadata/manifest.env" || {
   exit 3
 }
 
+if [[ "${HERMES_DATA_LOCK_HELD:-0}" != "1" ]]; then
+  mkdir -p "${HERMES_LOCK_DIR:-$HOME/.hermes/locks}"
+  exec 8>"${HERMES_LOCK_DIR:-$HOME/.hermes/locks}/datahub-global.lock"
+  flock -n 8 || { echo "DataHub writer, backup, or recovery is active; restore deferred" >&2; exit 75; }
+fi
+
 (
   cd "$BACKUP"
   sha256sum -c metadata/SHA256SUMS --quiet
@@ -42,7 +48,7 @@ if ((!APPLY)); then
   exit 0
 fi
 
-pgrep -f 'data:full-init|data:pull-|data:incremental-update' >/dev/null && {
+pgrep -f 'data:full-init|data:pull-|data:incremental-update|datahub_reference_fetch|datahub_market_series_fetch|datahub_suspension_fetch' >/dev/null && {
   echo "data writer is active; stop it before restore" >&2
   exit 4
 }

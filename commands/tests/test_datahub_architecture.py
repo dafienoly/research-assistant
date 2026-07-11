@@ -93,3 +93,13 @@ def test_vnext_provider_router_has_no_structured_market_provider_client():
     source = path.read_text(encoding="utf-8")
     assert "class TushareFetcher" not in source
     assert "client._query" not in source
+
+
+def test_universe_builders_are_read_only_datahub_consumers():
+    path = ROOT / "commands/universes.py"
+    assert provider_imports(path) == []
+    source = path.read_text(encoding="utf-8")
+    assert "UniverseDataHubSnapshot" in source
+    assert "get_ts_client" not in source
+    assert "._query(" not in source
+    assert "requests." not in source

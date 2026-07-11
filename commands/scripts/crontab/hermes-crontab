@@ -11,6 +11,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 0-30 11 * * 1-5 cd /home/ly/.hermes/research-assistant && .venv_quant/bin/python3 commands/scripts/decision_guard_once.py >> ~/.hermes/logs/decision_guard.log 2>&1
 * 13-14 * * 1-5 cd /home/ly/.hermes/research-assistant && .venv_quant/bin/python3 commands/scripts/decision_guard_once.py >> ~/.hermes/logs/decision_guard.log 2>&1
 0 15 * * 1-5 cd /home/ly/.hermes/research-assistant && .venv_quant/bin/python3 commands/scripts/decision_guard_once.py >> ~/.hermes/logs/decision_guard.log 2>&1
+* 9-15 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 commands/scripts/decision_notification_worker.py >> ~/.hermes/logs/decision_notifications.log 2>&1
 55 8 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 commands/scripts/vnext_passlist.py >> ~/.hermes/logs/decision_guard.log 2>&1
 # Post-market write DAG uses dependencies and checkpoints instead of assuming a
 # prior job completed because its wall-clock slot elapsed. Independent status
@@ -19,6 +20,6 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 */30 8-18 * * 1-5 cd /home/ly/.hermes/research-assistant && scripts/data_recovery_guard.sh >> ~/.hermes/logs/data_recovery_guard.log 2>&1
 0 10 * * 0 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 commands/scripts/run_scheduled_dag.py weekly_datahub >> ~/.hermes/logs/datahub_cron.log 2>&1
 
-# L2 is a digest; L3/L4 are delivered immediately by the guard.
-35 11 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands /usr/bin/python3 -m factor_lab.decision_loop.cli flush-l2 >> ~/.hermes/logs/decision_guard.log 2>&1
-5 15 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands /usr/bin/python3 -m factor_lab.decision_loop.cli flush-l2 >> ~/.hermes/logs/decision_guard.log 2>&1
+# L2 is a digest; L3/L4 use the durable outbox worker above.
+35 11 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 -m factor_lab.decision_loop.cli flush-l2 >> ~/.hermes/logs/decision_guard.log 2>&1
+5 15 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 -m factor_lab.decision_loop.cli flush-l2 >> ~/.hermes/logs/decision_guard.log 2>&1

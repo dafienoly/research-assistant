@@ -3,7 +3,7 @@
 Tests for V4.1 分层股票池 U0-U4 + ETF替代池
 
 测试策略:
-  - 核心逻辑通过 mock TushareClient._query 验证
+  - 核心逻辑通过隔离的 canonical DataHub CSV 验证
   - 测试 ETF 替代池时无需 mock (纯逻辑)
   - U0-U4 构建逻辑验证参数和返回值
 """
@@ -127,19 +127,54 @@ def clear_universe_output(tmp_path, monkeypatch):
 
 @pytest.fixture()
 def mock_ts_client_minimal(mocker):
-    """Mock TushareClient — 仅返回 stock_basic + trade_cal"""
-    from universes import _ts_client_mod
+    """Create an isolated canonical DataHub while retaining a harmless mock handle."""
+    import universes
 
-    mock = mocker.patch.object(_ts_client_mod, "get_ts_client", autospec=True)
-    client = mock.return_value
-
-    # stock_basic 返回少量数据
-    client.stock_basic.return_value = _mock_stock_basic_df(5)
-    # trade_cal 返回数据
-    client.trade_cal.return_value = _mock_trade_cal_df()
-    # _query 默认返回空
-    client._query.return_value = pd.DataFrame()
-    return client
+    root = universes.OUTPUT_FILE.parent / "normalized"
+    market = root / "market"
+    reference = root / "reference"
+    calendar = root / "calendar"
+    suspension = root / "suspend"
+    for directory in (market, reference, calendar, suspension):
+        directory.mkdir(parents=True, exist_ok=True)
+    stocks = _mock_stock_basic_df(5)
+    stocks["symbol"] = stocks["ts_code"].str.split(".").str[0]
+    stocks["list_status"] = "L"
+    stocks.to_csv(reference / "stock_basic.csv", index=False, encoding="utf-8-sig")
+    _mock_trade_cal_df().to_csv(calendar / "trade_calendar.csv", index=False, encoding="utf-8-sig")
+    pd.DataFrame(columns=["ts_code", "trade_date", "suspend_type"]).to_csv(
+        suspension / "records.csv", index=False, encoding="utf-8-sig"
+    )
+    for code in stocks["ts_code"]:
+        daily = _mock_daily_basic_df(5)
+        row = daily[daily["ts_code"] == code].iloc[0].to_dict()
+        pd.DataFrame(
+            {
+                "ts_code": [code, code],
+                "trade_date": ["20260707", "20260708"],
+                "total_mv": [row["total_mv"] * 0.9, row["total_mv"]],
+                "circ_mv": [row["circ_mv"] * 0.9, row["circ_mv"]],
+                "turnover_rate": [1.0, row["turnover_rate"]],
+                "pe": [10.0, 11.0],
+                "pb": [1.0, 1.1],
+            }
+        ).to_csv(market / f"valuation_{code}.csv", index=False, encoding="utf-8-sig")
+        pd.DataFrame(
+            {
+                "ts_code": [code, code],
+                "trade_date": ["20260707", "20260708"],
+                "amount": [row["amount"] * 0.8, row["amount"]],
+            }
+        ).to_csv(market / f"{code}.csv", index=False, encoding="utf-8-sig")
+    mocker.patch.multiple(
+        universes,
+        NORMALIZED_DIR=root,
+        STOCK_BASIC_CSV=reference / "stock_basic.csv",
+        TRADE_CALENDAR_CSV=calendar / "trade_calendar.csv",
+        SUSPENSION_CSV=suspension / "records.csv",
+        MARKET_DIR=market,
+    )
+    return mocker.Mock()
 
 
 # =========================================================================
@@ -220,13 +255,11 @@ class TestU0:
     """U0 全A基础池测试"""
 
     def test_u0_build_fails_without_data(self, mocker):
-        """无 Tushare 数据时应该报错"""
-        from universes import _ts_client_mod
-        mock = mocker.patch.object(_ts_client_mod, "get_ts_client", autospec=True)
-        mock.return_value.stock_basic.return_value = pd.DataFrame()
-        mock.return_value.trade_cal.return_value = pd.DataFrame()
+        """无 canonical DataHub stock_basic 时应该报错"""
+        import universes
+        mocker.patch.object(universes, "STOCK_BASIC_CSV", Path("/nonexistent/stock_basic.csv"))
 
-        with pytest.raises(RuntimeError, match="stock_basic 返回空"):
+        with pytest.raises(RuntimeError, match="stock_basic missing"):
             build_u0()
 
     def test_u0_basic_structure(self, mock_ts_client_minimal):
@@ -262,6 +295,7 @@ class TestU0:
         for s in result["stocks"]:
             for field in required_fields:
                 assert field in s, f"缺少字段: {field}"
+            assert s["exchange"] in {"SSE", "SZSE", "BSE"}
 
     def test_u0_data_sources(self, mock_ts_client_minimal):
         """U0 数据来源声明"""
@@ -273,7 +307,7 @@ class TestU0:
 
         result = build_u0()
         assert len(result["data_sources"]) >= 1
-        assert "Tushare stock_basic" in result["data_sources"]
+        assert "DataHub reference/stock_basic.csv" in result["data_sources"]
 
 
 # =========================================================================
@@ -296,8 +330,8 @@ class TestU1:
         assert result["name"] == "U1"
         assert result["label"] == "用户可交易池"
         assert "filtered_counts" in result
-        # 第1只股票有 delist_date → 被过滤 → 剩2只
-        assert result["total_stocks"] == 2
+        # 第1只股票有 delist_date → 被过滤 → 剩4只
+        assert result["total_stocks"] == 4
 
     def test_u1_fields(self, mock_ts_client_minimal):
         """U1 股票包含所有交易标记+扩展字段"""
@@ -588,8 +622,9 @@ class TestEdgeCases:
     """边界情况测试"""
 
     def test_empty_stock_basic_all_status(self, mock_ts_client_minimal):
-        """所有 stock_basic 状态返回空应报错"""
-        mock_ts_client_minimal.stock_basic.return_value = pd.DataFrame()
+        """canonical stock_basic 为空应报错"""
+        import universes
+        pd.DataFrame().to_csv(universes.STOCK_BASIC_CSV, index=False)
         with pytest.raises(RuntimeError):
             build_u0()
 

@@ -699,28 +699,28 @@ def run_all_audits() -> dict[str, str]:
 
     results: dict[str, str] = {}
 
-    print("[1/4] 覆盖率统计...")
+    print("[1/5] 覆盖率统计...")
     c = coverage()
     results["coverage"] = str(HEALTH_DIR / "coverage.json")
     print(f"      股票数: {c['stocks_with_data']}/{c['total_stocks']}, "
           f"日期范围: {c['earliest_date']} ~ {c['latest_date']}")
     print()
 
-    print("[2/4] 数据新鲜度...")
+    print("[2/5] 数据新鲜度...")
     f = freshness()
     results["freshness"] = str(HEALTH_DIR / "freshness.json")
     print(f"      平均滞后: {f['average_lag_days']} 天, "
           f"新鲜: {f['freshness_distribution']['fresh (<=7d)']} 只")
     print()
 
-    print("[3/4] 缺失率报告...")
+    print("[3/5] 缺失率报告...")
     m = missing()
     results["missing"] = str(HEALTH_DIR / "missing.json")
     print(f"      已拉取: {m['pulled_stocks']}/{m['u0_total']}, "
           f"缺失: {m['missing_stocks']}")
     print()
 
-    print("[4/4] 生存偏差检查...")
+    print("[4/5] 生存偏差检查...")
     s = survivorship_check()
     results["survivorship"] = str(HEALTH_DIR / "survivorship.json")
     print(f"      退市: {s['delisted_stocks']}, "
@@ -728,8 +728,20 @@ def run_all_audits() -> dict[str, str]:
           f"生存偏差风险: {s['survivorship_bias_risk']}%")
     print()
 
+    print("[5/5] 行级完整性检查...")
+    from factor_lab.datahub_integrity import audit_daily_integrity
+
+    integrity_report = audit_daily_integrity(output_path=HEALTH_DIR / "integrity.json")
+    results["integrity"] = str(HEALTH_DIR / "integrity.json")
+    print(
+        f"      状态: {integrity_report['status']}, "
+        f"问题文件: {integrity_report['problematic_file_count']}, "
+        f"缺失活跃文件: {len(integrity_report['missing_active_files'])}"
+    )
+    print()
+
     print("=" * 60)
-    print("  ✅ 全部审计完成")
+    print(f"  {'✅' if integrity_report['status'] == 'OK' else '❌'} 全部审计完成")
     print(f"  报告目录: {HEALTH_DIR}")
     for name, path in results.items():
         print(f"    {name}: {path}")

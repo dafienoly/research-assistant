@@ -30,6 +30,9 @@ def main() -> int:
     service = DecisionLoopService()
     status = service.status()
     data = read(ROOT / "artifacts/vnext/data_audit_report.json")
+    integrity = read(ROOT / "data/audit/health/integrity.json")
+    benchmark_projection = read(ROOT / "data/normalized/derived/benchmarks/manifest.json")
+    regulatory_truth = read(ROOT / "data/normalized/events/regulatory_watchlist.json")
     certification = service.store.read_json("certification/latest.json", default={"status": "NOT_RUN"})
     qmt_response = QMTClient().health()
     qmt = qmt_response.get("data") if qmt_response.get("status") == "ok" else {}
@@ -43,6 +46,9 @@ def main() -> int:
         "| 能力 | 当前状态 | 证据 / 阻断 |",
         "|---|---|---|",
         f"| VNext 数据健康 | {data.get('status', 'MISSING')} | {'；'.join(data.get('blocking_reasons', [])) or '无'} |",
+        f"| 行情行级完整性 | {integrity.get('status', 'MISSING')} | 问题文件={integrity.get('problematic_file_count', 'unknown')}，缺失活跃文件={len(integrity.get('missing_active_files', []))} |",
+        f"| 动态基准投影 | {benchmark_projection.get('status', 'MISSING')} | canonical DataHub derived/benchmarks |",
+        f"| 监管公告真值 | {regulatory_truth.get('status', 'MISSING')} | 缺失时 PreTrade BUY fail-closed |",
         f"| 真实确认持仓 | {'READY' if status.get('current_position_snapshot') else 'BLOCKED'} | {status.get('current_position_snapshot', {}).get('snapshot_id', 'confirmed snapshot missing') if status.get('current_position_snapshot') else 'confirmed snapshot missing'} |",
         f"| 日级授权 | {(status.get('daily_authorization') or {}).get('status', 'inactive')} | 收盘自动失效，参数/数据/审计/风险变化自动撤销 |",
         f"| 分钟决策周期 | {service.store.read_json('cycles/latest.json', default={'status': 'NOT_RUN'}).get('status')} | 统一 DecisionCycleResult + 周期锁 |",
@@ -54,6 +60,10 @@ def main() -> int:
         "",
     ]
     blockers = list(data.get("blocking_reasons", [])) + list(status.get("execution_readiness", {}).get("reasons", []))
+    if integrity.get("status") != "OK":
+        blockers.append("canonical_daily_integrity_not_ok")
+    if regulatory_truth.get("status") not in {"OK", "EMPTY"}:
+        blockers.append("regulatory_truth_unavailable")
     lines.extend([f"- {item}" for item in dict.fromkeys(blockers)] or ["- 无"])
     output = ROOT / "docs/generated/current_capabilities.md"
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -62,8 +72,20 @@ def main() -> int:
         "events/events.jsonl",
         "execution/audit.jsonl",
         "notifications/delivery_receipts.jsonl",
+        "notifications/acknowledgements.jsonl",
+        "notifications/dead_letter.jsonl",
         "cycles/history.jsonl",
         "reviews/records.jsonl",
+        "authorization/audit.jsonl",
+        "positions/history.jsonl",
+        "positions/rollback_audit.jsonl",
+        "reconciliation/history.jsonl",
+        "reconciliation/failure_history.jsonl",
+        "parameters/candidates.jsonl",
+        "parameters/weekly_candidates.jsonl",
+        "parameters/audit.jsonl",
+        "parameters/production_history.jsonl",
+        "certification/history.jsonl",
     ):
         service.store.archive_jsonl(name, datetime.now().astimezone() - timedelta(days=90))
     print(output)
