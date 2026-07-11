@@ -865,6 +865,17 @@
       "behavior": "Live readiness 只接受 24 小时内且全部通过的 canonical coverage/freshness/integrity 审计；因子基准和批量股票枚举通过 DataHub facade，缺失或过期时 fail-closed。"
     },
     {
+      "id": "INFRA-FUND-FLOW-CONSUMER-01",
+      "title": "遗留资金流 CLI 只读 canonical DataHub",
+      "code_locations": [
+        {"file": "commands/fund_flow.py", "function": "extract_stock_fund_flow", "line": 11},
+        {"file": "commands/fund_flow.py", "function": "extract_market_fund_flow", "line": 42},
+        {"file": "commands/tests/test_fund_flow_datahub.py", "line": 1}
+      ],
+      "expected_keywords": ["read_fund_flow_partitions", "read_trade_calendar", "datahub:moneyflow", "data_status", "STALE", "MISSING", "canonical market-wide fund-flow dataset unavailable"],
+      "behavior": "个股资金流兼容接口只读 canonical 分区并按交易日历报告来源、观测日期和 OK/STALE 状态；没有 owned dataset 的市场汇总明确 MISSING，不允许业务层浏览器或外部 provider fallback。"
+    },
+    {
       "id": "P1-REGULATORY-COVERAGE-01",
       "title": "监管公告 ingestion 与逐标的覆盖感知门禁",
       "code_locations": [
