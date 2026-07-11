@@ -14,15 +14,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 
+from factor_lab.datahub_access import PROJECT_ROOT
 from factor_lab.research_skill.skill_spec import (
     SkillSpec,
     SkillParam,
     SkillCategory,
-    SkillStatus,
 )
 
 CST = timezone(timedelta(hours=8))
@@ -32,23 +31,45 @@ CST = timezone(timedelta(hours=8))
 
 
 def _execute_data_quality(ctx, params: dict) -> dict:
-    """检查数据源健康状态和新鲜度"""
-    results = {}
+    """检查 canonical coverage、freshness 与 integrity 审计。"""
+    import json
 
-    # 检查 fetch_log 新鲜度
+    max_age_hours = float(params.get("max_age_hours", 24))
+    health_root = PROJECT_ROOT / "data" / "audit" / "health"
+    audits = {}
+    errors = []
+    for name in ("coverage", "freshness", "integrity"):
+        path = health_root / f"{name}.json"
+        try:
+            report = json.loads(path.read_text(encoding="utf-8"))
+            generated = datetime.fromisoformat(str(report["generated_at"]))
+            age_hours = (datetime.now(CST) - generated.astimezone(CST)).total_seconds() / 3600
+            if age_hours > max_age_hours:
+                errors.append(f"{name}:stale:{age_hours:.1f}h")
+            audits[name] = {"status": report.get("status"), "generated_at": report["generated_at"]}
+        except (OSError, KeyError, ValueError, json.JSONDecodeError) as exc:
+            errors.append(f"{name}:unavailable:{type(exc).__name__}")
+
+    coverage_path = health_root / "coverage.json"
     try:
-        log_path = Path("/home/ly/.hermes/research-assistant/data/audit/fetch_log.jsonl")
-        if log_path.exists():
-            lines = log_path.read_text().splitlines()
-            results["fetch_log_count"] = len(lines)
-            if lines:
-                import json
-                last = json.loads(lines[-1])
-                results["last_fetch"] = last.get("timestamp", "unknown")
-        else:
-            results["fetch_log"] = "not_found"
-    except Exception as e:
-        results["fetch_log"] = {"error": str(e)}
+        coverage = json.loads(coverage_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        coverage = {}
+    passed = (
+        not errors
+        and coverage.get("universe_status") == "OK"
+        and coverage.get("active_missing_files") == 0
+        and coverage.get("stocks_with_data") == coverage.get("total_stocks")
+        and audits.get("freshness", {}).get("status") == "OK"
+        and audits.get("integrity", {}).get("status") == "OK"
+    )
+    results = {
+        "status": "OK" if passed else "BLOCKED",
+        "source": "canonical_datahub_audits",
+        "audits": audits,
+        "coverage": f"{coverage.get('stocks_with_data')}/{coverage.get('total_stocks')}",
+        "errors": errors,
+    }
 
     # 检查数据源注册表
     try:
@@ -295,7 +316,7 @@ def _execute_strategy_report(ctx, params: dict) -> dict:
             if not path.exists():
                 return {"error": f"文件不存在: {result_path}"}
             import json as _json
-            data = _json.loads(path.read_text())
+            _json.loads(path.read_text())
             # 尝试重建 PortfolioResult (需要 Portfolio 模块)
             results["loaded"] = True
             results["source_file"] = result_path

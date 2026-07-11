@@ -159,3 +159,5 @@ Vite/Rolldown 生产构建原有 1.14 MB 与 550 KB 大块。现按 charts、Ant
 能力文档任务已负责对事件、执行、通知、授权、持仓、对账、参数、认证、周期和 ReviewRecord 做 90 日归档。归档时间识别已覆盖 `attempted_at/started_at/completed_at/acknowledged_at/as_of` 等运行字段；无可识别时间的记录保留在当前账本，不再错误视为过期。归档实现使用临时文件、`fsync`、`os.replace`；先安全落盘 archive，再替换当前账本，异常时不允许截断源 JSONL。
 
 代码审计协调器原来按 change-set 同时缓存 PASS 和 FAIL，环境性失败（例如临时盘满）在环境恢复后仍会永久阻断且不重跑。现只复用已通过结果；失败和异常每次重新执行完整门禁。测试临时目录统一可由 `TMPDIR/TEMP/TMP` 指向 WSL `/tmp`，不通过删除 Windows 临时数据解决容量问题。
+
+内置 Research Skill 的“数据质量”原来只统计 `fetch_log.jsonl` 行数，无法证明数据可用；Registry/Runtime 又把运行状态写入源码树 `agent_tasks`。现 Skill 强制读取有时效限制的 canonical coverage/freshness/integrity 并输出 OK/BLOCKED；运行状态默认迁至 `~/.hermes/state/research-assistant/research-skills`，支持环境覆盖，旧源码树内容保留不删。

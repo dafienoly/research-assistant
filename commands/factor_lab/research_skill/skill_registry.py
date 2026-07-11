@@ -11,20 +11,24 @@ Centralized registry for all available research skills. Supports:
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
+import os
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
 
 from factor_lab.research_skill.skill_spec import (
     SkillSpec,
-    SkillCategory,
     validate_spec,
 )
 
 
 CST = timezone(timedelta(hours=8))
-REGISTRY_ROOT = Path("/home/ly/.hermes/research-assistant/agent_tasks/skill_registry")
+REGISTRY_ROOT = Path(
+    os.environ.get(
+        "HERMES_RESEARCH_SKILL_REGISTRY",
+        Path.home() / ".hermes/state/research-assistant/research-skills/registry",
+    )
+)
 
 
 class SkillRegistry:

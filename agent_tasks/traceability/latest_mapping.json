@@ -973,6 +973,18 @@
       "behavior": "旧脚本不能写入硬编码 backtested 状态或伪造收益/IC；运行时 fail-loud。治理测试的候选、索引和报告全部位于 pytest 临时根，不写入或删除 D 盘生产数据。"
     },
     {
+      "id": "P2-RESEARCH-SKILL-STATE-01",
+      "title": "Research Skill 使用 canonical 数据健康与外置状态根",
+      "code_locations": [
+        {"file": "commands/factor_lab/research_skill/builtins.py", "function": "_execute_data_quality", "line": 35},
+        {"file": "commands/factor_lab/research_skill/skill_registry.py", "line": 1},
+        {"file": "commands/factor_lab/research_skill/skill_runtime.py", "line": 1},
+        {"file": "commands/tests/test_research_skill_data_quality.py", "line": 1}
+      ],
+      "expected_keywords": ["canonical_datahub_audits", "coverage", "freshness", "integrity", "HERMES_RESEARCH_SKILL_REGISTRY", "HERMES_RESEARCH_SKILL_RUNTIME", ".hermes/state/research-assistant/research-skills"],
+      "behavior": "内置数据质量 Skill 只接受时效内的 canonical 三项审计并输出 OK/BLOCKED；registry/run 状态默认在源码树外持久化且可配置，旧数据不删除。"
+    },
+    {
       "id": "P1-WECHAT-PUSH-OUTBOX-01",
       "title": "旧 WeChatPusher 业务事件迁入双通道 outbox",
       "code_locations": [

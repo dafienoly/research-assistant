@@ -8,13 +8,14 @@ agent execution system via the SkillRegistry.
 from __future__ import annotations
 
 import json
+import os
 import time
 import uuid
 import traceback
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from factor_lab.research_skill.skill_spec import (
     SkillSpec,
@@ -26,7 +27,12 @@ from factor_lab.research_skill.skill_registry import SkillRegistry
 
 
 CST = timezone(timedelta(hours=8))
-RUNTIME_ROOT = Path("/home/ly/.hermes/research-assistant/agent_tasks/skill_runs")
+RUNTIME_ROOT = Path(
+    os.environ.get(
+        "HERMES_RESEARCH_SKILL_RUNTIME",
+        Path.home() / ".hermes/state/research-assistant/research-skills/runs",
+    )
+)
 DEFAULT_TIMEOUT = 300  # 5 minutes
 
 
