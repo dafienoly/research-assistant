@@ -952,6 +952,16 @@
       "behavior": "kill switch、risk sentinel 和盘中监控等遗留业务调用不执行网络请求；内容哈希事件以单次加锁批量方式写入 Telegram 与企业微信 outbox，重复调用幂等，worker 独立重试并 dead-letter。"
     },
     {
+      "id": "P0-DUAL-CHANNEL-READINESS-01",
+      "title": "实盘就绪门禁要求双通道受控环境凭据",
+      "code_locations": [
+        {"file": "commands/live_readiness.py", "function": "check_wechat_notify", "line": 897},
+        {"file": "commands/tests/test_live_readiness.py", "function": "test_missing_telegram_fails_without_shell_fallback", "line": 1480}
+      ],
+      "expected_keywords": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "WECOM_WEBHOOK_URL", "双通道通知凭据不完整", "禁止依赖 .bashrc"],
+      "behavior": "Live readiness 同时要求 Telegram 和企业微信凭据存在于进程环境；不启动 shell 或读取 .bashrc，任一通道缺失即 blocker。"
+    },
+    {
       "id": "P1-AUDIT-RETRY-01",
       "title": "代码审计失败结果不得永久缓存",
       "code_locations": [

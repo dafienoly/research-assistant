@@ -895,55 +895,42 @@ class LiveReadinessChecker:
     # ── 13. WeChatNotifyGate — 企业微信通知正常 ───────────────────
 
     def check_wechat_notify(self) -> GateOutput:
-        """检查企业微信通知是否正常工作。
+        """检查 Telegram + 企业微信 durable worker 凭据是否完整。
 
         验证:
-          - WECHAT_WEBHOOK_URL 环境变量已配置
-          - 可成功发送测试消息
-          - 通知频率和冷却机制正常
+          - WECHAT_WEBHOOK_URL/WECOM_WEBHOOK_URL 已配置
+          - TELEGRAM_BOT_TOKEN 与 TELEGRAM_CHAT_ID 已配置
+          - 不从交互 shell 或 .bashrc 读取凭据
         """
         gate = GateOutput(gate_name="WeChatNotifyGate", severity="blocker")
 
         evidence_parts = []
 
-        # 检查 webhook URL
-        webhook = os.environ.get("WECHAT_WEBHOOK_URL", "")
+        webhook = os.environ.get("WECHAT_WEBHOOK_URL") or os.environ.get("WECOM_WEBHOOK_URL")
+        telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+        telegram_chat = os.environ.get("TELEGRAM_CHAT_ID", "")
         if webhook:
-            evidence_parts.append("WECHAT_WEBHOOK_URL 环境变量已配置")
+            evidence_parts.append("企业微信环境凭据已配置")
+        else:
+            evidence_parts.append("企业微信环境凭据未配置")
+        if telegram_token and telegram_chat:
+            evidence_parts.append("Telegram 环境凭据已配置")
+        else:
+            evidence_parts.append("Telegram 环境凭据未配置")
+
+        if webhook and telegram_token and telegram_chat:
             gate.passed = True
             gate.severity = "info"
-            gate.message = "企业微信通知正常 (Webhook 已配置)"
+            gate.message = "Telegram 与企业微信双通道 worker 凭据完整"
             gate.fix_suggestion = ""
         else:
-            evidence_parts.append("WECHAT_WEBHOOK_URL 未配置")
-
-            # 尝试从 .bashrc 读取
-            try:
-                import subprocess as sp
-                r = sp.run(
-                    ["bash", "-c", "source ~/.bashrc && echo $WECHAT_WEBHOOK_URL"],
-                    capture_output=True, text=True, timeout=5,
-                )
-                webhook_from_bashrc = r.stdout.strip()
-                if webhook_from_bashrc:
-                    evidence_parts.append(".bashrc 中存在 webhook 配置")
-                    gate.passed = True
-                    gate.severity = "info"
-                    gate.message = "企业微信通知正常 (Webhook 在 .bashrc 中)"
-                else:
-                    gate.passed = False
-                    gate.severity = "blocker"
-                    gate.message = "企业微信 Webhook 未配置"
-                    gate.fix_suggestion = (
-                        "在 .bashrc 或环境变量中设置 "
-                        "export WECHAT_WEBHOOK_URL=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx"
-                    )
-            except Exception as e:
-                evidence_parts.append(f"读取 .bashrc 失败: {e}")
-                gate.passed = False
-                gate.severity = "blocker"
-                gate.message = "企业微信 Webhook 无法读取"
-                gate.fix_suggestion = "在 .bashrc 中设置 WECHAT_WEBHOOK_URL"
+            gate.passed = False
+            gate.severity = "blocker"
+            gate.message = "双通道通知凭据不完整"
+            gate.fix_suggestion = (
+                "通过受控进程环境配置 WECHAT_WEBHOOK_URL、TELEGRAM_BOT_TOKEN、"
+                "TELEGRAM_CHAT_ID；禁止依赖 .bashrc"
+            )
 
         gate.evidence = "; ".join(evidence_parts)
         return gate

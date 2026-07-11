@@ -1456,35 +1456,34 @@ class TestWeChatNotifyGate:
         assert result.gate_name == "WeChatNotifyGate"
         assert isinstance(result.evidence, str)
 
-    def test_uses_env_var(self):
+    def test_uses_env_var(self, monkeypatch):
         """检查环境变量"""
-        import os
-        original = os.environ.get("WECHAT_WEBHOOK_URL", "")
-        try:
-            os.environ["WECHAT_WEBHOOK_URL"] = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test"
-            checker = LiveReadinessChecker()
-            result = checker.check_wechat_notify()
-            assert result.passed is True
-        finally:
-            if original:
-                os.environ["WECHAT_WEBHOOK_URL"] = original
-            else:
-                del os.environ["WECHAT_WEBHOOK_URL"]
+        monkeypatch.setenv("WECHAT_WEBHOOK_URL", "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test")
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "token")
+        monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+        checker = LiveReadinessChecker()
+        result = checker.check_wechat_notify()
+        assert result.passed is True
 
-    def test_missing_webhook_fails(self):
+    def test_missing_webhook_fails(self, monkeypatch):
         """缺少 Webhook 时失败"""
-        import os
-        original = os.environ.get("WECHAT_WEBHOOK_URL", "")
-        try:
-            if "WECHAT_WEBHOOK_URL" in os.environ:
-                del os.environ["WECHAT_WEBHOOK_URL"]
-            checker = LiveReadinessChecker()
-            result = checker.check_wechat_notify()
-            # May pass if .bashrc has webhook, may fail otherwise
-            assert isinstance(result.passed, bool)
-        finally:
-            if original:
-                os.environ["WECHAT_WEBHOOK_URL"] = original
+        monkeypatch.delenv("WECHAT_WEBHOOK_URL", raising=False)
+        monkeypatch.delenv("WECOM_WEBHOOK_URL", raising=False)
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "token")
+        monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+        checker = LiveReadinessChecker()
+        result = checker.check_wechat_notify()
+        assert result.passed is False
+        assert result.severity == "blocker"
+
+    def test_missing_telegram_fails_without_shell_fallback(self, monkeypatch):
+        monkeypatch.setenv("WECHAT_WEBHOOK_URL", "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test")
+        monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+        monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+        result = LiveReadinessChecker().check_wechat_notify()
+        assert result.passed is False
+        source = Path(__import__("live_readiness").__file__).read_text(encoding="utf-8")
+        assert "source ~/.bashrc" not in source
 
 
 class TestRunLiveReadinessCheck:
