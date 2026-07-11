@@ -17,6 +17,7 @@ grep -qx 'status=FINAL_COMPLETE' "$backup/metadata/manifest.env" || {
 }
 
 count_csv() {
+  [[ -d "$1" ]] || { echo 0; return 0; }
   find "$1" -maxdepth 1 -type f -name '*.csv' 2>/dev/null | wc -l
 }
 
