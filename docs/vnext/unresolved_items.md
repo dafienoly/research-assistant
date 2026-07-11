@@ -26,4 +26,4 @@
 - vectorbt 受 Apache-2.0 + Commons Clause 约束，仅批准隔离内部研究；商业托管或分发前需重新审查。
 - vn.py、OpenBB、FinRL/FinRL-X、Qbot 均未装入 Core；comment-only lock 表示“未安装”，不能宣称对应运行时已适配完成。
 - 无真实订单发送实现；任何未来 Live 通道必须另行授权、安全评审、Paper/Shadow 稳定性证明和小额白名单验收。
-- `intraday_monitor.py`、`etf_dive_warning.py`、`monitor_588710.py`、部分 dive predictor 与 `semiconductor_events.py` 仍存在生产可达的外部 provider 旁路；在统一 RealtimeQuoteEngine/Event Truth ingestion 前不得作为 Core 执行门禁证据。
+- `intraday_monitor.py` 已收敛为 DataHub canonical live snapshot 只读消费者；`etf_dive_warning.py`、`monitor_588710.py`、部分 dive predictor 与 `semiconductor_events.py` 仍存在生产可达的外部 provider 旁路，在统一 DataHub/Event Truth ingestion 前不得作为 Core 执行门禁证据。

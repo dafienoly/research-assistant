@@ -103,3 +103,13 @@ def test_universe_builders_are_read_only_datahub_consumers():
     assert "get_ts_client" not in source
     assert "._query(" not in source
     assert "requests." not in source
+
+
+def test_intraday_monitor_is_read_only_datahub_consumer():
+    path = ROOT / "commands/intraday_monitor.py"
+    assert provider_imports(path) == []
+    source = path.read_text(encoding="utf-8")
+    assert "read_live_snapshot" in source
+    assert "fetch_stock_prices" not in source
+    assert "fetch_sina_quotes" not in source
+    assert "stock_zh_a_spot_em" not in source

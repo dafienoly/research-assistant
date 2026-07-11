@@ -13,7 +13,7 @@ from typing import Optional
 from config import PATHS, now_str, now_cst, date_id, ensure_dirs, read_csv_safe, safe_write_json, append_jsonl
 from rsscast_mcp import (
     fetch_stock_prices, fetch_kline, fetch_index_prices,
-    fetch_sina_quotes, fetch_akshare_spot,
+    fetch_sina_quotes, fetch_company_overview,
 )
 
 
@@ -21,76 +21,11 @@ class MarketDataFetcher:
     """行情数据获取器"""
 
     def update_live_snapshot(self, priority_codes: list[str] = None) -> dict:
-        """更新全A实时快照
+        """Compatibility entrypoint delegated to the DataHub ingestion owner."""
+        from factor_lab.datahub_ingestion.live_snapshot import LiveSnapshotIngestion
 
-        策略:
-        1. RSScast MCP 获取优先股
-        2. AKShare 获取全A快照
-        3. Sina 作为深度备用
-        """
-        ensure_dirs()
-        snapshot_time = now_str()
-
-        # 1. 优先股 - RSScast
-        priority_data = []
-        if priority_codes:
-            priority_data = fetch_stock_prices(priority_codes)
-            time.sleep(0.5)  # 避免频率限制
-
-        # 2. 全A - AKShare
-        all_data = fetch_akshare_spot()
-
-        # 3. 合并
-        all_map = {}
-        for row in all_data:
-            code = str(row.get("code", "")).strip()
-            if code:
-                all_map[code] = row
-
-        for row in priority_data:
-            code = str(row.get("code", ""))
-            if code:
-                all_map[code] = row
-
-        # 写 CSV
-        snapshot_path = PATHS["market"] / "live_snapshot.csv"
-        fields = ["code", "name", "last_price", "change_pct", "change_amount",
-                   "volume", "amount", "amplitude", "turnover_rate",
-                   "pe", "pb", "open", "high", "low", "source", "update_time"]
-        with open(snapshot_path, "w", encoding="utf-8-sig", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
-            w.writeheader()
-            for code, row in all_map.items():
-                record = {
-                    "code": code,
-                    "name": row.get("name", ""),
-                    "last_price": row.get("last_price", row.get("最新价", "")),
-                    "change_pct": row.get("change_pct", row.get("涨跌幅", "")),
-                    "change_amount": row.get("change_amount", row.get("涨跌额", "")),
-                    "volume": row.get("volume", row.get("成交量", "")),
-                    "amount": row.get("amount", row.get("成交额", "")),
-                    "amplitude": row.get("amplitude", row.get("振幅", "")),
-                    "turnover_rate": row.get("turnover_rate", row.get("换手率", "")),
-                    "pe": row.get("pe", row.get("市盈率-动态", "")),
-                    "pb": row.get("pb", row.get("市净率", "")),
-                    "open": row.get("open", ""),
-                    "high": row.get("high", ""),
-                    "low": row.get("low", ""),
-                    "source": row.get("source", "akshare"),
-                    "update_time": snapshot_time,
-                }
-                w.writerow(record)
-
-        # 写审计日志
-        append_jsonl(PATHS["audit"] / "fetch_log.jsonl", {
-            "timestamp": snapshot_time,
-            "action": "update_live_snapshot",
-            "source": "rsscast_mcp+akshare",
-            "records": len(all_map),
-            "priority_records": len(priority_data),
-        })
-
-        return {"total": len(all_map), "priority": len(priority_data)}
+        manifest = LiveSnapshotIngestion().fetch_locked(priority_codes)
+        return {"total": manifest["rows"], "priority": manifest["priority_rows"]}
 
     def update_daily_kline(self, codes: list[str], start_date: str = None, end_date: str = None):
         """更新日K线数据"""

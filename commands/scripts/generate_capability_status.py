@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "commands"))
 
 from factor_lab.decision_loop.service import DecisionLoopService  # noqa: E402
 from factor_lab.broker.qmt_client import QMTClient  # noqa: E402
+from factor_lab.datahub_access import LIVE_SNAPSHOT_PATH  # noqa: E402
 
 
 def read(path: Path) -> dict:
@@ -32,6 +33,7 @@ def main() -> int:
     data = read(ROOT / "artifacts/vnext/data_audit_report.json")
     integrity = read(ROOT / "data/audit/health/integrity.json")
     benchmark_projection = read(ROOT / "data/normalized/derived/benchmarks/manifest.json")
+    live_snapshot = read(LIVE_SNAPSHOT_PATH.with_suffix(".manifest.json"))
     regulatory_truth = read(ROOT / "data/normalized/events/regulatory_watchlist.json")
     certification = service.store.read_json("certification/latest.json", default={"status": "NOT_RUN"})
     qmt_response = QMTClient().health()
@@ -48,6 +50,7 @@ def main() -> int:
         f"| VNext 数据健康 | {data.get('status', 'MISSING')} | {'；'.join(data.get('blocking_reasons', [])) or '无'} |",
         f"| 行情行级完整性 | {integrity.get('status', 'MISSING')} | 问题文件={integrity.get('problematic_file_count', 'unknown')}，缺失活跃文件={len(integrity.get('missing_active_files', []))} |",
         f"| 动态基准投影 | {benchmark_projection.get('status', 'MISSING')} | canonical DataHub derived/benchmarks |",
+        f"| 盘中 canonical 快照 | {live_snapshot.get('status', 'MISSING')} | rows={live_snapshot.get('rows', 0)}，observed_at={live_snapshot.get('observed_at', 'unknown')} |",
         f"| 监管公告真值 | {regulatory_truth.get('status', 'MISSING')} | 缺失时 PreTrade BUY fail-closed |",
         f"| 真实确认持仓 | {'READY' if status.get('current_position_snapshot') else 'BLOCKED'} | {status.get('current_position_snapshot', {}).get('snapshot_id', 'confirmed snapshot missing') if status.get('current_position_snapshot') else 'confirmed snapshot missing'} |",
         f"| 日级授权 | {(status.get('daily_authorization') or {}).get('status', 'inactive')} | 收盘自动失效，参数/数据/审计/风险变化自动撤销 |",

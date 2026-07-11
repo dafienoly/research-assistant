@@ -1,12 +1,18 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 
 import pandas as pd
 import pytest
 
 from factor_lab import datahub_access
-from factor_lab.datahub_access import calendar_row, daily_kline_path, latest_open_date, read_trade_calendar
+from factor_lab.datahub_access import (
+    calendar_row,
+    daily_kline_path,
+    latest_open_date,
+    read_live_snapshot,
+    read_trade_calendar,
+)
 
 
 def write_calendar(tmp_path):
@@ -48,3 +54,37 @@ def test_daily_kline_path_uses_canonical_roots_and_fails_when_symbol_missing(tmp
     assert daily_kline_path("600000.SH") == kline
     with pytest.raises(FileNotFoundError):
         daily_kline_path("000001.SZ")
+
+
+def test_live_snapshot_normalizes_codes_and_reports_provenance(tmp_path):
+    snapshot = tmp_path / "live_snapshot.csv"
+    pd.DataFrame(
+        [{
+            "code": "sh600000", "last_price": 10.5, "change_pct": -1.2,
+            "volume": 100, "amount": 1050, "source": "akshare",
+            "update_time": "2026-07-10T10:30:00+08:00",
+        }]
+    ).to_csv(snapshot, index=False)
+    rows = read_live_snapshot(
+        ["600000", "sh600000"], path=snapshot,
+        now=datetime(2026, 7, 10, 10, 30, 30, tzinfo=timezone.utc).astimezone(),
+        max_age_seconds=24 * 3600,
+    )
+    assert rows["600000"]["price"] == 10.5
+    assert rows["sh600000"]["change_pct"] == -1.2
+    assert rows["600000"]["source"] == "datahub:akshare"
+
+
+def test_live_snapshot_rejects_stale_truth(tmp_path):
+    snapshot = tmp_path / "live_snapshot.csv"
+    pd.DataFrame(
+        [{
+            "code": "600000", "last_price": 10.5, "change_pct": -1.2,
+            "source": "akshare", "update_time": "2026-07-10T10:00:00+08:00",
+        }]
+    ).to_csv(snapshot, index=False)
+    with pytest.raises(ValueError, match="stale"):
+        read_live_snapshot(
+            ["600000"], path=snapshot,
+            now=datetime(2026, 7, 10, 3, 0, tzinfo=timezone.utc), max_age_seconds=60,
+        )

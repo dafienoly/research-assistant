@@ -6,6 +6,12 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # Minute guard: holdings + persisted recommendations/anchor ETFs. The runner is
 # fail-closed unless confirmed positions, MiniQMT quotes, and trade-calendar
 # confirmation are all available. Live orders still require daily authorization.
+# Canonical live market truth has one ingestion owner. The non-blocking global
+# lock prevents overlap with backup, recovery, and post-market DataHub writers.
+* 9-10 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 commands/scripts/datahub_live_snapshot.py >> ~/.hermes/logs/datahub_live_snapshot.log 2>&1
+0-30 11 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 commands/scripts/datahub_live_snapshot.py >> ~/.hermes/logs/datahub_live_snapshot.log 2>&1
+* 13-14 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 commands/scripts/datahub_live_snapshot.py >> ~/.hermes/logs/datahub_live_snapshot.log 2>&1
+0 15 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 commands/scripts/datahub_live_snapshot.py >> ~/.hermes/logs/datahub_live_snapshot.log 2>&1
 30-59 9 * * 1-5 cd /home/ly/.hermes/research-assistant && .venv_quant/bin/python3 commands/scripts/decision_guard_once.py >> ~/.hermes/logs/decision_guard.log 2>&1
 * 10 * * 1-5 cd /home/ly/.hermes/research-assistant && .venv_quant/bin/python3 commands/scripts/decision_guard_once.py >> ~/.hermes/logs/decision_guard.log 2>&1
 0-30 11 * * 1-5 cd /home/ly/.hermes/research-assistant && .venv_quant/bin/python3 commands/scripts/decision_guard_once.py >> ~/.hermes/logs/decision_guard.log 2>&1

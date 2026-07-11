@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -17,6 +17,12 @@ STOCK_BASIC_PATH = DATAHUB_ROOT / "reference" / "stock_basic.csv"
 SHARED_DATAHUB_ROOT = Path(
     os.environ.get("HERMES_SHARED_DATAHUB_ROOT", "/mnt/c/Users/ly/.codex/data/a-share-data-hub")
 )
+LIVE_SNAPSHOT_PATH = SHARED_DATAHUB_ROOT / "market" / "live_snapshot.csv"
+
+
+def _optional_number(value: object) -> float | None:
+    parsed = pd.to_numeric(value, errors="coerce")
+    return None if pd.isna(parsed) else float(parsed)
 
 
 def _daily_kline_candidates() -> tuple[Path, ...]:
@@ -97,6 +103,60 @@ def read_stock_name_map(path: Path | None = None) -> dict[str, str]:
     usable["name"] = usable["name"].str.strip()
     usable = usable[(usable["symbol"] != "") & (usable["name"] != "")]
     return dict(zip(usable["symbol"], usable["name"], strict=False))
+
+
+def read_live_snapshot(
+    codes: list[str] | None = None,
+    *,
+    path: Path | None = None,
+    max_age_seconds: int = 120,
+    now: datetime | None = None,
+) -> dict[str, dict]:
+    """Read a fresh canonical intraday snapshot without provider access."""
+    source = path or LIVE_SNAPSHOT_PATH
+    if not source.exists():
+        raise FileNotFoundError(f"canonical DataHub live snapshot missing: {source}")
+    frame = pd.read_csv(source, encoding="utf-8-sig", dtype={"code": "string"})
+    required = {"code", "last_price", "change_pct", "update_time", "source"}
+    if frame.empty or not required.issubset(frame.columns):
+        raise ValueError(f"canonical live snapshot missing columns: {sorted(required - set(frame.columns))}")
+    observed = pd.to_datetime(frame["update_time"], errors="coerce", utc=True)
+    latest = observed.max()
+    if pd.isna(latest):
+        raise ValueError("canonical live snapshot has no valid observation time")
+    current = pd.Timestamp(now or datetime.now().astimezone())
+    if current.tzinfo is None:
+        current = current.tz_localize(datetime.now().astimezone().tzinfo)
+    age_seconds = max(0.0, (current.tz_convert("UTC") - latest).total_seconds())
+    if age_seconds > max_age_seconds:
+        raise ValueError(f"canonical DataHub live snapshot stale: {age_seconds:.0f}s > {max_age_seconds}s")
+
+    normalized = frame.copy()
+    normalized["bare_code"] = normalized["code"].str.lower().str.replace(r"^(sh|sz|bj)", "", regex=True)
+    normalized = normalized.drop_duplicates("bare_code", keep="last").set_index("bare_code")
+    requested = codes or normalized.index.astype(str).tolist()
+    result: dict[str, dict] = {}
+    for requested_code in requested:
+        key = str(requested_code).strip()
+        bare = key.lower()[2:] if key.lower().startswith(("sh", "sz", "bj")) else key.lower()
+        if bare not in normalized.index:
+            continue
+        row = normalized.loc[bare]
+        raw_source = row.get("source")
+        provider = "unknown" if raw_source is None or pd.isna(raw_source) else str(raw_source).strip()
+        result[key] = {
+            "code": key,
+            "price": _optional_number(row.get("last_price")),
+            "change_pct": _optional_number(row.get("change_pct")),
+            "volume": _optional_number(row.get("volume")),
+            "amount": _optional_number(row.get("amount")),
+            "amplitude": _optional_number(row.get("amplitude")),
+            "turnover_rate": _optional_number(row.get("turnover_rate")),
+            "delay_seconds": int(age_seconds),
+            "source": f"datahub:{provider or 'unknown'}",
+            "observed_at": latest.isoformat(),
+        }
+    return result
 
 
 def daily_kline_root() -> Path:

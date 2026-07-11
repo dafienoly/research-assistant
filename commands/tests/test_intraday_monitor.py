@@ -98,8 +98,7 @@ def mock_ensure_dirs():
 @pytest.fixture
 def no_fetch():
     """阻止所有真实行情获取"""
-    with patch("intraday_monitor.fetch_stock_prices", return_value=[]), \
-         patch("intraday_monitor.fetch_sina_quotes", return_value={}):
+    with patch("intraday_monitor.read_live_snapshot", return_value={}):
         yield
 
 
@@ -382,16 +381,14 @@ class TestCheckVolumeAnomaly:
 class TestRunAll:
     def test_run_all_returns_report(self, mock_paths, mock_ensure_dirs):
         """run_all 返回 LowFreqReport"""
-        with patch("intraday_monitor.fetch_stock_prices", return_value=[]), \
-             patch("intraday_monitor.fetch_sina_quotes", return_value={}):
+        with patch("intraday_monitor.read_live_snapshot", return_value={}):
             m = LowFreqMonitor()
             report = m.run_all()
             assert isinstance(report, LowFreqReport)
 
     def test_empty_run_all(self, mock_paths, mock_cst, mock_ensure_dirs):
         """无行情数据时, run_all 不报错"""
-        with patch("intraday_monitor.fetch_stock_prices", return_value=[]), \
-             patch("intraday_monitor.fetch_sina_quotes", return_value={}):
+        with patch("intraday_monitor.read_live_snapshot", return_value={}):
             m = LowFreqMonitor()
             report = m.run_all()
             s = report.summary()

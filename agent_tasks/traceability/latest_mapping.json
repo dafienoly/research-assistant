@@ -407,6 +407,19 @@
       ],
       "expected_keywords": ["STOCK_BASIC_PATH", "regulatory_truth_unavailable", "st_truth_unavailable", "available"],
       "behavior": "业务风险模块不再自动访问 AkShare/Eastmoney 或写 D 盘缓存；ST 读取 canonical 股票主表，监管快照缺失时 PreTrade BUY 明确阻断。"
+    },
+    {
+      "id": "INFRA-INTRADAY-DATAHUB-01",
+      "title": "盘中监控只读 canonical 快照且实时写入单一归属",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_access.py", "function": "read_live_snapshot", "line": 100},
+        {"file": "commands/factor_lab/datahub_ingestion/live_snapshot.py", "function": "LiveSnapshotIngestion", "line": 25},
+        {"file": "commands/intraday_monitor.py", "function": "load_snapshot", "line": 590},
+        {"file": "commands/intraday_monitor.py", "function": "fetch_quotes", "line": 1000},
+        {"file": "commands/tests/test_datahub_architecture.py", "function": "test_intraday_monitor_is_read_only_datahub_consumer", "line": 100}
+      ],
+      "expected_keywords": ["LIVE_SNAPSHOT_PATH", "fetch_locked", "canonical DataHub live snapshot stale", "read_live_snapshot", "stock_zh_a_spot_em"],
+      "behavior": "外部 provider 仅由 DataHub ingestion 调用；空响应保留旧快照，CSV 原子落盘并生成 SHA manifest。盘中业务复用一次 canonical 快照，缺失或过期时不自行联网。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

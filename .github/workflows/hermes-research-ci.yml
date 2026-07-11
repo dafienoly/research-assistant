@@ -71,6 +71,9 @@ jobs:
           commands/tests/test_data_pipeline.py
           commands/tests/test_datahub_integrity.py
           commands/tests/test_datahub_architecture.py
+          commands/tests/test_datahub_access.py
+          commands/tests/test_live_snapshot_ingestion.py
+          commands/tests/test_intraday_monitor.py
           commands/tests/test_benchmark_projection.py
           commands/tests/test_universes.py
           commands/tests/test_scheduling.py

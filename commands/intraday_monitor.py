@@ -21,7 +21,7 @@ from config import (
     VENV_PYTHON,
 )
 from wechat_push import WeChatPusher, build_position_drop_notice, build_position_critical_alert
-from rsscast_mcp import fetch_stock_prices, fetch_sina_quotes
+from factor_lab.datahub_access import read_live_snapshot
 
 # ========== V4.11 盘中低频监测常量 ==========
 
@@ -586,7 +586,7 @@ class IntradayMonitor:
         print(f"📊 读取: {len(self.positions)} 持仓, {len(self.candidates)} 推荐, {len(self.watchlist)} 关注")
 
     def load_snapshot(self) -> dict:
-        """加载实时快照 — Phase 2: 使用 RSScast MCP + Sina + 本地缓存"""
+        """只读 DataHub canonical 实时快照；消费者不得自行访问 provider。"""
         # 收集所有关注的股票代码
         all_codes = set()
         for items in [self.positions, self.candidates, self.watchlist]:
@@ -604,54 +604,12 @@ class IntradayMonitor:
 
         codes_list = sorted(all_codes)
         if not codes_list:
-            # 没有关注的股票，尝试本地缓存
-            cached = PATHS["market"] / "live_snapshot.csv"
-            if cached.exists():
-                rows = read_csv_safe(cached)
-                codes_list = [r.get("code", "") for r in rows if r.get("code")]
-
-        snapshot = {}
-        if codes_list:
-            # 1. RSScast MCP
-            try:
-                prices = fetch_stock_prices(codes_list[:50])  # MCP 限制
-                for p in prices:
-                    code = str(p.get("code", ""))
-                    if code:
-                        snapshot[code] = {
-                            "code": code,
-                            "price": p.get("last_price", 0),
-                            "change_pct": p.get("change_pct", 0) * 100 if p.get("change_pct") else 0,
-                            "volume": p.get("volume", 0),
-                            "amount": p.get("amount", 0),
-                            "amplitude": p.get("amplitude", 0),
-                            "turnover_rate": p.get("turnover_rate", 0),
-                            "delay_seconds": 0,  # MCP 数据无延迟
-                            "source": "rsscast",
-                        }
-            except Exception as e:
-                print(f"⚠️ RSScast 行情获取失败: {e}")
-
-            # 2. 如果还有未覆盖的，用 Sina 补充
-            missing = [c for c in codes_list if c not in snapshot]
-            if missing:
-                try:
-                    sina = fetch_sina_quotes(missing[:200])
-                    for code, data in sina.items():
-                        if code not in snapshot and data.get("last_price"):
-                            snapshot[code] = {
-                                "code": code,
-                                "price": data.get("last_price", 0),
-                                "change_pct": (data.get("change_pct", 0) * 100) if data.get("change_pct") else 0,
-                                "volume": data.get("volume", 0),
-                                "amount": data.get("amount", 0),
-                                "delay_seconds": 0,
-                                "source": "sina",
-                            }
-                except Exception as e:
-                    print(f"⚠️ Sina 行情获取失败: {e}")
-
-        return snapshot
+            return {}
+        try:
+            return read_live_snapshot(codes_list)
+        except (FileNotFoundError, ValueError, OSError) as error:
+            print(f"⚠️ DataHub 实时快照不可用: {error}")
+            return {}
 
     def classify_event(self, event: dict) -> str:
         """对事件进行 L0-L4 分级"""
@@ -1039,53 +997,34 @@ class LowFreqMonitor:
 
     # ── 数据获取 ──────────────────────────────────────────
 
+    def _load_datahub_snapshot(self) -> dict[str, dict]:
+        if self.market_snapshot:
+            return self.market_snapshot
+        try:
+            self.market_snapshot = read_live_snapshot()
+        except (FileNotFoundError, ValueError, OSError) as error:
+            print(f"  ⚠️ DataHub 实时快照不可用: {error}")
+            self.market_snapshot = {}
+        return self.market_snapshot
+
     def fetch_quotes(self, codes: list[str]) -> dict[str, dict]:
-        """从 RSScast → Sina → 本地缓存逐级获取行情
+        """从 DataHub canonical 实时快照读取行情。
 
         Returns:
             {code: {price, change_pct, volume, amount, source}}
         """
-        merged: dict[str, dict] = {}
         if not codes:
-            return merged
-
-        # P1: RSScast MCP
-        try:
-            prices = fetch_stock_prices(codes[:50])
-            for p in prices:
-                code = str(p.get("code", ""))
-                if code:
-                    merged[code] = {
-                        "code": code,
-                        "price": p.get("last_price"),
-                        "change_pct": (p.get("change_pct", 0) or 0) * 100,
-                        "volume": p.get("volume", 0),
-                        "amount": p.get("amount", 0),
-                        "source": "rsscast",
-                    }
-        except Exception as e:
-            print(f"  ⚠️ RSScast 行情获取失败: {e}")
-
-        # P2: Sina 补充缺失
-        missing = [c for c in codes if c not in merged or merged[c].get("price") is None]
-        if missing:
-            try:
-                sina = fetch_sina_quotes(missing[:200])
-                for code, data in sina.items():
-                    if code not in merged or merged[code].get("price") is None:
-                        merged[code] = {
-                            "code": code,
-                            "price": data.get("last_price"),
-                            "change_pct": (data.get("change_pct", 0) or 0) * 100,
-                            "volume": data.get("volume", 0),
-                            "amount": data.get("amount", 0),
-                            "source": "sina",
-                        }
-            except Exception as e:
-                print(f"  ⚠️ Sina 行情获取失败: {e}")
-
-        self.quotes.update(merged)
-        return merged
+            return {}
+        snapshot = self._load_datahub_snapshot()
+        quotes = {}
+        for code in codes:
+            key = str(code).strip()
+            bare = key.lower()[2:] if key.lower().startswith(("sh", "sz", "bj")) else key.lower()
+            row = snapshot.get(bare)
+            if row:
+                quotes[key] = {**row, "code": key}
+        self.quotes.update(quotes)
+        return quotes
 
     def fetch_u3_codes(self) -> list[str]:
         """动态加载 U3 半导体核心池代码"""
@@ -1187,47 +1126,16 @@ class LowFreqMonitor:
         decline = 0
         total = 0
 
-        # 尝试从 akshare 获取全A涨跌家数
-        try:
-            import akshare as ak
-            from dive_prediction.proxy_bypass import call_no_proxy
-            df = call_no_proxy(ak.stock_zh_a_spot_em)
-            if df is not None and not df.empty:
-                for _, row in df.iterrows():
-                    change = row.get("涨跌幅", None)
-                    if change is not None:
-                        total += 1
-                        if float(change) > 0:
-                            advance += 1
-                        elif float(change) < 0:
-                            decline += 1
-            else:
-                # 通过 sina 全A快照
-                try:
-                    sina = fetch_sina_quotes(["sh000001", "sz399001"])
-                    # 只能取指数, 用已有报价估
-                    pass
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-        # 回退: 尝试 sina 批次快照
-        if total == 0:
-            try:
-                sina = fetch_sina_quotes(["sh600000", "sh600001"])
-                # 如果 sina 也失败, 使用已有 quotes 估
-                if self.quotes:
-                    for code, q in self.quotes.items():
-                        cp = q.get("change_pct")
-                        if cp is not None:
-                            total += 1
-                            if float(cp) > 0:
-                                advance += 1
-                            elif float(cp) < 0:
-                                decline += 1
-            except Exception:
-                pass
+        snapshot = self._load_datahub_snapshot() or self.quotes
+        for quote in snapshot.values():
+            change = quote.get("change_pct")
+            if change is None:
+                continue
+            total += 1
+            if float(change) > 0:
+                advance += 1
+            elif float(change) < 0:
+                decline += 1
 
         ratio = advance / decline if decline > 0 else (advance if advance > 0 else 0)
         if advance == 0 and decline == 0:
@@ -1302,7 +1210,7 @@ class LowFreqMonitor:
     def check_volume_anomaly(self) -> dict:
         """5. 成交额异常监测（当日 vs 20日均）
 
-        通过 mx:data 或 akshare 获取全市场成交额数据。
+        基于同一 DataHub canonical 实时快照汇总全市场成交额。
 
         Returns:
             {"today_volume": float, "avg_20d": float, "pct_deviation": float, "alert": bool}
