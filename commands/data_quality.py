@@ -4,6 +4,7 @@
 """
 
 import csv
+import json
 from datetime import datetime
 
 from config import (
@@ -146,21 +147,29 @@ class DataGapReporter:
         """生成数据缺口报告"""
         data_dir = PATHS["data"]
         gaps = []
+        availability = self._tag_availability(data_dir / "tags/tag_availability.json")
 
         # 检查必需文件
         for rel_path in self.REQUIRED_FILES:
             abs_path = data_dir / rel_path
             if not abs_path.exists():
+                declared = availability.get(rel_path.removeprefix("tags/"), {})
+                unavailable = declared.get("status") == "MISSING_SOURCE_DATA"
                 gaps.append({
+                    "name": rel_path,
+                    "description": declared.get("reason") if unavailable else f"必需文件缺失: {rel_path}",
                     "category": self._categorize(rel_path),
-                    "gap_type": "missing_file",
+                    "gap_type": "source_unavailable" if unavailable else "missing_file",
                     "affected_stocks": [],
                     "affected_fields": [],
-                    "failed_source": "",
-                    "failure_reason": f"必需文件缺失: {rel_path}",
+                    "failed_source": declared.get("source") or "",
+                    "failure_reason": declared.get("reason") if unavailable else f"必需文件缺失: {rel_path}",
                     "impact": "blocking" if rel_path == "market/pool.csv" else "partial",
                     "blocking_codex": rel_path == "market/pool.csv",
-                    "recommendation": f"请运行对应 fetcher 生成 {rel_path}",
+                    "recommendation": (
+                        f"接入并验证 {rel_path} 的 durable upstream 后增量生成；不得用空文件解除门禁"
+                        if unavailable else f"请运行对应 fetcher 生成 {rel_path}"
+                    ),
                 })
 
         # 检查盘前事件是否覆盖
@@ -171,6 +180,8 @@ class DataGapReporter:
                     rows = list(csv.DictReader(f))
                 if not rows:
                     gaps.append({
+                        "name": "events/preopen_events.csv",
+                        "description": "preopen_events.csv 为空",
                         "category": "event",
                         "gap_type": "empty_file",
                         "affected_stocks": [],
@@ -183,6 +194,8 @@ class DataGapReporter:
                     })
             except Exception as e:
                 gaps.append({
+                    "name": "events/preopen_events.csv",
+                    "description": f"preopen_events.csv 解析失败: {e}",
                     "category": "event",
                     "gap_type": "parse_error",
                     "affected_stocks": [],
@@ -224,6 +237,15 @@ class DataGapReporter:
         })
 
         return report
+
+    @staticmethod
+    def _tag_availability(path):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            datasets = payload.get("datasets", {})
+            return datasets if isinstance(datasets, dict) else {}
+        except (OSError, json.JSONDecodeError, AttributeError):
+            return {}
 
     @staticmethod
     def _categorize(rel_path: str) -> str:
