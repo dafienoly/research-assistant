@@ -74,6 +74,10 @@ jobs:
           commands/tests/test_datahub_access.py
           commands/tests/test_live_snapshot_ingestion.py
           commands/tests/test_intraday_monitor.py
+          commands/tests/test_etf_dive_warning.py
+          commands/tests/test_monitor_588710.py
+          commands/tests/test_etf_holdings_ingestion.py
+          commands/tests/test_dive_live_predictor_datahub.py
           commands/tests/test_benchmark_projection.py
           commands/tests/test_universes.py
           commands/tests/test_scheduling.py

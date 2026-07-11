@@ -11,6 +11,8 @@ from factor_lab.datahub_access import (
     daily_kline_path,
     latest_open_date,
     read_live_snapshot,
+    read_etf_holdings,
+    read_latest_north_flow,
     read_trade_calendar,
 )
 
@@ -88,3 +90,26 @@ def test_live_snapshot_rejects_stale_truth(tmp_path):
             ["600000"], path=snapshot,
             now=datetime(2026, 7, 10, 3, 0, tzinfo=timezone.utc), max_age_seconds=60,
         )
+
+
+def test_etf_holdings_select_latest_disclosure(tmp_path):
+    path = tmp_path / "holdings.csv"
+    pd.DataFrame([
+        {"etf_code": "588710.SH", "symbol": "688012.SH", "stk_mkv_ratio": 4.0, "end_date": 20250331},
+        {"etf_code": "588710.SH", "symbol": "688012.SH", "stk_mkv_ratio": 5.0, "end_date": 20250630},
+        {"etf_code": "588710.SH", "symbol": "688072.SH", "stk_mkv_ratio": 6.0, "end_date": 20250630},
+    ]).to_csv(path, index=False)
+
+    result = read_etf_holdings("588710.SH", path)
+
+    assert result["end_date"].nunique() == 1
+    assert result.iloc[0]["symbol"] == "688072.SH"
+
+
+def test_north_flow_reads_latest_canonical_observation(tmp_path):
+    path = tmp_path / "north.csv"
+    pd.DataFrame([
+        {"trade_date": 20260709, "north_money": 100},
+        {"trade_date": 20260710, "north_money": -250},
+    ]).to_csv(path, index=False)
+    assert read_latest_north_flow(path)["north_money"] == -250

@@ -113,3 +113,44 @@ def test_intraday_monitor_is_read_only_datahub_consumer():
     assert "fetch_stock_prices" not in source
     assert "fetch_sina_quotes" not in source
     assert "stock_zh_a_spot_em" not in source
+
+
+def test_etf_dive_warning_is_read_only_datahub_consumer():
+    path = ROOT / "commands/etf_dive_warning.py"
+    assert provider_imports(path) == []
+    source = path.read_text(encoding="utf-8")
+    assert "read_live_snapshot" in source
+    assert "fund_etf_spot_em" not in source
+    assert "subprocess.run" not in source
+    assert "mx.py" not in source
+
+
+def test_monitor_588710_quote_path_is_read_only_datahub_consumer():
+    path = ROOT / "commands/monitor_588710.py"
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "get_quotes")
+    quote_source = ast.get_source_segment(source, function) or ""
+    assert "read_live_snapshot" in quote_source
+    assert "EastmoneyProvider" not in quote_source
+    assert "fetch_stock_prices" not in quote_source
+    assert "SinaProvider" not in quote_source
+    assert "requests.get" not in quote_source
+
+    for function_name in ("_load_holdings", "get_north_flow", "get_kospi"):
+        function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == function_name)
+        function_source = ast.get_source_segment(source, function) or ""
+        assert "read_" in function_source or "DataHub" in function_source
+        assert "subprocess.run" not in function_source
+        assert "akshare" not in function_source
+        assert "get_ts_client" not in function_source
+
+
+def test_dive_live_predictor_is_read_only_datahub_consumer():
+    path = ROOT / "commands/dive_prediction/live_predictor.py"
+    assert provider_imports(path) == []
+    source = path.read_text(encoding="utf-8")
+    assert "read_live_snapshot" in source
+    assert "urllib.request" not in source
+    assert "qt.gtimg.cn" not in source
+    assert "os.environ.pop" not in source

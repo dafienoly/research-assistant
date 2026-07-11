@@ -7,136 +7,44 @@
 4. 板块联动 — 龙头股冲高回落
 5. 涨幅过高 — 上午涨幅 >3% 且回撤 >1/2
 
-数据源（优先级）:
-  1. akshare (fund_etf_spot_em) — 全字段实时行情 + 资金流向
-  2. 本地 live_snapshot.csv — 已有快照
-  3. mx:data — 东方财富妙想（免费版 150次/日）
+数据源：DataHub canonical live snapshot。业务模块不自行访问 provider。
 
 用法:
   python3 etf_dive_warning.py [--code 159516]
 """
-import sys, json, subprocess, os, re, csv
+import sys, json
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
 CST = timezone(timedelta(hours=8))
 _BASE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_BASE))
-from config import VENV_PYTHON
+from factor_lab.datahub_access import read_live_snapshot
 
 # ── 配置 ────────────────────────────────────────────
 DEFAULT_CODE = "159516"
 DEFAULT_NAME = "半导体设备ETF(159516)"
-PROJECT_ROOT = Path.home() / ".hermes" / "research-assistant"
-SNAPSHOT_PATH = PROJECT_ROOT / "data" / "market" / "live_snapshot.csv"
-
-
-def _fetch_akshare(code: str) -> dict | None:
-    """通过 akshare 获取 ETF 实时行情 + 资金流向（优先）"""
-    try:
-        import akshare as ak
-        df = ak.fund_etf_spot_em()
-        row = df[df["代码"] == code]
-        if row.empty:
-            return None
-        r = row.iloc[0]
-        # 资金流向也用 akshare
-        fund = None
-        try:
-            fdf = ak.stock_individual_fund_flow(stock=code, market="sh")
-            if not fdf.empty:
-                fund = {
-                    "主力净流入": fdf.iloc[-1].get("主力净流入-净额", 0),
-                    "超大单净流入": fdf.iloc[-1].get("超大单净流入-净额", 0),
-                    "大单净流入": fdf.iloc[-1].get("大单净流入-净额", 0),
-                    "中单净流入": fdf.iloc[-1].get("中单净流入-净额", 0),
-                    "小单净流入": fdf.iloc[-1].get("小单净流入-净额", 0),
-                }
-        except Exception:
-            pass
-
-        quote = {
-            "price": float(r.get("最新价", 0)),
-            "change_pct": float(r.get("涨跌幅", 0)),
-            "high": float(r.get("最高价", 0)),
-            "low": float(r.get("最低价", 0)),
-            "open": float(r.get("开盘价", 0)),
-            "turnover": float(r.get("成交额", 0)) / 1e8,  # 转亿
-            "amplitude": float(r.get("振幅", 0)),
-            "turnover_rate": float(r.get("换手率", 0)),
-            "volume": float(r.get("成交量", 0)),
-            "name": str(r.get("名称", "")),
-            "source": "akshare",
-            "fund": fund,
-        }
-        return quote
-    except ImportError:
-        return None
-    except Exception as e:
-        return {"_error": str(e)}
-
-
 def _fetch_snapshot(code: str) -> dict | None:
-    """从本地 live_snapshot.csv 读取行情"""
-    if not SNAPSHOT_PATH.exists():
-        return None
+    """从 DataHub canonical live snapshot 读取行情。"""
     try:
-        with open(SNAPSHOT_PATH, encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if row.get("code", "").strip() == code:
-                    return {
-                        "price": float(row.get("last_price", 0)),
-                        "change_pct": float(row.get("change_pct", 0)),
-                        "high": float(row.get("high", 0)),
-                        "low": float(row.get("low", 0)),
-                        "turnover": float(row.get("amount", 0)) / 1e8,
-                        "amplitude": float(row.get("amplitude", 0)),
-                        "source": "snapshot",
-                    }
-    except Exception:
-        pass
-    return None
-
-
-def _fetch_mx(code: str) -> dict | None:
-    """通过 mx:data 获取行情（末位备用）"""
-    MX = [VENV_PYTHON, str(_BASE / "mx.py")]
-    r = subprocess.run(MX + ["data", f"{code} 实时行情"], capture_output=True, text=True, timeout=30)
-    if "调用次数已达到上限" in r.stdout:
-        return {"_error": "API limit"}
-    price = change = high = low = turnover = amplitude = 0.0
-    for line in r.stdout.split("\n"):
-        m = re.match(r"\s*(f\d+):\s*(.+)", line.strip())
-        if not m:
-            continue
-        k, v = m.group(1), m.group(2).strip()
-        try:
-            vf = float(v.replace("%", "").replace("亿元", "").replace("亿", ""))
-        except ValueError:
-            continue
-        if k == "f2":
-            price = vf
-        elif k == "f3":
-            change = vf
-        elif k == "f15":
-            high = vf
-        elif k == "f16":
-            low = vf
-        elif k == "f6":
-            turnover = vf
-        elif k == "f7":
-            amplitude = vf
-    if price == 0:
+        row = read_live_snapshot([code]).get(code)
+    except (FileNotFoundError, ValueError, OSError) as error:
+        return {"_error": str(error)}
+    if not row or row.get("price") is None:
         return None
     return {
-        "price": price,
-        "change_pct": change,
-        "high": high,
-        "low": low,
-        "turnover": turnover,
-        "amplitude": amplitude,
-        "source": "mxdata",
+        "price": row.get("price") or 0,
+        "change_pct": row.get("change_pct") or 0,
+        "high": row.get("high") or 0,
+        "low": row.get("low") or 0,
+        "open": row.get("open") or 0,
+        "turnover": (row.get("amount") or 0) / 1e8,
+        "amplitude": row.get("amplitude") or 0,
+        "turnover_rate": row.get("turnover_rate") or 0,
+        "volume": row.get("volume") or 0,
+        "name": row.get("name") or "",
+        "source": row.get("source", "datahub"),
+        "fund": None,
     }
 
 
@@ -146,12 +54,8 @@ def check_dive_risk(code: str = DEFAULT_CODE, name: str = DEFAULT_NAME) -> dict:
     score = 0
     max_score = 0
 
-    # 1. 获取行情（akshare → snapshot → mx:data）
-    quote = _fetch_akshare(code)
-    if quote is None or quote.get("_error"):
-        quote = _fetch_snapshot(code)
-    if quote is None:
-        quote = _fetch_mx(code)
+    # 1. 只读 DataHub；缺失或过期时不允许业务层自行联网降级。
+    quote = _fetch_snapshot(code)
     if quote is None or quote.get("_error"):
         reason = str(quote.get("_error", "所有数据源均不可用")) if quote else "所有数据源均不可用"
         return {
@@ -243,6 +147,7 @@ def check_dive_risk(code: str = DEFAULT_CODE, name: str = DEFAULT_NAME) -> dict:
     return {
         "code": code, "name": name, "price": price, "change_pct": change_pct,
         "turnover": turnover, "main_net": main_net, "risk": risk,
+        "fund_data_status": "OK" if fund else "MISSING",
         "score": score, "max_score": max(9, max_score),
         "signals": signals, "summary": "\n".join(parts),
         "time": now.strftime("%H:%M"), "is_afternoon": is_afternoon,

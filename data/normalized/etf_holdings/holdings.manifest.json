@@ -1,0 +1,10 @@
+{
+  "dataset": "normalized/etf_holdings",
+  "etf_count": 4,
+  "generated_at": "2026-07-12T03:10:26.399184+08:00",
+  "path": "holdings.csv",
+  "rows": 379,
+  "sha256": "d074e77654d5e9b758fe7251aec7f15c936e360abab5550a31dc6bd85e37ec9a",
+  "source": "tushare:fund_portfolio",
+  "status": "OK"
+}

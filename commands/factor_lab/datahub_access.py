@@ -14,6 +14,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATAHUB_ROOT = Path(os.environ.get("HERMES_DATAHUB_ROOT", PROJECT_ROOT / "data" / "normalized"))
 TRADE_CALENDAR_PATH = DATAHUB_ROOT / "calendar" / "trade_calendar.csv"
 STOCK_BASIC_PATH = DATAHUB_ROOT / "reference" / "stock_basic.csv"
+ETF_HOLDINGS_PATH = DATAHUB_ROOT / "etf_holdings" / "holdings.csv"
+NORTH_FLOW_PATH = PROJECT_ROOT / "data" / "north_flow_timeseries.csv"
 SHARED_DATAHUB_ROOT = Path(
     os.environ.get("HERMES_SHARED_DATAHUB_ROOT", "/mnt/c/Users/ly/.codex/data/a-share-data-hub")
 )
@@ -105,6 +107,40 @@ def read_stock_name_map(path: Path | None = None) -> dict[str, str]:
     return dict(zip(usable["symbol"], usable["name"], strict=False))
 
 
+def read_etf_holdings(etf_code: str, path: Path | None = None) -> pd.DataFrame:
+    """Read the latest holdings disclosure for one ETF from canonical DataHub."""
+    source = path or ETF_HOLDINGS_PATH
+    if not source.exists():
+        raise FileNotFoundError(f"canonical DataHub ETF holdings missing: {source}")
+    frame = pd.read_csv(source, encoding="utf-8-sig", dtype={"etf_code": "string", "symbol": "string"})
+    required = {"etf_code", "symbol", "stk_mkv_ratio"}
+    if frame.empty or not required.issubset(frame.columns):
+        raise ValueError(f"canonical ETF holdings missing columns: {sorted(required - set(frame.columns))}")
+    target = etf_code.upper()
+    selected = frame[frame["etf_code"].str.upper() == target].copy()
+    if selected.empty:
+        return selected
+    if "end_date" in selected.columns:
+        dates = selected["end_date"].astype("string").str.replace(r"\.0$", "", regex=True)
+        selected = selected[dates == dates.max()].copy()
+    selected["stk_mkv_ratio"] = pd.to_numeric(selected["stk_mkv_ratio"], errors="coerce")
+    return selected.dropna(subset=["symbol", "stk_mkv_ratio"]).sort_values("stk_mkv_ratio", ascending=False)
+
+
+def read_latest_north_flow(path: Path | None = None) -> dict:
+    """Read the latest canonical northbound-flow observation."""
+    source = path or NORTH_FLOW_PATH
+    if not source.exists():
+        raise FileNotFoundError(f"canonical DataHub north flow missing: {source}")
+    frame = pd.read_csv(source, encoding="utf-8-sig", dtype={"trade_date": "string"})
+    required = {"trade_date", "north_money"}
+    if frame.empty or not required.issubset(frame.columns):
+        raise ValueError(f"canonical north flow missing columns: {sorted(required - set(frame.columns))}")
+    frame = frame.copy()
+    frame["trade_date"] = frame["trade_date"].str.replace(r"\.0$", "", regex=True)
+    return frame.sort_values("trade_date", kind="stable").iloc[-1].to_dict()
+
+
 def read_live_snapshot(
     codes: list[str] | None = None,
     *,
@@ -146,8 +182,12 @@ def read_live_snapshot(
         provider = "unknown" if raw_source is None or pd.isna(raw_source) else str(raw_source).strip()
         result[key] = {
             "code": key,
+            "name": None if pd.isna(row.get("name")) else str(row.get("name")),
             "price": _optional_number(row.get("last_price")),
             "change_pct": _optional_number(row.get("change_pct")),
+            "open": _optional_number(row.get("open")),
+            "high": _optional_number(row.get("high")),
+            "low": _optional_number(row.get("low")),
             "volume": _optional_number(row.get("volume")),
             "amount": _optional_number(row.get("amount")),
             "amplitude": _optional_number(row.get("amplitude")),

@@ -3,10 +3,7 @@
 基于 data_collector 回测验证的信号权重，产出实时跳水概率。
 数据从 config.PATHS 标准路径读取。
 """
-import os, json, csv, sys
-for k in list(os.environ):
-    if 'proxy' in k.lower():
-        os.environ.pop(k, None)
+import json, sys
 
 import pandas as pd
 import numpy as np
@@ -16,12 +13,10 @@ from datetime import datetime, timezone, timedelta
 CST = timezone(timedelta(hours=8))
 _BASE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_BASE.parent))
-from config import PATHS, VENV_PYTHON
-from dive_prediction.proxy_bypass import call_no_proxy
+from config import PATHS
+from factor_lab.datahub_access import read_live_snapshot
 
 DATA_DIR = PATHS["daily_kline"]
-PROJECT_ROOT = Path.home() / ".hermes" / "research-assistant"
-SNAPSHOT = PROJECT_ROOT / "data" / "market" / "live_snapshot.csv"
 
 # Random Forest 模型集成（生产最佳）
 _RF_PROB_CACHE = None
@@ -124,26 +119,22 @@ def compute_prediction_signals(df: pd.DataFrame) -> dict:
 
 
 def fetch_realtime_price() -> dict | None:
-    """获取ETF当前实时行情（腾讯行情API，单次<1s）"""
-    import urllib.request
+    """Read the ETF quote from the fresh canonical DataHub snapshot."""
     try:
-        # 腾迅行情直接连接，绕开 Clash proxy
-        for k in ['HTTP_PROXY','HTTPS_PROXY','http_proxy','https_proxy','ALL_PROXY','all_proxy']:
-            os.environ.pop(k, None)
-        prefix = "sz" if ETF_CODE.startswith(("00", "30", "15", "16")) else "sh"
-        resp = urllib.request.urlopen(f"http://qt.gtimg.cn/q={prefix}{ETF_CODE}", timeout=5).read().decode("gbk")
-        parts = resp.split("~")
-        if len(parts) < 10:
-            return None
-        price = float(parts[3])
-        prev_close = float(parts[4])
-        open_p = float(parts[5])
-        change_pct = (price - prev_close) / prev_close * 100
-        return {"price": price, "change_pct": round(change_pct, 2),
-                "high": price * 1.02, "low": price * 0.98,
-                "open": open_p, "amount": 0, "source": "tencent"}
-    except Exception:
+        row = read_live_snapshot([ETF_CODE]).get(ETF_CODE)
+    except (FileNotFoundError, ValueError, OSError):
         return None
+    if not row or row.get("price") is None:
+        return None
+    return {
+        "price": row["price"],
+        "change_pct": row.get("change_pct") or 0,
+        "high": row.get("high") or row["price"],
+        "low": row.get("low") or row["price"],
+        "open": row.get("open") or row["price"],
+        "amount": (row.get("amount") or 0) / 1e8,
+        "source": row.get("source", "datahub"),
+    }
 
 
 def check_intraday_dive(realtime: dict) -> dict:
@@ -192,33 +183,21 @@ def check_event_driven(realtime: dict | None = None) -> dict:
     events = []
     risk_boost = 0
 
-    # 1. 大盘急跌（通过 live_snapshot.csv 检查）
-    import csv as _csv
-    snap_path = SNAPSHOT
-    if snap_path.exists():
-        try:
-            down_count = 0
-            total = 0
-            with open(snap_path, encoding="utf-8-sig") as f:
-                reader = _csv.DictReader(f)
-                for row in reader:
-                    try:
-                        chg = float(row.get("change_pct", 0))
-                        if chg < -5:
-                            down_count += 1
-                        total += 1
-                    except (ValueError, TypeError):
-                        pass
-            if total > 100:  # 有足够样本
-                pct_down = down_count / total * 100
-                if pct_down > 15:
-                    events.append(f"全市场{down_count}只跌超5%({pct_down:.0f}%)")
-                    risk_boost += 2
-                elif pct_down > 8:
-                    events.append(f"市场普跌({pct_down:.0f}%个股跌超5%)")
-                    risk_boost += 1
-        except Exception:
-            pass
+    # 1. 大盘急跌（同一 canonical DataHub 快照）
+    try:
+        snapshot = read_live_snapshot()
+    except (FileNotFoundError, ValueError, OSError):
+        snapshot = {}
+    down_count = sum(1 for row in snapshot.values() if (row.get("change_pct") or 0) < -5)
+    total = sum(1 for row in snapshot.values() if row.get("change_pct") is not None)
+    if total > 100:
+        pct_down = down_count / total * 100
+        if pct_down > 15:
+            events.append(f"全市场{down_count}只跌超5%({pct_down:.0f}%)")
+            risk_boost += 2
+        elif pct_down > 8:
+            events.append(f"市场普跌({pct_down:.0f}%个股跌超5%)")
+            risk_boost += 1
 
     # 2. ETF 自身盘中加速下跌
     if realtime:

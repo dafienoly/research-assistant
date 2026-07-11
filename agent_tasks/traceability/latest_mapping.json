@@ -420,6 +420,43 @@
       ],
       "expected_keywords": ["LIVE_SNAPSHOT_PATH", "fetch_locked", "canonical DataHub live snapshot stale", "read_live_snapshot", "stock_zh_a_spot_em"],
       "behavior": "外部 provider 仅由 DataHub ingestion 调用；空响应保留旧快照，CSV 原子落盘并生成 SHA manifest。盘中业务复用一次 canonical 快照，缺失或过期时不自行联网。"
+    },
+    {
+      "id": "INFRA-ETF-DIVE-DATAHUB-01",
+      "title": "ETF 跳水预警只读 DataHub 且辅助资金流缺失诚实降级",
+      "code_locations": [
+        {"file": "commands/etf_dive_warning.py", "function": "_fetch_snapshot", "line": 25},
+        {"file": "commands/etf_dive_warning.py", "function": "check_dive_risk", "line": 55},
+        {"file": "commands/tests/test_etf_dive_warning.py", "line": 1},
+        {"file": "commands/tests/test_datahub_architecture.py", "function": "test_etf_dive_warning_is_read_only_datahub_consumer", "line": 115}
+      ],
+      "expected_keywords": ["read_live_snapshot", "fund_data_status", "MISSING", "fund_etf_spot_em", "subprocess.run"],
+      "behavior": "ETF 风险分析只消费新鲜 canonical 快照；快照缺失或过期返回未知风险，资金流缺失显式 MISSING，不进行业务层 provider fallback。"
+    },
+    {
+      "id": "INFRA-588710-DATAHUB-01",
+      "title": "588710 看板行情、权重和辅助市场数据统一 DataHub",
+      "code_locations": [
+        {"file": "commands/monitor_588710.py", "function": "get_quotes", "line": 100},
+        {"file": "commands/monitor_588710.py", "function": "_load_holdings", "line": 25},
+        {"file": "commands/monitor_588710.py", "function": "get_north_flow", "line": 140},
+        {"file": "commands/data_pipeline.py", "function": "incremental_etf_holdings", "line": 507},
+        {"file": "commands/factor_lab/datahub_access.py", "function": "read_etf_holdings", "line": 100}
+      ],
+      "expected_keywords": ["read_live_snapshot", "read_etf_holdings", "read_latest_north_flow", "normalized/etf_holdings", "atomic_write_frame"],
+      "behavior": "588710 业务看板不直接查询外部 provider；周 ingestion 原子发布 ETF holdings 和 manifest，空响应保留旧数据；KOSPI 缺失显式展示。"
+    },
+    {
+      "id": "INFRA-DIVE-LIVE-DATAHUB-01",
+      "title": "跳水实时预测只读 canonical DataHub 快照",
+      "code_locations": [
+        {"file": "commands/dive_prediction/live_predictor.py", "function": "fetch_realtime_price", "line": 120},
+        {"file": "commands/dive_prediction/live_predictor.py", "function": "check_event_driven", "line": 180},
+        {"file": "commands/tests/test_dive_live_predictor_datahub.py", "line": 1},
+        {"file": "commands/tests/test_datahub_architecture.py", "function": "test_dive_live_predictor_is_read_only_datahub_consumer", "line": 140}
+      ],
+      "expected_keywords": ["read_live_snapshot", "datahub:akshare", "urllib.request", "os.environ.pop"],
+      "behavior": "实时 ETF 价格和市场跌幅广度使用同一新鲜 DataHub 快照；不构造 synthetic high/low，不清除进程代理变量，不直连腾讯。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

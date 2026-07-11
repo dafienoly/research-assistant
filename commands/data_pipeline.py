@@ -527,13 +527,30 @@ def incremental_etf_holdings() -> dict:
 
     if all_rows:
         combined = pd.concat(all_rows, ignore_index=True)
-        out = BASE / "data" / "etf" / "etf_holdings.csv"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        combined.to_csv(out, index=False, encoding="utf-8-sig")
+        successful_etfs = sum(1 for etf in etf_codes if results.get(etf, 0) > 0)
+        out = NORMALIZED_DIR / "etf_holdings" / "holdings.csv"
+        content_hash = atomic_write_frame(combined, out)
+        _atomic_write_json(
+            out.with_suffix(".manifest.json"),
+            {
+                "status": "OK" if successful_etfs == len(etf_codes) else "PARTIAL",
+                "dataset": "normalized/etf_holdings",
+                "generated_at": datetime.now(CST).isoformat(),
+                "rows": len(combined),
+                "etf_count": successful_etfs,
+                "path": out.name,
+                "sha256": content_hash,
+                "source": "tushare:fund_portfolio",
+            },
+        )
         results["total"] = len(combined)
         print(f"     ✅ ETF 持仓汇总: {len(combined)} 条 → {out.name}")
 
-    results["status"] = "ok"
+    results["status"] = (
+        "OK"
+        if all_rows and sum(1 for etf in etf_codes if results.get(etf, 0) > 0) == len(etf_codes)
+        else ("PARTIAL" if all_rows else "MISSING")
+    )
     return results
 
 
