@@ -22,10 +22,6 @@ Provider 优先级:
 
 import json
 import time
-import hashlib
-from typing import Optional
-from datetime import datetime
-from dataclasses import dataclass, field, asdict
 
 from config import PATHS, now_str, append_jsonl
 
@@ -145,7 +141,8 @@ class TencentProvider:
 
     def get_quotes(self, codes: list[str]) -> dict[str, dict]:
         """获取 Tencent 实时行情"""
-        import urllib.request, re
+        import re
+        import urllib.request
         t0 = time.time()
 
         def normalize(code):
@@ -154,8 +151,10 @@ class TencentProvider:
 
         def _prefix(code):
             c = normalize(code)
-            if c.startswith(("6", "5", "9")): return "sh" + c
-            if c.startswith(("0", "3", "2")): return "sz" + c
+            if c.startswith(("6", "5", "9")):
+                return "sh" + c
+            if c.startswith(("0", "3", "2")):
+                return "sz" + c
             return "sh" + c
 
         codes = [c for c in codes if normalize(c)]
@@ -189,8 +188,10 @@ class TencentProvider:
                 turnover_str, amplitude_str = data[38], data[43]
 
                 def f(v, d=None):
-                    try: return float(v)
-                    except: return d
+                    try:
+                        return float(v)
+                    except (TypeError, ValueError):
+                        return d
 
                 prev_close = f(close_str)
                 last = f(last_str)
@@ -327,13 +328,37 @@ class AnnouncementProvider:
             resp = urllib.request.urlopen(req, timeout=10)
             data = json.loads(resp.read().decode())
             items = data.get("announcements", [])
+            matched = next(
+                (item for item in items if str(item.get("secCode", "")).strip() == symbol and item.get("orgId")),
+                None,
+            )
+            if matched is None:
+                log_fetch(self.name, "get_cninfo", "ok", 0, [symbol],
+                          duration_ms=int((time.time() - t0) * 1000))
+                return []
+            payload = json.dumps({
+                "stock": f"{symbol},{matched['orgId']}",
+                "pageNum": page,
+                "pageSize": page_size,
+                "category": "",
+                "seDate": "",
+            }).encode()
+            req = urllib.request.Request(url, data=payload, headers={
+                "User-Agent": "Mozilla/5.0",
+                "Content-Type": "application/json",
+                "Referer": "https://www.cninfo.com.cn/",
+            })
+            resp = urllib.request.urlopen(req, timeout=10)
+            data = json.loads(resp.read().decode())
+            items = data.get("announcements", [])
             result = []
             for item in items:
                 result.append({
                     "source": "cninfo",
                     "symbol": symbol,
+                    "source_symbol": str(item.get("secCode", "")).strip(),
                     "title": item.get("announcementTitle", ""),
-                    "date": item.get("announcementDate", ""),
+                    "date": item.get("announcementDate") or item.get("announcementTime", ""),
                     "ann_type": item.get("announcementTypeName", ""),
                     "id": item.get("announcementId", ""),
                     "adjunct_url": item.get("adjunctUrl", ""),
@@ -366,6 +391,9 @@ class AnnouncementProvider:
                 result.append({
                     "source": "sse",
                     "symbol": symbol,
+                    "source_symbol": str(
+                        item.get("SECURITY_CODE") or item.get("security_Code") or item.get("SECURITYCODE") or ""
+                    ).strip(),
                     "title": item.get("TITLE", ""),
                     "date": item.get("DATE", ""),
                     "url": item.get("URL", ""),
@@ -403,6 +431,9 @@ class AnnouncementProvider:
                 result.append({
                     "source": "szse",
                     "symbol": symbol,
+                    "source_symbol": str(
+                        item.get("secCode") or item.get("securityCode") or item.get("stockCode") or ""
+                    ).strip(),
                     "title": item.get("announcementTitle", ""),
                     "date": item.get("announcementDate", ""),
                     "id": item.get("id", ""),
@@ -421,7 +452,12 @@ class AnnouncementProvider:
         all_items.extend(self.get_cninfo(symbol))
         all_items.extend(self.get_sse(symbol))
         all_items.extend(self.get_szse(symbol))
-        return all_items
+        requested = "".join(character for character in str(symbol) if character.isdigit())[:6]
+        return [
+            item for item in all_items
+            if "".join(character for character in str(item.get("source_symbol", "")) if character.isdigit())[:6]
+            == requested
+        ]
 
 
 # ========== 统一调度器 ==========

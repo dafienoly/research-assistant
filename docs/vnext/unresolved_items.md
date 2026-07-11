@@ -8,7 +8,7 @@
 - Canonical DataHub 核心新鲜度已为 OK：活跃股票 5,530/5,530，5,526 只最新至 2026-07-10，另 4 只由官方 `suspend_d` 解释；正式 ML 和 Shadow 数据门禁为 OK。生产 BUY OrderDraft 仍因资金流/财务/标签辅助缺口保持 BLOCKED，保护性 SELL 数据门禁为 OK。
 - 市场 Event Truth 已真实拉取 13 个指数/ETF 代理，覆盖 `stk_limit`、`suspend_d`、现金分红和复权因子；公司事件已完成 166 个有效 U3 A 股标的，holdertrade 892、repurchase 493、share_float 1,412、dividend 5,363。forecast 网关持续返回非 JSON，累计三次后熔断，因此公司事件保持 `PARTIAL`，不得宣称完整。
 - 行级完整性审计当前为 OK（活跃 5,530 文件、0 问题行）；曾污染的 3 个文件已从最早干净 D 盘快照恢复，污染原件保留在 `quarantine_polluted_market_20260712_0134`。该事件说明备份恢复已生效，但恢复后的连续每日门禁仍需观察。
-- 监管公告 ingestion 与覆盖感知门禁已实现并安装 08:57 cron；688012 真实 snapshot 已验证 30 条公告、覆盖 `OK`。PreTrade 对不在 `covered_symbols` 的 BUY 明确 `regulatory_truth_unavailable`，不得用空事件列表解除阻断。
+- 监管公告 ingestion 与覆盖感知门禁已实现并安装 08:57 cron。真实 smoke 曾发现 CNINFO 缺 orgId 时返回全市场公告，原“30 条”证据已撤销；现按上游 `secCode` 验证并二阶段使用 `688012,orgId` 拉取，得到 1 条证券专属公告、覆盖 `OK`。该证据仅证明 688012，不代表全市场覆盖。
 - Antifragile Review 缺 realized Regime/Semi/Style 标签、滚动模型衰减历史及连续 Paper/Shadow 权益曲线，因此相关六项指标为 null。
 - vectorbt 第二个 OOS fold 收益为 -6.03%，不得用第一段或样本内结果替代。
 

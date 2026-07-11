@@ -584,18 +584,43 @@
       "behavior": "五类公司事件只在 ingestion 层拉取并原子发布；累计三次异常触发熔断；合法空结果标记 EMPTY 而非 MISSING；每个标的后原子更新运行中 manifest。"
     },
     {
+      "id": "INFRA-STOCK-CONTEXT-DATAHUB-01",
+      "title": "股票研究上下文只读 canonical DataHub",
+      "code_locations": [
+        {
+          "file": "commands/stock_context.py",
+          "function": "build_context",
+          "line": 60
+        },
+        {
+          "file": "commands/tests/test_stock_context_datahub.py",
+          "function": "test_stock_context_reads_only_canonical_datahub_inputs",
+          "line": 10
+        }
+      ],
+      "expected_keywords": [
+        "daily_kline_path",
+        "STOCK_BASIC_PATH",
+        "normalized/fundamentals",
+        "normalized/fund_flow",
+        "regulatory_watchlist.json"
+      ],
+      "behavior": "股票研究上下文仅读取 DataHub canonical 行情、参考数据、基本面、资金流和监管事件；不在消费路径调用 Baostock、Tavily 或其他网络来源，也不回写行情缓存。"
+    },
+    {
       "id": "P1-REGULATORY-COVERAGE-01",
       "title": "监管公告 ingestion 与逐标的覆盖感知门禁",
       "code_locations": [
         {"file": "commands/factor_lab/datahub_ingestion/regulatory_events.py", "function": "RegulatoryEventIngestion", "line": 15},
         {"file": "commands/factor_lab/risk/regulatory_watchlist.py", "function": "covers", "line": 90},
         {"file": "commands/factor_lab/risk/pretrade_risk_check.py", "function": "run_pretrade_risk_check", "line": 169},
+        {"file": "commands/provider_matrix.py", "function": "AnnouncementProvider", "line": 300},
         {"file": "commands/announcement_parser.py", "function": "AnnouncementParser", "line": 50},
         {"file": "commands/scripts/datahub_regulatory_events.py", "line": 1},
         {"file": "commands/tests/test_regulatory_event_ingestion.py", "line": 1}
       ],
-      "expected_keywords": ["covered_symbols", "failed_symbols", "announcements", "coverage_policy", "no verifiable response", "regulatory truth does not cover", "datahub-global.lock"],
-      "behavior": "公告只在 ingestion 层抓取并同时发布完整公告和风险事件视图；解析器只读 canonical snapshot；快照记录成功/失败覆盖，所有来源吞错后返回空列表时仍判定失败，PreTrade 对未覆盖标的 fail-closed。"
+      "expected_keywords": ["covered_symbols", "failed_symbols", "source_symbol", "orgId", "announcements", "coverage_policy", "no verifiable response", "regulatory truth does not cover"],
+      "behavior": "公告 ingestion 同时发布完整公告和风险视图；来源记录必须以 secCode 匹配请求标的，CNINFO 二阶段使用代码+orgId 专属查询；无法验证来源代码或所有来源为空时 fail-closed。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

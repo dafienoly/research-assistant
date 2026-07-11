@@ -1,342 +1,194 @@
-"""Stock Analyst — 数据上下文助手（自动补全缺失数据）"""
-import csv, json, os, sys
+"""Stock Analyst context assembled exclusively from canonical DataHub datasets."""
+
+from __future__ import annotations
+
+import json
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
 
-CST = timezone(timedelta(hours=8))
-sys.path.insert(0, os.path.dirname(__file__))
+import pandas as pd
 
-KLINE = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline")
-FUND = Path("/home/ly/.hermes/research-assistant/data/fundamentals")
-TAGS = Path("/home/ly/.hermes/research-assistant/data/tags")
+from factor_lab.datahub_access import STOCK_BASIC_PATH, daily_kline_path
 
 
-def _bs_fetch_all(symbol: str, fetch_kline: bool = True) -> dict:
-    """一次登录 Baostock，拉取所有缺失数据
+ROOT = Path(__file__).resolve().parents[1]
+FUNDAMENTALS_ROOT = ROOT / "data/normalized/fundamentals"
+FUND_FLOW_ROOT = ROOT / "data/normalized/fund_flow"
+REGULATORY_PATH = ROOT / "data/normalized/events/regulatory_watchlist.json"
 
-    fetch_kline: 是否刷新 K 线缓存
-    """
-    import dns_patch
-    import baostock as bs
-    exchange = "sh" if symbol.startswith(("6", "9")) else "sz"
-    full = f"{exchange}.{symbol}"
-    result = {"name": "", "fundamentals": {}, "tags": {}, "kline_updated": False, "kline_latest_date": ""}
 
-    bs.login()
-    try:
-        # 股票名称
-        try:
-            rs = bs.query_stock_basic(full)
-            while rs.next():
-                r = rs.get_row_data()
-                if r and len(r) > 1:
-                    result["name"] = r[1]
-                break
-        except Exception:
-            pass  # name lookup error (non-critical)
+def _exchange_code(symbol: str) -> str:
+    code = "".join(character for character in str(symbol) if character.isdigit())[:6]
+    if len(code) != 6:
+        raise ValueError(f"invalid A-share symbol: {symbol}")
+    exchange = "SH" if code.startswith(("6", "9")) else "BJ" if code.startswith(("8", "4")) else "SZ"
+    return f"{code}.{exchange}"
 
-        # K 线刷新（仅当 fetch_kline=True 时执行）
-        # K 线刷新（仅当 fetch_kline=True 时执行）
-        if fetch_kline:
-            try:
-                import signal
-                class TimeoutError(Exception): pass
-                def _handler(s, f): raise TimeoutError()
-                old = signal.signal(signal.SIGALRM, _handler)
-                signal.alarm(5)
-                try:
-                    rs = bs.query_history_k_data_plus(
-                        full, "date,open,high,low,close,volume,amount",
-                        "2026-05-01", "2026-07-03", "d", "2"
-                    )
-                    new_rows = []
-                    while rs.next():
-                        r = rs.get_row_data()
-                        if r and len(r) >= 5 and r[4]:
-                            new_rows.append({
-                                "date": r[0], "open": r[1], "high": r[2],
-                                "low": r[3], "close": r[4],
-                                "volume": r[5] if len(r) > 5 else "",
-                                "amount": r[6] if len(r) > 6 else "",
-                            })
-                    if new_rows:
-                        kf = KLINE / f"{symbol}.csv"
-                        if kf.exists():
-                            with open(kf, encoding="utf-8-sig") as fh:
-                                existing = list(csv.DictReader(fh))
-                            existing_dates = {r["date"] for r in existing}
-                            to_add = [r for r in new_rows if r["date"] not in existing_dates]
-                        else:
-                            existing = []
-                            to_add = new_rows
-                        if to_add:
-                            all_rows = existing + [{"code": symbol, **r} for r in to_add]
-                            all_rows.sort(key=lambda x: x["date"])
-                            with open(kf, "w", newline="") as fh:
-                                w = csv.DictWriter(fh, fieldnames=["code","date","open","high","low","close","volume","amount"])
-                                w.writeheader()
-                                w.writerows(all_rows)
-                            result["kline_updated"] = True
-                            result["kline_latest_date"] = max(r["date"] for r in new_rows)
-                        else:
-                            result["kline_latest_date"] = existing[-1]["date"] if existing else ""
-                finally:
-                    signal.alarm(0)
-                    signal.signal(signal.SIGALRM, old)
-            except TimeoutError:
-                pass
-            except:
-                pass
 
-        # 盈利能力 2026Q1
-        try:
-            rs = bs.query_profit_data(full, 2026, 1)
-            while rs.next():
-                r = rs.get_row_data()
-                if r and len(r) > 7 and r[3]:
-                    result["fundamentals"]["盈利能力"] = {
-                        "report_date": r[2], "pub_date": r[1],
-                        "roe": r[3], "net_margin": r[4], "gross_margin": r[5],
-                        "net_profit": r[6], "eps": r[7], "revenue": r[8] if len(r) > 8 else "",
-                    }
-                break
-        except Exception:
-            pass  # name lookup error (non-critical)
+def _read_frame(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    return pd.read_csv(path, encoding="utf-8-sig")
 
-        # 资产负债表 2025Q4
-        try:
-            rs = bs.query_balance_data(full, 2025, 4)
-            while rs.next():
-                r = rs.get_row_data()
-                if r and len(r) > 5 and r[3]:
-                    result["fundamentals"]["资产负债表"] = {
-                        "report_date": r[2], "pub_date": r[1],
-                        "total_assets": r[3],
-                        "total_liab": r[4],
-                        "debt_ratio": r[5] if len(r) > 5 else "",
-                    }
-                break
-        except Exception:
-            pass  # name lookup error (non-critical)
 
-        # 行业分类
-        try:
-            rs = bs.query_stock_industry(full)
-            while rs.next():
-                r = rs.get_row_data()
-                if r and len(r) >= 4:
-                    result["tags"]["行业"] = r[3]
-                break
-        except Exception:
-            pass  # name lookup error (non-critical)
-
-    finally:
-        bs.logout()
-
+def _technical_context(frame: pd.DataFrame) -> dict:
+    if frame.empty:
+        return {}
+    date_column = next((column for column in ("trade_date", "date", "timeString") if column in frame), None)
+    if date_column is None or "close" not in frame:
+        return {}
+    normalized = frame.copy()
+    raw_dates = normalized[date_column].astype("string").str.replace(r"\.0$", "", regex=True).str.replace("-", "", regex=False)
+    normalized["date"] = pd.to_datetime(raw_dates, format="%Y%m%d", errors="coerce")
+    normalized["close"] = pd.to_numeric(normalized["close"], errors="coerce")
+    volume_column = "volume" if "volume" in normalized else "vol" if "vol" in normalized else None
+    normalized["volume_value"] = pd.to_numeric(normalized[volume_column], errors="coerce") if volume_column else 0.0
+    normalized = normalized.dropna(subset=["date", "close"]).sort_values("date", kind="stable")
+    if normalized.empty:
+        return {}
+    closes = normalized["close"]
+    volumes = normalized["volume_value"]
+    result = {
+        "rows": len(normalized),
+        "range": f"{normalized['date'].iloc[0]:%Y-%m-%d} ~ {normalized['date'].iloc[-1]:%Y-%m-%d}",
+        "latest_close": float(closes.iloc[-1]),
+        "latest_date": normalized["date"].iloc[-1].strftime("%Y-%m-%d"),
+    }
+    for window in (5, 10, 20, 60):
+        result[f"ma{window}"] = float(closes.tail(window).mean()) if len(closes) >= window else None
+    for window in (5, 20, 60):
+        result[f"ret{window}"] = (
+            float((closes.iloc[-1] / closes.iloc[-window - 1] - 1) * 100)
+            if len(closes) > window and closes.iloc[-window - 1] != 0 else None
+        )
+    result["high60"] = float(closes.tail(60).max())
+    result["low60"] = float(closes.tail(60).min())
+    result["vol60_avg"] = float(volumes.tail(60).mean()) if len(volumes) >= 60 else 0.0
+    result["vol5_avg"] = float(volumes.tail(5).mean()) if len(volumes) >= 5 else 0.0
     return result
 
 
-def build_context(symbol: str) -> dict:
-    ctx = {"symbol": symbol, "name": "", "data_freshness": {}, "errors": []}
+def build_context(
+    symbol: str,
+    *,
+    kline_file: Path | None = None,
+    reference_path: Path | None = None,
+    fundamentals_root: Path | None = None,
+    fund_flow_root: Path | None = None,
+    regulatory_path: Path | None = None,
+) -> dict:
+    ts_code = _exchange_code(symbol)
+    code = ts_code.split(".")[0]
+    ctx = {"symbol": code, "name": "", "data_freshness": {}, "errors": []}
 
-    # ─── K 线（只读缓存，不做实时补全） ───
-    kf = KLINE / f"{symbol}.csv"
-    kline_data = None
-    if kf.exists():
-        with open(kf, encoding="utf-8-sig") as f:
-            kline_data = list(csv.DictReader(f))
+    reference = _read_frame(reference_path or STOCK_BASIC_PATH)
+    if not reference.empty and "symbol" in reference:
+        match = reference[reference["symbol"].astype("string").str.zfill(6) == code]
+        if not match.empty:
+            row = match.iloc[-1]
+            ctx["name"] = str(row.get("name") or "")
+            industry = row.get("industry")
+            if pd.notna(industry) and str(industry).strip():
+                ctx["tags"] = [{"行业": str(industry).strip()}]
+            ctx["data_freshness"]["reference_source"] = "datahub:stock_basic"
+    if not ctx["name"]:
+        ctx["errors"].append("canonical stock reference missing")
 
-    if kline_data:
-        closes = [float(r.get("close", 0) or 0) for r in kline_data]
-        dates = [r["date"] for r in kline_data]
-        ctx["kline"] = {
-            "rows": len(kline_data),
-            "range": f"{dates[0]} ~ {dates[-1]}",
-            "latest_close": closes[-1],
-            "latest_date": dates[-1],
-            "ret5": (closes[-1] - closes[-6]) / closes[-6] * 100 if len(closes) > 6 else None,
-            "ret20": (closes[-1] - closes[-21]) / closes[-21] * 100 if len(closes) > 21 else None,
-            "ret60": (closes[-1] - closes[-61]) / closes[-61] * 100 if len(closes) > 61 else None,
-            "ma5": sum(closes[-5:]) / 5 if len(closes) >= 5 else None,
-            "ma10": sum(closes[-10:]) / 10 if len(closes) >= 10 else None,
-            "ma20": sum(closes[-20:]) / 20 if len(closes) >= 20 else None,
-            "ma60": sum(closes[-60:]) / 60 if len(closes) >= 60 else None,
-            "high60": max(closes[-60:]),
-            "low60": min(closes[-60:]),
-            "vol60_avg": sum(float(r.get("volume", 0) or 0) for r in kline_data[-60:]) / 60 if len(kline_data) >= 60 else 0,
-            "vol5_avg": sum(float(r.get("volume", 0) or 0) for r in kline_data[-5:]) / 5 if len(kline_data) >= 5 else 0,
-        }
-    else:
-        ctx["errors"].append("无 K 线数据（Baostock 也未返回）")
-
-    # ─── 新闻/消息面（Tavily 搜索 + 本地公告） ───
-    news = []
-
-    # Tavily 搜索（最多 3 条，省配额）
     try:
-        from search_enhancer import TavilySearch
-        import quota
-        if quota.quota_check("tavily"):
-            tv = TavilySearch()
-            q = f"{ctx.get('name','')} {symbol}"
-            news_results = tv.search(q, max_results=5)
-            for n in news_results or []:
-                title = n.get("title", "")
-                snippet = n.get("content", "")[:200]
-                # 只保留标题或摘要中包含股票代码或名称的结果
-                if symbol in title or ctx.get('name','') in title:
-                    news.append({
-                        "source": "tavily",
-                        "title": title,
-                        "url": n.get("url", ""),
-                        "snippet": snippet,
-                    })
-            if news_results:
-                quota.quota_consume("tavily")
-    except Exception:
-        pass
+        source = kline_file or daily_kline_path(ts_code)
+        ctx["kline"] = _technical_context(_read_frame(source))
+        if not ctx["kline"]:
+            raise ValueError("unusable kline")
+        ctx["data_freshness"]["kline_source"] = "datahub:daily_kline"
+    except (FileNotFoundError, ValueError):
+        ctx["errors"].append("canonical daily kline missing or invalid")
 
-    # 本地公告
-    events_dir = Path("/home/ly/.hermes/research-assistant/data/events")
-    if events_dir.exists():
-        for f in ["announcement_events.csv", "preopen_events.csv"]:
-            fp = events_dir / f
-            if fp.exists():
-                with open(fp, encoding="utf-8-sig") as fh:
-                    for r in csv.DictReader(fh):
-                        syms = r.get("symbols", "") or r.get("symbol", "") or ""
-                        if symbol in syms and r.get("title", ""):
-                            news.append({
-                                "source": "公告",
-                                "title": r.get("title", ""),
-                                "snippet": r.get("summary", "")[:200],
-                            })
-                            if len(news) >= 5:
-                                break
-            if len(news) >= 5:
-                break
-
-    if news:
-        ctx["news"] = news
+    fundamentals = _read_frame((fundamentals_root or FUNDAMENTALS_ROOT) / f"{ts_code}.csv")
+    if not fundamentals.empty:
+        sort_column = "end_date" if "end_date" in fundamentals else "ann_date" if "ann_date" in fundamentals else None
+        if sort_column:
+            fundamentals = fundamentals.sort_values(sort_column, kind="stable")
+        row = fundamentals.iloc[-1]
+        selected = {
+            key: row.get(key)
+            for key in ("end_date", "eps", "roe", "grossprofit_margin", "netprofit_margin", "debt_to_assets", "revenue_ps")
+            if key in fundamentals and pd.notna(row.get(key))
+        }
+        ctx["fundamentals"] = {"最新财务指标": selected}
+        ctx["data_freshness"]["fundamentals_source"] = "datahub:fina_indicator"
     else:
-        ctx["news"] = [{"source": "system", "title": "无近期相关新闻", "snippet": "Tavily 搜索和本地公告均未找到该股近期消息"}]
+        ctx["errors"].append("canonical fundamentals missing")
 
-    # ─── Baostock 刷新（可选，仅当基础数据缺失时） ───
-    # K 线由每日 cron 更新，stock:context 不负责 K 线实时补全
-    bf = {}
-    if not ctx.get("fundamentals") or not ctx.get("tags") or not ctx.get("name"):
-        try:
-            import socket
-            s = socket.socket()
-            s.settimeout(2)
-            s.connect(("114.94.20.73", 10030))
-            s.close()
-            bf = _bs_fetch_all(symbol, fetch_kline=False)
-        except Exception:
-            pass  # name lookup error (non-critical)
+    flow = _read_frame((fund_flow_root or FUND_FLOW_ROOT) / f"{ts_code}.csv")
+    if not flow.empty:
+        if "trade_date" in flow:
+            flow = flow.sort_values("trade_date", kind="stable")
+        latest = flow.iloc[-1]
+        ctx["fund_flow"] = {
+            key: latest.get(key)
+            for key in ("trade_date", "net_mf_amount", "net_mf_vol")
+            if key in flow and pd.notna(latest.get(key))
+        }
+        ctx["data_freshness"]["fund_flow_source"] = "datahub:moneyflow"
 
-    # K 线已由 _bs_fetch_all 合并到缓存，重新读取
-    kf = KLINE / f"{symbol}.csv"
-    if kf.exists():
-        with open(kf, encoding="utf-8-sig") as f:
-            kline_data = list(csv.DictReader(f))
-        if kline_data:
-            closes = [float(r.get("close", 0) or 0) for r in kline_data]
-            dates = [r["date"] for r in kline_data]
-            ctx["kline"] = {
-                "rows": len(kline_data),
-                "range": f"{dates[0]} ~ {dates[-1]}",
-                "latest_close": closes[-1],
-                "latest_date": dates[-1],
-                "ret5": (closes[-1] - closes[-6]) / closes[-6] * 100 if len(closes) > 6 else None,
-                "ret20": (closes[-1] - closes[-21]) / closes[-21] * 100 if len(closes) > 21 else None,
-                "ret60": (closes[-1] - closes[-61]) / closes[-61] * 100 if len(closes) > 61 else None,
-                "ma5": sum(closes[-5:]) / 5 if len(closes) >= 5 else None,
-                "ma10": sum(closes[-10:]) / 10 if len(closes) >= 10 else None,
-                "ma20": sum(closes[-20:]) / 20 if len(closes) >= 20 else None,
-                "ma60": sum(closes[-60:]) / 60 if len(closes) >= 60 else None,
-                "high60": max(closes[-60:]),
-                "low60": min(closes[-60:]),
-                "vol60_avg": sum(float(r.get("volume", 0) or 0) for r in kline_data[-60:]) / 60 if len(kline_data) >= 60 else 0,
-                "vol5_avg": sum(float(r.get("volume", 0) or 0) for r in kline_data[-5:]) / 5 if len(kline_data) >= 5 else 0,
-            }
-            if bf.get("kline_updated"):
-                ctx["data_freshness"]["kline_updated"] = "baostock"
-                ctx["data_freshness"]["kline_latest_date"] = bf.get("kline_latest_date", "")
-
-    # 基本面/名称/标签（缓存优先）
-    if bf.get("name") and not ctx["name"]:
-        ctx["name"] = bf["name"]
-        ctx["data_freshness"]["name_source"] = "baostock"
-    if bf.get("fundamentals") and not ctx.get("fundamentals"):
-        ctx["fundamentals"] = bf["fundamentals"]
-        ctx["data_freshness"]["fundamentals_source"] = "baostock"
-    if bf.get("tags") and not ctx.get("tags"):
-        ctx["tags"] = [bf["tags"]]
-        ctx["data_freshness"]["tags_source"] = "baostock"
-
-    # ─── 资金流向（盘中行情类数据，盘后提取历史） ───
-    # 非必选：仅当需要资金流向分析时调用
-    # 使用方式: stock:context 已含此功能，通过 fund_flow 字段输出
-    
+    news_path = regulatory_path or REGULATORY_PATH
+    try:
+        snapshot = json.loads(news_path.read_text(encoding="utf-8"))
+        if code not in set(snapshot.get("covered_symbols", [])):
+            ctx["errors"].append("canonical announcement coverage missing")
+        else:
+            ctx["news"] = [
+                {
+                    "source": item.get("source", "announcement"),
+                    "title": item.get("title", ""),
+                    "snippet": "",
+                    "source_ref": item.get("source_ref"),
+                }
+                for item in snapshot.get("announcements", [])
+                if item.get("symbol") == code
+            ][:5]
+            ctx["data_freshness"]["news_source"] = "datahub:regulatory_watchlist"
+    except (OSError, json.JSONDecodeError):
+        ctx["errors"].append("canonical announcement snapshot missing or invalid")
+    ctx.setdefault("news", [])
     return ctx
 
 
 def format_markdown(ctx: dict) -> str:
-    lines = [f"## {ctx['symbol']}{'.SZ' if not ctx['symbol'].startswith(('6','9')) else '.SH'} {ctx.get('name', '')}", ""]
-
-    # 数据口径
-    sources = []
-    sources.append("K 线: data hub（daily_kline/）")
-    if ctx.get("data_freshness", {}).get("fundamentals_source"):
-        sources.append("基本面: Baostock（实时拉取）")
-    else:
-        sources.append("基本面: data hub 缓存")
+    symbol = ctx["symbol"]
+    suffix = ".SH" if symbol.startswith(("6", "9")) else ".BJ" if symbol.startswith(("8", "4")) else ".SZ"
+    lines = [f"## {symbol}{suffix} {ctx.get('name', '')}", ""]
+    sources = ["K 线: DataHub canonical"]
+    if ctx.get("fundamentals"):
+        sources.append("基本面: DataHub canonical")
     if ctx.get("news"):
-        news_sources = set(n.get("source", "") for n in ctx["news"])
-        if news_sources:
-            sources.append(f"消息: {', '.join(news_sources)}")
+        sources.append("消息: DataHub regulatory snapshot")
     if ctx.get("errors"):
         sources.append(f"⚠️ 缺失: {'; '.join(ctx['errors'])}")
-    lines.append(f"_数据口径：{' | '.join(sources)}_")
-    lines.append("")
+    lines.extend([f"_数据口径：{' | '.join(sources)}_", ""])
 
-    # K 线
-    k = ctx.get("kline", {})
-    if k:
-        lines.append("### 最新交易状态")
-        lines.append(f"最新交易日 **{k['latest_date']}** 收 **{k['latest_close']:.2f}** 元")
-        if k.get("vol5_avg") and k.get("vol60_avg"):
-            vol_ratio = k["vol5_avg"] / k["vol60_avg"] if k["vol60_avg"] else 1
-            lines.append(f"近 5 日均量 {k['vol5_avg']/10000:.0f} 万，60 日均量 {k['vol60_avg']/10000:.0f} 万（量比 {vol_ratio:.2f}）")
-        lines.append("")
-        lines.append("均线状态：")
-        for name, val in [("MA5", k.get("ma5")), ("MA10", k.get("ma10")),
-                          ("MA20", k.get("ma20")), ("MA60", k.get("ma60"))]:
-            if val is not None:
-                status = "已跌破 ❌" if k["latest_close"] < val else "仍在上方 ✅"
-                lines.append(f"- {name}: {val:.2f} → {status}")
-        lines.append("")
-        if k.get("high60") and k.get("low60"):
-            lines.append(f"60 日最高 {k['high60']:.2f}，最低 {k['low60']:.2f}")
-            lines.append(f"距高点 {(k['high60']-k['latest_close'])/k['high60']*100:.1f}%")
-            lines.append("")
+    kline = ctx.get("kline", {})
+    if kline:
+        lines.extend(["### 最新交易状态", f"最新交易日 **{kline['latest_date']}** 收 **{kline['latest_close']:.2f}** 元"])
+        if kline.get("vol5_avg") and kline.get("vol60_avg"):
+            ratio = kline["vol5_avg"] / kline["vol60_avg"]
+            lines.append(f"近 5 日均量 {kline['vol5_avg']/10000:.0f} 万，60 日均量 {kline['vol60_avg']/10000:.0f} 万（量比 {ratio:.2f}）")
+        lines.extend(["", "均线状态："])
+        for name, value in (("MA5", kline.get("ma5")), ("MA10", kline.get("ma10")), ("MA20", kline.get("ma20")), ("MA60", kline.get("ma60"))):
+            if value is not None:
+                status = "已跌破 ❌" if kline["latest_close"] < value else "仍在上方 ✅"
+                lines.append(f"- {name}: {value:.2f} → {status}")
+        lines.extend(["", f"60 日最高 {kline['high60']:.2f}，最低 {kline['low60']:.2f}", ""])
 
-    # 基本面
     if ctx.get("fundamentals"):
         lines.append("### 基本面")
         for label, data in ctx["fundamentals"].items():
-            items = ", ".join(f"{k}={v}" for k, v in data.items() if v)
-            lines.append(f"- **{label}**：{items}")
+            lines.append(f"- **{label}**：" + ", ".join(f"{key}={value}" for key, value in data.items()))
         lines.append("")
-
-    # 消息面
+    if ctx.get("fund_flow"):
+        lines.extend(["### 资金流", "- " + ", ".join(f"{key}={value}" for key, value in ctx["fund_flow"].items()), ""])
     if ctx.get("news"):
         lines.append("### 消息面")
-        for n in ctx["news"][:5]:
-            lines.append(f"- **[{n.get('source','')}]** {n.get('title','')}")
-            if n.get("snippet"):
-                lines.append(f"  {n['snippet']}")
+        for item in ctx["news"]:
+            lines.append(f"- **[{item.get('source', '')}]** {item.get('title', '')}")
         lines.append("")
-
     return "\n".join(lines)
