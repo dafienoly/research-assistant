@@ -1,5 +1,6 @@
 """测试: V3.0 Alpha Factory"""
 import sys, os, json, tempfile, shutil
+import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from pathlib import Path
 from factor_lab.alpha.schema import AlphaSpec
@@ -8,6 +9,16 @@ from factor_lab.alpha.lifecycle import AlphaLifecycle
 from factor_lab.alpha.evaluation_hook import generate_evaluation_plan
 
 REGISTRY_BACKUP = "/tmp/alpha_registry_backup"
+
+
+@pytest.fixture(autouse=True)
+def isolated_registry(tmp_path, monkeypatch):
+    """Keep factory tests out of the durable D: drive Alpha registry."""
+    import factor_lab.alpha.registry as registry
+
+    monkeypatch.setattr(registry, "REGISTRY_ROOT", tmp_path)
+    monkeypatch.setattr(registry, "REGISTRY_INDEX", tmp_path / "registry_index.json")
+    monkeypatch.setattr(sys.modules[__name__], "REGISTRY_ROOT", tmp_path)
 
 
 def _clean():

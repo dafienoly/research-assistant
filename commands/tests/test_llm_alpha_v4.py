@@ -10,13 +10,9 @@
   7. Trial counter / parent_factor_id / failure_reason 持久化
 """
 
-import sys, os, json
+import os
+import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-from pathlib import Path
-from datetime import datetime, timezone, timedelta
-
-CST = timezone(timedelta(hours=8))
 
 # ═══════════════════════════════════════════════════════════════════
 # 1. LLM Prompt 扩展字段检查
@@ -189,7 +185,7 @@ def test_validator_accepts_fund_flow_fields():
         "name": "test_fund_flow",
         "description": "主力资金因子",
         "hypothesis": "主力净流入预示上涨",
-        "factor_expression": "rank(net_main_force) * rank(returns)",
+        "factor_expression": "rank(net_main_force) * rank(close / ts_mean(close, 20))",
         "universe": "all_watchlist",
         "data_requirements": ["close", "net_main_force"],
         "signal_direction": "long",
@@ -200,7 +196,7 @@ def test_validator_accepts_fund_flow_fields():
         "industry_hypothesis": "半导体板块主力资金效应显著",
     }
     ok = validator.validate(candidate)
-    # Note: this has "returns" but also "net_main_force" — should pass
+    # 非价量资金流字段存在，且不使用当日 returns 造成未来函数
     assert ok, f"包含资金流向字段的因子应通过: {validator.errors}"
 
 
@@ -284,7 +280,7 @@ def test_future_leakage_gate_delta_zero():
 
 def test_future_leakage_gate_intraday_close():
     """盘中策略使用 close 应检测为 HIGH"""
-    from factor_lab.alpha.future_leakage_gate import FutureLeakageGate, LeakageSeverity
+    from factor_lab.alpha.future_leakage_gate import FutureLeakageGate
 
     gate = FutureLeakageGate()
     report = gate.check("close / ts_mean(close, 20)", context={"trade_time": "intraday"})

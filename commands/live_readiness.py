@@ -18,7 +18,6 @@ LiveReadinessChecker — 运行全部 13 个 Gate, 返回 READY/NOT_READY。
         print(f"  {gate['gate_name']}: {'✅' if gate['passed'] else '❌'} [{gate['severity']}]")
 """
 import json
-import logging
 import os
 import sys
 from dataclasses import dataclass, field
@@ -26,12 +25,53 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
 
-from factor_lab.core.gate import GateEngine, GateCheck, GateResult
+from factor_lab.core.gate import GateEngine
 from factor_lab.datahub_access import PROJECT_ROOT
 from factor_lab.risk.kill_switch import KillSwitch
-from factor_lab.notify import notify_goal_done, notify_risk_event
 
 CST = timezone(timedelta(hours=8))
+RUNTIME_ENV_PATH = Path.home() / ".config" / "hermes" / "runtime.env"
+RUNTIME_ENV_KEYS = {
+    "WECHAT_WEBHOOK_URL",
+    "WECOM_WEBHOOK_URL",
+    "TELEGRAM_BOT_TOKEN",
+    "TELEGRAM_CHAT_ID",
+}
+
+
+def _load_runtime_env_file(path: Path = RUNTIME_ENV_PATH) -> list[str]:
+    """Load allow-listed notification variables without sourcing a shell.
+
+    The readiness CLI must see the same non-repository runtime environment as
+    cron, while unit callers remain deterministic and do not inherit secrets.
+    Existing process variables always win; values are never printed.
+    """
+    if not path.is_file():
+        return []
+    loaded: list[str] = []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if key not in RUNTIME_ENV_KEYS or os.environ.get(key):
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        if value:
+            os.environ[key] = value
+            loaded.append(key)
+    return loaded
 BASE = Path(__file__).parent.resolve()
 
 # ---------------------------------------------------------------------------
@@ -338,8 +378,6 @@ class LiveReadinessChecker:
         try:
             from factor_lab.core.gate import check_semiconductor_pool_gate
 
-            from factor_lab.validate_factor_v4 import load_v4_report
-
             # 尝试加载最新 V4 报告
             report_dir = Path("/mnt/d/HermesReports/factor_lab/v4_reports")
             latest_report = None
@@ -406,8 +444,6 @@ class LiveReadinessChecker:
 
         try:
             from factor_lab.core.gate import check_risk_exposure_gate
-
-            from factor_lab.validate_factor_v4 import load_v4_report
 
             report_dir = Path("/mnt/d/HermesReports/factor_lab/v4_reports")
             latest_report = None
@@ -633,12 +669,12 @@ class LiveReadinessChecker:
                 )
             elif shadow_days < 5:
                 gate.passed = False
-                gate.severity = "warning"
+                gate.severity = "blocker"
                 gate.message = f"Shadow Trading 运行天数不足 ({shadow_days}/5)"
-                gate.fix_suggestion = "继续运行 Shadow Trading"
+                gate.fix_suggestion = "先完成至少 5 个交易日的 canonical Shadow 观测和配对成交验收"
             else:
                 gate.passed = False
-                gate.severity = "warning"
+                gate.severity = "blocker"
                 gate.message = (
                     f"Shadow Trading 与 Paper 偏差较大 "
                     f"(相关性={correlation:.2f}, 偏差={deviation_text})"
@@ -739,6 +775,7 @@ class LiveReadinessChecker:
             from factor_lab.adaptive.live_readiness import ManualApprovalPackage
 
             # 尝试检查审批包生成能力
+            _ = ManualApprovalPackage
             evidence_parts.append("ManualApprovalPackage 可用")
             approval_modules_found.append("ManualApprovalPackage")
         except ImportError:
@@ -748,6 +785,7 @@ class LiveReadinessChecker:
             # V2.5 审批工作流
             from factor_lab.risk.pretrade_risk_check import ApprovalEngine
 
+            _ = ApprovalEngine
             evidence_parts.append("ApprovalEngine 可用")
             approval_modules_found.append("ApprovalEngine")
         except ImportError:
@@ -1062,7 +1100,7 @@ def print_readiness_report(report: ReadinessReport, verbose: bool = False):
     warnings = len(report.warnings)
 
     print(f"\n{'='*60}")
-    print(f"  V4.9 小资金实盘 Readiness Gate 检查报告")
+    print("  V4.9 小资金实盘 Readiness Gate 检查报告")
     print(f"{'='*60}")
     print(f"  运行 ID:  {report.run_id}")
     print(f"  检查时间: {report.scanned_at[:19]}")
@@ -1092,7 +1130,7 @@ def print_readiness_report(report: ReadinessReport, verbose: bool = False):
             print()
 
     if verbose:
-        print(f"\n📋 全部 Gate 明细:")
+        print("\n📋 全部 Gate 明细:")
         for g in report.gates:
             icon = "✅" if g.passed else ("⚠️" if g.severity == "warning" else "❌")
             print(f"  {icon} [{g.severity:8s}] {g.gate_name}")
@@ -1123,6 +1161,7 @@ def cmd_live_readiness_v4(args: list = None):
         python3 live_readiness.py all
         python3 hermes_cli.py live-readiness:v4
     """
+    _load_runtime_env_file()
     strict = "--strict" in (args or [])
     report = run_live_readiness_check(strict=strict)
     print_readiness_report(report, verbose=False)
@@ -1136,6 +1175,7 @@ def cmd_live_gate_report(args: list = None):
         python3 live_readiness.py report
         python3 hermes_cli.py live-gate:v4-report
     """
+    _load_runtime_env_file()
     strict = "--strict" in (args or [])
     report = run_live_readiness_check(strict=strict)
     print_readiness_report(report, verbose=True)
@@ -1158,8 +1198,8 @@ if __name__ == "__main__":
         elif cmd == "report":
             cmd_live_gate_report(args)
         else:
-            print(f"用法: python3 live_readiness.py [all|report]")
-            print(f"  all      — 运行全部 13 个 Gate (简短输出)")
-            print(f"  report   — 运行全部 13 个 Gate (详细输出)")
+            print("用法: python3 live_readiness.py [all|report]")
+            print("  all      — 运行全部 13 个 Gate (简短输出)")
+            print("  report   — 运行全部 13 个 Gate (详细输出)")
     else:
         cmd_live_readiness_v4()

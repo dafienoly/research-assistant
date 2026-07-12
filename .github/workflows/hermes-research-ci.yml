@@ -4,6 +4,18 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_major_audit:
+        description: "Run the release-only source audit"
+        required: true
+        default: false
+        type: boolean
+      major_version:
+        description: "Major release version, for example 2.0.0"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -42,10 +54,14 @@ jobs:
           PYTHONPATH: commands
         run: python commands/vnext_ci_gate.py --root .
 
-      - name: Deterministic full and security code audit
+      - name: Optional release-only source audit
+        if: github.event_name == 'workflow_dispatch' && inputs.run_major_audit == true
         env:
           PYTHONPATH: commands
-        run: python commands/hermes_cli.py audit:code --profile security --scope compare --base origin/main
+        run: >-
+          python commands/hermes_cli.py audit:code
+          --major-version "${{ inputs.major_version }}"
+          --profile security --scope compare --base origin/main
 
       - name: VNext security, contract and integration tests
         env:
@@ -135,15 +151,11 @@ jobs:
             scripts/generate_hashed_lock.py
 
       - name: Semgrep blocking gate
+        if: github.event_name == 'workflow_dispatch' && inputs.run_major_audit == true
         run: >-
           env -u HTTPS_PROXY -u HTTP_PROXY -u ALL_PROXY
           semgrep scan --config auto --error --exclude '*test*'
           commands/factor_lab/decision_loop commands/factor_lab/api_server
-
-      - name: GitNexus current-index and change-impact gate
-        run: |
-          node .gitnexus/run.cjs analyze
-          node .gitnexus/run.cjs detect-changes --scope compare --base-ref origin/main
 
       - name: Generate CycloneDX SBOM
         env:

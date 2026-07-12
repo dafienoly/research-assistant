@@ -15,6 +15,19 @@ from fastapi.testclient import TestClient
 from factor_lab.api_server.main import app
 
 client = TestClient(app)
+_env_path = os.path.join(_HERE, "..", "..", "..", ".env")
+_token = os.environ.get("HERMES_UI_TOKEN", "")
+if not _token:
+    try:
+        with open(_env_path, encoding="utf-8") as _env_file:
+            for _line in _env_file:
+                if _line.startswith("HERMES_UI_TOKEN="):
+                    _token = _line.split("=", 1)[1].strip().strip("'\"")
+                    break
+    except OSError:
+        pass
+if _token:
+    client.headers.update({"Authorization": f"Bearer {_token}"})
 
 FAILED_ENDPOINTS = [
     ("GET", "/api/roadmap"),

@@ -60,10 +60,12 @@ NORTH_FLOW_DIR = BASE / "data"               # 北向资金文件直接放 data/
 ETC_DIR = NORMALIZED_DIR                     # concept, industry 等
 INTRADAY_SNAPSHOT = BASE / "data" / "market" / "live_snapshot.csv"
 RECOVERY_AUDIT_DIR = BASE / "data" / "audit" / "recovery"
+INCREMENTAL_STATE_PATH = RECOVERY_AUDIT_DIR / "incremental_state.json"
 
 # ─── 分批配置 ────────────────────────────────────────────────────────
 BATCH_SIZE = 10           # 每批最多同时拉取的股票数（逐股模式）
 BATCH_SLEEP = 1.5         # 批间休眠秒数（叠加在 TushareClient 内置限流之上）
+FUNDAMENTAL_EMPTY_STREAK_LIMIT = 8  # 连续空结果时熔断，避免无效 API 风暴
 
 # ─── Provider 单例 ───────────────────────────────────────────────────
 _market_provider: Optional[TushareMarketProvider] = None
@@ -237,6 +239,66 @@ def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
             temp_path.unlink(missing_ok=True)
 
 
+def _read_incremental_state() -> dict[str, Any]:
+    """Read the last fully persisted trading date for append-only updates."""
+    try:
+        payload = json.loads(INCREMENTAL_STATE_PATH.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return {"version": 1, "datasets": {}}
+    if not isinstance(payload, dict) or not isinstance(payload.get("datasets"), dict):
+        return {"version": 1, "datasets": {}}
+    return payload
+
+
+def _incremental_fast_path(dataset: str, trade_date: str) -> bool:
+    """Use append-only writes only after a prior complete day is recorded."""
+    last_date = _read_incremental_state().get("datasets", {}).get(dataset, {}).get("last_trade_date")
+    return isinstance(last_date, str) and last_date < trade_date
+
+
+def _record_incremental_state(dataset: str, trade_date: str, *, rows: int, files: int) -> None:
+    state = _read_incremental_state()
+    state.setdefault("version", 1)
+    state.setdefault("datasets", {})[dataset] = {
+        "last_trade_date": trade_date,
+        "rows_added": int(rows),
+        "files_touched": int(files),
+        "recorded_at": datetime.now(CST).isoformat(),
+    }
+    _atomic_write_json(INCREMENTAL_STATE_PATH, state)
+
+
+def _append_rows_without_rewrite(path: Path, frame: pd.DataFrame) -> int:
+    """Append a new date partition without reading/re-writing history.
+
+    The caller must have proven that this is a strictly newer trading date via
+    ``INCREMENTAL_STATE_PATH``. Missing outputs are rejected instead of being
+    recreated, so an accidental deletion cannot silently discard history.
+    """
+    if not path.is_file():
+        raise FileNotFoundError(f"existing canonical output missing: {path}")
+    if frame.empty:
+        return 0
+    try:
+        columns = list(pd.read_csv(path, encoding="utf-8-sig", nrows=0).columns)
+    except (OSError, UnicodeError, pd.errors.ParserError) as exc:
+        raise ValueError(f"existing canonical output unreadable: {path}") from exc
+    if columns != list(frame.columns):
+        raise ValueError(f"canonical output schema changed: {path}")
+    with path.open("a", encoding="utf-8", newline="") as handle:
+        with path.open("rb") as existing:
+            existing.seek(0, os.SEEK_END)
+            if existing.tell():
+                existing.seek(-1, os.SEEK_END)
+            if existing.tell() and existing.read(1) != b"\n":
+                handle.write("\n")
+        frame.to_csv(handle, index=False, header=False)
+        handle.flush()
+        os.fsync(handle.fileno())
+    _fsync_directory(path.parent)
+    return len(frame)
+
+
 # ══════════════════════════════════════════════════════════════════════
 # 按交易日全量更新 — 每次 API 调用获取全A当天数据，拆分写逐股 CSV
 # ══════════════════════════════════════════════════════════════════════
@@ -267,20 +329,35 @@ def incremental_daily(trade_date: str = "") -> dict:
     total_added = 0
     stocks = 0
     errors: list[str] = []
+    fast_path = _incremental_fast_path("daily", trade_date)
 
     for ts_code, group in df.groupby("ts_code"):
         try:
             group = group.reset_index(drop=True)
             out = DAILY_DIR / f"{ts_code}.csv"
-            added = _append_to_csv(out, group, dedup_cols=["trade_date"], sort_cols=["trade_date"])
+            added = (
+                _append_rows_without_rewrite(out, group)
+                if fast_path
+                else _append_to_csv(out, group, dedup_cols=["trade_date"], sort_cols=["trade_date"])
+            )
             if added > 0:
                 total_added += added
                 stocks += 1
         except Exception as e:
             errors.append(f"{ts_code}: {e}")
 
+    status = "partial" if errors else "ok"
+    if status == "ok":
+        _record_incremental_state("daily", trade_date, rows=total_added, files=stocks)
     print(f"     ✅ {stocks} 只股票, 新增 {total_added} 行{ ' ⚠️ ' + str(len(errors)) + ' 错误' if errors else ''}")
-    return {"status": "ok", "trade_date": trade_date, "stocks": stocks, "rows_added": total_added, "errors": errors}
+    return {
+        "status": status,
+        "trade_date": trade_date,
+        "stocks": stocks,
+        "rows_added": total_added,
+        "errors": errors,
+        "write_mode": "append_only" if fast_path else "merge_once",
+    }
 
 
 def incremental_valuation(trade_date: str = "") -> dict:
@@ -304,20 +381,35 @@ def incremental_valuation(trade_date: str = "") -> dict:
     total_added = 0
     stocks = 0
     errors: list[str] = []
+    fast_path = _incremental_fast_path("valuation", trade_date)
 
     for ts_code, group in df.groupby("ts_code"):
         try:
             group = group.reset_index(drop=True)
             out = VALUATION_DIR / f"valuation_{ts_code}.csv"
-            added = _append_to_csv(out, group, dedup_cols=["trade_date"], sort_cols=["trade_date"])
+            added = (
+                _append_rows_without_rewrite(out, group)
+                if fast_path
+                else _append_to_csv(out, group, dedup_cols=["trade_date"], sort_cols=["trade_date"])
+            )
             if added > 0:
                 total_added += added
                 stocks += 1
         except Exception as e:
             errors.append(f"{ts_code}: {e}")
 
+    status = "partial" if errors else "ok"
+    if status == "ok":
+        _record_incremental_state("valuation", trade_date, rows=total_added, files=stocks)
     print(f"     ✅ {stocks} 只股票, 新增 {total_added} 行{ ' ⚠️' if errors else ''}")
-    return {"status": "ok", "trade_date": trade_date, "stocks": stocks, "rows_added": total_added, "errors": errors}
+    return {
+        "status": status,
+        "trade_date": trade_date,
+        "stocks": stocks,
+        "rows_added": total_added,
+        "errors": errors,
+        "write_mode": "append_only" if fast_path else "merge_once",
+    }
 
 
 def incremental_fund_flow(trade_date: str = "") -> dict:
@@ -339,20 +431,35 @@ def incremental_fund_flow(trade_date: str = "") -> dict:
     total_added = 0
     stocks = 0
     errors: list[str] = []
+    fast_path = _incremental_fast_path("fund_flow", trade_date)
 
     for ts_code, group in df.groupby("ts_code"):
         try:
             group = group.reset_index(drop=True)
             out = FUND_FLOW_DIR / f"{ts_code}.csv"
-            added = _append_to_csv(out, group, dedup_cols=["trade_date"], sort_cols=["trade_date"])
+            added = (
+                _append_rows_without_rewrite(out, group)
+                if fast_path
+                else _append_to_csv(out, group, dedup_cols=["trade_date"], sort_cols=["trade_date"])
+            )
             if added > 0:
                 total_added += added
                 stocks += 1
         except Exception as e:
             errors.append(f"{ts_code}: {e}")
 
+    status = "partial" if errors else "ok"
+    if status == "ok":
+        _record_incremental_state("fund_flow", trade_date, rows=total_added, files=stocks)
     print(f"     ✅ {stocks} 只股票, 新增 {total_added} 行{ ' ⚠️' if errors else ''}")
-    return {"status": "ok", "trade_date": trade_date, "stocks": stocks, "rows_added": total_added, "errors": errors}
+    return {
+        "status": status,
+        "trade_date": trade_date,
+        "stocks": stocks,
+        "rows_added": total_added,
+        "errors": errors,
+        "write_mode": "append_only" if fast_path else "merge_once",
+    }
 
 
 def incremental_north_flow(trade_date: str = "") -> dict:
@@ -408,100 +515,24 @@ def _mx_data_query(question: str) -> dict:
 
 
 def incremental_concept_industry() -> dict:
-    """刷新概念板块和行业分类（每周一次）
+    """刷新概念板块和行业分类（每周一次）。
 
-    Tushare Pro 代理不支持 concept/industry 接口时自动降级到 mx-data。
+    旧实现调用了不存在的 ``concept``/``industry`` API 名称，导致每次
+    cron 运行都进行三轮重试，随后才进入备用源。统一转发到 canonical
+    ``pull_concept_industry_mx``，避免重复实现、错误重试和无来源覆盖。
     """
-    tc = _get_ts_client()
-    print("  📅 概念/行业刷新")
-    results = {}
-
-    # ─── 概念板块（Tushare → mx-data fallback）───
-    df = pd.DataFrame()
-    try:
-        df = tc._query("concept")
-    except Exception as e:
-        print(f"     ⚠️ Tushare concept 失败: {e}, 降级到 mx-data")
-
-    if df.empty:
-        mx = _mx_data_query("A股概念板块列表 代码 名称")
-        if "error" not in mx:
-            try:
-                dtos = mx.get("data", {}).get("data", {}).get("searchDataResultDTO", {}).get("dataTableDTOList", [])
-                rows = []
-                for tbl in dtos:
-                    raw = tbl.get("table") or tbl.get("rawTable") or {}
-                    name_map = tbl.get("nameMap") or {}
-                    head = raw.get("headName", [])
-                    if head:
-                        for key, val in raw.items():
-                            if key in ("headName", "headNameSub"):
-                                continue
-                            col_name = name_map.get(key, key)
-                            for i, v in enumerate(val):
-                                while len(rows) <= i:
-                                    rows.append({})
-                                rows[i][col_name] = v
-                            for i, h in enumerate(head):
-                                if i < len(rows):
-                                    rows[i]["板块名称"] = h
-                df = pd.DataFrame(rows)
-            except Exception as e:
-                print(f"     ⚠️ mx-data concept 解析失败: {e}")
-
-    if not df.empty:
-        out = ETC_DIR / "concept" / "concept_list.csv"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(out, index=False, encoding="utf-8-sig")
-        results["concept_list"] = len(df)
-        print(f"     ✅ concept_list: {len(df)} 条")
-    else:
-        print(f"     ⚠️  concept_list: 无数据（Tushare + mx-data 均失败）")
-
-    # ─── 行业分类（Tushare → mx-data fallback）───
-    df_ind = pd.DataFrame()
-    try:
-        df_ind = tc._query("industry")
-    except Exception as e:
-        print(f"     ⚠️ Tushare industry 失败: {e}, 降级到 mx-data")
-
-    if df_ind.empty:
-        mx = _mx_data_query("申万行业分类 代码 名称")
-        if "error" not in mx:
-            try:
-                dtos = mx.get("data", {}).get("data", {}).get("searchDataResultDTO", {}).get("dataTableDTOList", [])
-                rows = []
-                for tbl in dtos:
-                    raw = tbl.get("table") or tbl.get("rawTable") or {}
-                    name_map = tbl.get("nameMap") or {}
-                    head = raw.get("headName", [])
-                    if head:
-                        for key, val in raw.items():
-                            if key in ("headName", "headNameSub"):
-                                continue
-                            col_name = name_map.get(key, key)
-                            for i, v in enumerate(val):
-                                while len(rows) <= i:
-                                    rows.append({})
-                                rows[i][col_name] = v
-                            for i, h in enumerate(head):
-                                if i < len(rows):
-                                    rows[i]["行业名称"] = h
-                df_ind = pd.DataFrame(rows)
-            except Exception as e:
-                print(f"     ⚠️ mx-data industry 解析失败: {e}")
-
-    if not df_ind.empty:
-        out = ETC_DIR / "industry" / "industry_list.csv"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        df_ind.to_csv(out, index=False, encoding="utf-8-sig")
-        results["industry"] = len(df_ind)
-        print(f"     ✅ industry: {len(df_ind)} 条")
-    else:
-        print(f"     ⚠️  industry: 无数据（Tushare + mx-data 均失败）")
-
-    results["status"] = "ok"
-    return results
+    result = pull_concept_industry_mx()
+    concept = result.get("concept", {})
+    industry = result.get("industry", {})
+    return {
+        "status": "ok" if result.get("status") == "OK" else "partial",
+        "concept_list": concept.get("rows", 0),
+        "industry": industry.get("rows", 0),
+        "concept_source": concept.get("source"),
+        "industry_source": industry.get("source"),
+        "errors": result.get("errors", []),
+        "canonical_result": result,
+    }
 
 
 def incremental_etf_holdings() -> dict:
@@ -576,6 +607,10 @@ def incremental_fina_latest() -> dict:
     total_added = 0
     stocks_ok = 0
     errors: list[str] = []
+    empty_count = 0
+    error_count = 0
+    processed_count = 0
+    upstream_unavailable = False
     _ensure_dirs()
 
     # 分批处理 (fina 只能逐股查询)
@@ -584,8 +619,19 @@ def incremental_fina_latest() -> dict:
         for ts_code in batch:
             try:
                 df = tc._query("fina_indicator", ts_code=ts_code, start_date=start, end_date=end_date)
+                processed_count += 1
                 if df.empty:
+                    empty_count += 1
+                    if empty_count >= FUNDAMENTAL_EMPTY_STREAK_LIMIT:
+                        upstream_unavailable = True
+                        print(
+                            "     ⛔ 财务接口连续返回空结果，停止本轮逐股请求；"
+                            "保留已有文件并记录为上游缺口"
+                        )
+                        break
                     continue
+                empty_count = 0
+                error_count = 0
                 df = df.reset_index(drop=True)
                 out = FINA_DIR / f"{ts_code}.csv"
                 added = _append_to_csv(out, df, dedup_cols=["end_date"], sort_cols=["end_date"])
@@ -593,13 +639,40 @@ def incremental_fina_latest() -> dict:
                     total_added += added
                     stocks_ok += 1
             except Exception as e:
+                processed_count += 1
                 errors.append(f"{ts_code}: {e}")
+                error_count += 1
+                if error_count >= FUNDAMENTAL_EMPTY_STREAK_LIMIT:
+                    upstream_unavailable = True
+                    print(
+                        "     ⛔ 财务接口连续失败，停止本轮逐股请求；"
+                        "保留已有文件并记录为上游缺口"
+                    )
+                    break
+        if upstream_unavailable:
+            break
         if batch_idx % 50 == 0 and batch_idx > 0:
             print(f"     ... {batch_idx * BATCH_SIZE}/{len(ts_codes)} ({stocks_ok} stocks ok)")
 
     err_info = f" ⚠️ {len(errors)} 错误" if errors else ""
-    print(f"     ✅ {stocks_ok} 只股票, 新增 {total_added} 行{err_info}")
-    return {"status": "ok", "stocks": stocks_ok, "rows_added": total_added, "errors": errors[:10]}
+    skipped_count = max(len(ts_codes) - processed_count, 0)
+    status = "upstream_unavailable" if upstream_unavailable else "ok"
+    if upstream_unavailable:
+        print(
+            f"     ⚠️ 财务增量提前结束: 已检查 {processed_count}/{len(ts_codes)}，"
+            f"剩余 {skipped_count} 只保留为待补缺口"
+        )
+    else:
+        print(f"     ✅ {stocks_ok} 只股票, 新增 {total_added} 行{err_info}")
+    return {
+        "status": status,
+        "stocks": stocks_ok,
+        "rows_added": total_added,
+        "errors": errors[:10],
+        "empty_results": empty_count,
+        "processed": processed_count,
+        "skipped_due_to_upstream": skipped_count,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -712,8 +785,9 @@ def weekly_maintenance() -> dict:
     print(f"{'='*50}")
     all_ok = True
     for name, r in results.items():
-        icon = "✅" if r.get("status") == "ok" else "⚠️"
-        all_ok = all_ok and r.get("status") == "ok"
+        component_ok = str(r.get("status", "")).lower() in {"ok", "success"}
+        icon = "✅" if component_ok else "⚠️"
+        all_ok = all_ok and component_ok
         print(f"  {icon} {name:18s}  status={r.get('status')}")
 
     print(f"  总体: {'✅ 全部正常' if all_ok else '⚠️ 部分异常'}")
@@ -1124,7 +1198,6 @@ def backfill_timeseries() -> dict:
     print("💰 北向资金 (moneyflow_hsgt) ...")
     north_out = NORTH_FLOW_DIR / "north_flow_timeseries.csv"
     north_rows = 0
-    nf_batches = (len(days) + BATCH_TRADE_DAYS - 1) // BATCH_TRADE_DAYS
     for b in range(0, len(days), BATCH_TRADE_DAYS):
         batch = days[b:b + BATCH_TRADE_DAYS]
         r = _process_ts_batch(batch, "moneyflow_hsgt", north_out, ["trade_date"],
@@ -1206,7 +1279,6 @@ def pull_remaining_market_data() -> dict:
 
     # ─── 复权因子 ──────────────────────────────────────
     print("📊 复权因子 (adj_factor) ...")
-    adj_start = __import__("time").time()
     adj_total = 0
     for b in range(0, len(days), BATCH_TRADE_DAYS):
         batch = days[b:b + BATCH_TRADE_DAYS]
@@ -1220,7 +1292,6 @@ def pull_remaining_market_data() -> dict:
 
     # ─── 涨跌停 ────────────────────────────────────────
     print("\n📊 涨跌停 (stk_limit) ...")
-    stk_start = __import__("time").time()
     stk_total = 0
     for b in range(0, len(days), BATCH_TRADE_DAYS):
         batch = days[b:b + BATCH_TRADE_DAYS]
@@ -1491,7 +1562,7 @@ def gap_report_and_plan() -> dict:
     print(f"{'='*50}")
     print()
     td_count = len(_get_trade_days("20210101"))
-    print(f"  优先级1️⃣  按交易日全量（当前立即执行）:")
+    print("  优先级1️⃣  按交易日全量（当前立即执行）:")
     print(f"    - 日线    按交易日遍历 {td_count}天  API~1,400次  耗时~12min")
     print("    - 估值    按交易日遍历 1,439天  API~1,400次  耗时~12min")
     print("    - 资金流  按交易日遍历 1,439天  API~1,400次  耗时~12min")

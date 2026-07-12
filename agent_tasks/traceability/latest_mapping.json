@@ -1335,6 +1335,87 @@
       ],
       "expected_keywords": ["legacy shadow-forward generator retired", "canonical", "BLOCKED", "paired fills"],
       "behavior": "旧 Shadow 生成器不再写入合成收益、虚构事件或订单；只有显式注入的 canonical 市场收益且证据完整时才记录观察，否则 fail-closed。"
+    },
+    {
+      "id": "P0-DATA-WEEKLY-PIPELINE-01",
+      "title": "周维护只通过 canonical DataHub 入口并对上游空结果熔断",
+      "code_locations": [
+        {"file": "commands/data_pipeline.py", "function": "incremental_concept_industry", "line": 411},
+        {"file": "commands/data_pipeline.py", "function": "incremental_fina_latest", "line": 482},
+        {"file": "commands/data_pipeline.py", "function": "weekly_maintenance", "line": 580}
+      ],
+      "expected_keywords": ["pull_concept_industry_mx", "FUNDAMENTAL_EMPTY_STREAK_LIMIT", "upstream_unavailable", "canonical"],
+      "behavior": "概念/行业周刷新不再调用不存在的 API 名称；财务接口连续空结果或失败时停止无效请求，保留已有文件并把剩余股票标记为待补缺口。"
+    },
+    {
+      "id": "P0-READINESS-RUNTIME-ENV-01",
+      "title": "Readiness CLI 使用受控双通道运行环境且 Shadow 未验收时阻断",
+      "code_locations": [
+        {"file": "commands/live_readiness.py", "function": "_load_runtime_env_file", "line": 41},
+        {"file": "commands/live_readiness.py", "function": "check_shadow_trading", "line": 644},
+        {"file": "commands/live_readiness.py", "function": "cmd_live_readiness_v4", "line": 1168}
+      ],
+      "expected_keywords": ["RUNTIME_ENV_KEYS", "canonical Shadow", "severity = \"blocker\"", "双通道 worker 凭据完整"],
+      "behavior": "CLI 只解析 allow-list 的非仓库 runtime.env，不执行 shell；Telegram/企业微信凭据可被 readiness 复用；Shadow 少于 5 个交易日保持阻断，实盘不得因 warning 误显示 READY。"
+    },
+    {
+      "id": "P0-DATA-APPEND-ONLY-01",
+      "title": "每日增量在已确认连续日期上采用追加写入",
+      "code_locations": [
+        {"file": "commands/data_pipeline.py", "function": "_append_rows_without_rewrite", "line": 265},
+        {"file": "commands/data_pipeline.py", "function": "_incremental_fast_path", "line": 238},
+        {"file": "commands/data_pipeline.py", "function": "incremental_daily", "line": 306}
+      ],
+      "expected_keywords": ["append_only", "last_trade_date", "existing canonical output missing", "merge_once"],
+      "behavior": "每日行情、估值和资金流在前一交易日完整记录后只追加新日分区，不再读取并重写历史 CSV；状态缺失或重跑同日仍走安全去重合并，缺失历史文件拒绝静默重建。"
+    },
+    {
+      "id": "P1-KLINE-TEST-CANONICAL-01",
+      "title": "K 线审计测试跟随 canonical DataHub 而非废弃目录",
+      "code_locations": [
+        {"file": "commands/tests/data/test_kline_freshness_schema.py", "function": "_get_kline_files", "line": 14},
+        {"file": "commands/tests/data/test_kline_freshness_schema.py", "function": "test_kline_schema_uniform", "line": 68},
+        {"file": "commands/tests/data/test_kline_freshness_schema.py", "function": "test_no_future_dates", "line": 82}
+      ],
+      "expected_keywords": ["daily_kline_root", "STOCK_BASIC_PATH", "trade_date", "utf-8-sig"],
+      "behavior": "K 线质量测试读取 DataHub canonical normalized/market 和 stock_basic，过滤测试残留/非 U0 文件，校验统一字段、未来日期和 OHLC，不再因旧空目录误报。"
+    },
+    {
+      "id": "P2-ARCH-AUDIT-BOUNDED-SCAN-01",
+      "title": "架构审计受控扫描且测试只执行一次",
+      "code_locations": [
+        {"file": "commands/factor_lab/architecture/architecture_audit.py", "function": "_iter_files", "line": 42},
+        {"file": "commands/factor_lab/architecture/architecture_audit.py", "function": "_scan_artifacts", "line": 226},
+        {"file": "commands/tests/test_architecture_audit.py", "function": "audit_once", "line": 12}
+      ],
+      "expected_keywords": ["os.scandir", "_ARTIFACT_MAX_FILES", "truncated", "scope=\"module\""],
+      "behavior": "架构审计不再对 D 盘历史产物使用无界 Path.rglob；按跳过目录、深度和文件数受控遍历并显式记录截断，测试 fixture 只运行一次审计。"
+    },
+    {
+      "id": "P2-TEST-AUTH-SEMANTICS-01",
+      "title": "鉴权测试使用真实 UI token 且保持 fail-closed",
+      "code_locations": [
+        {"file": "commands/tests/test_data_status_ui.py", "function": "_configured_ui_token", "line": 13},
+        {"file": "commands/tests/test_ops_dashboard.py", "function": "client", "line": 32},
+        {"file": "commands/tests/test_report_center.py", "function": "_client", "line": 25},
+        {"file": "commands/tests/test_vnext_lane_artifacts.py", "function": "test_real_fast_and_event_artifacts_share_snapshot_and_target_weight_identity", "line": 16}
+      ],
+      "expected_keywords": ["Authorization", "HERMES_UI_TOKEN", "within_tolerance", "BACKTEST_ONLY"],
+      "behavior": "测试客户端在 UI 鉴权开启时携带受控 token；artifact 断言验证真实计算和阻断状态，不通过放宽生产鉴权或伪造历史缺口来消除失败。"
+    },
+    {
+      "id": "P0-AUDIT-SOURCE-ONLY-01",
+      "title": "退役旧审计并仅在大版本前执行源码审计",
+      "code_locations": [
+        {"file": "commands/factor_lab/audit/source_audit.py", "function": "run_source_audit", "line": 184},
+        {"file": "commands/factor_lab/audit/coordinator.py", "function": "run", "line": 30},
+        {"file": "commands/factor_lab/audit/runner.py", "function": "cmd_main", "line": 93},
+        {"file": "commands/factor_lab/architecture/architecture_audit.py", "function": "run_architecture_audit", "line": 44},
+        {"file": "commands/scripts/pre-push.sh", "function": "shell-entrypoint", "line": 1},
+        {"file": ".github/workflows/hermes-research-ci.yml", "function": "Optional release-only source audit", "line": 58}
+      ],
+      "expected_keywords": ["major-version-only", "data_scan", "temp_scan", "pytest", "gitnexus", "exit 0"],
+      "behavior": "普通审计入口与 Git hooks 结构化跳过；只有显式 major_version 进入 source-only 内核，且不扫描数据/临时/构建目录，不运行旧 Gate、pytest、Semgrep 或 GitNexus。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

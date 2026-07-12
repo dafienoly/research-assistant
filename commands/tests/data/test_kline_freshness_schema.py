@@ -1,18 +1,45 @@
-"""K线数据新鲜度与schema一致性测试 — V5.1 P1-1验收"""
-import os, csv, sys
+"""Canonical DataHub K 线新鲜度与 schema 一致性测试。"""
+import csv
+import os
+import sys
 from datetime import datetime, timezone, timedelta
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+from factor_lab.datahub_access import STOCK_BASIC_PATH, daily_kline_root
+
 CST = timezone(timedelta(hours=8))
-BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-DATA_DIR = os.path.join(BASE, "data")
-KLINE_DIR = os.path.join(DATA_DIR, "market", "daily_kline")
+KLINE_DIR = str(daily_kline_root())
 TODAY = datetime.now(CST)
 
 
 def _get_kline_files():
     if not os.path.isdir(KLINE_DIR):
         return []
-    return [f for f in os.listdir(KLINE_DIR) if f.endswith("_daily_kline.csv")]
+    with open(STOCK_BASIC_PATH, encoding="utf-8-sig", newline="") as reference:
+        canonical_codes = {
+            str(row.get("ts_code", "")).strip().upper()
+            for row in csv.DictReader(reference)
+            if row.get("ts_code")
+        }
+    return [
+        f for f in os.listdir(KLINE_DIR)
+        if f.endswith(".csv")
+        and not f.startswith("valuation_")
+        and not f.startswith(".")
+        and f[:-4].upper() in canonical_codes
+    ]
+
+
+def _date_value(row):
+    for key in ("trade_date", "date", "timeString"):
+        if row.get(key):
+            return row[key]
+    return ""
+
+
+def _sample_kline_files(limit: int = 20):
+    """Keep unit tests bounded; full-file checks belong to DataHub integrity audit."""
+    return _get_kline_files()[:limit]
 
 
 def test_kline_directory_exists():
@@ -20,19 +47,19 @@ def test_kline_directory_exists():
 
 
 def test_kline_files_exist():
-    files = _get_kline_files()
+    files = _sample_kline_files()
     assert len(files) >= 1, f"K线文件数量不足: {len(files)}"
 
 
 def test_kline_freshness():
     """最新K线日期距当前交易日 <= 3天"""
-    files = _get_kline_files()
+    files = _sample_kline_files()
     latest = None
     for fname in files:
         fpath = os.path.join(KLINE_DIR, fname)
-        with open(fpath) as f:
+        with open(fpath, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
-            dates = [r["timeString"] for r in reader if "timeString" in r]
+            dates = [_date_value(r) for r in reader if _date_value(r)]
             if dates:
                 fd = max(dates)
                 if latest is None or fd > latest:
@@ -52,27 +79,28 @@ def test_kline_freshness():
 
 
 def test_kline_schema_uniform():
-    """所有K线文件必须包含 code, timeString, open, high, low, close, volume, amount"""
-    files = _get_kline_files()
-    expected = {"code", "timeString", "open", "high", "low", "close", "volume", "amount"}
+    """所有 canonical K 线文件包含统一字段。"""
+    files = _sample_kline_files()
+    expected = {"ts_code", "trade_date", "open", "high", "low", "close", "amount"}
     for fname in files:
         fpath = os.path.join(KLINE_DIR, fname)
-        with open(fpath) as f:
+        with open(fpath, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             fields = set(reader.fieldnames or [])
             missing = expected - fields
             assert not missing, f"{fname}: 缺少列 {missing}, 实际字段={fields}"
+            assert {"vol", "volume"} & fields, f"{fname}: 缺少成交量列"
 
 
 def test_no_future_dates():
     """无未来日期"""
-    files = _get_kline_files()
+    files = _sample_kline_files()
     for fname in files:
         fpath = os.path.join(KLINE_DIR, fname)
-        with open(fpath) as f:
+        with open(fpath, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             for r in reader:
-                ds = r.get("timeString", "")
+                ds = _date_value(r)
                 assert ds, f"{fname}: 空日期"
                 try:
                     d = datetime.strptime(ds[:10], "%Y-%m-%d")
@@ -82,15 +110,17 @@ def test_no_future_dates():
 
 
 def test_no_duplicate_hist():
-    """无 _hist.csv 与 _daily_kline.csv 重复"""
+    """无旧历史文件与 canonical 文件重复"""
     all_files = os.listdir(KLINE_DIR) if os.path.isdir(KLINE_DIR) else []
     hist = [f for f in all_files if f.endswith("_hist.csv") and not f.startswith(".")]
-    kline = [f for f in all_files if f.endswith("_daily_kline.csv")]
+    kline = _get_kline_files()
     for hf in hist:
         base = hf.replace("_hist.csv", "")
         pair = [k for k in kline if base in k]
         for pk in pair:
-            with open(os.path.join(KLINE_DIR, hf)) as f1, open(os.path.join(KLINE_DIR, pk)) as f2:
+            with open(os.path.join(KLINE_DIR, hf), encoding="utf-8-sig") as f1, open(
+                os.path.join(KLINE_DIR, pk), encoding="utf-8-sig"
+            ) as f2:
                 assert f1.read() != f2.read(), f"重复文件: {hf} == {pk}"
 
 

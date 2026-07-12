@@ -100,10 +100,11 @@ class AuditReport:
         return gates
 
     def summary_text(self) -> str:
+        status = "⏭️ SKIPPED" if self.state == "skipped" else ("✅ PASS" if self.passed else "❌ FAIL")
         lines = [
             "═══ Code Audit Report ═══",
             f"Version: {self.version or '(unversioned)'}",
-            f"Status:  {'✅ PASS' if self.passed else '❌ FAIL'}",
+            f"Status:  {status}",
             f"Gates:   {', '.join(self.gates_run) or '(none)'}",
             "",
         ]

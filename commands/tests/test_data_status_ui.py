@@ -1,12 +1,31 @@
 """Tests for V7.1 Data Status / Provider Failure UI — 后端 API 路由测试"""
 import sys
 import os
+from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from fastapi.testclient import TestClient
 from factor_lab.api_server.main import app
 
+
+
+def _configured_ui_token() -> str:
+    token = os.environ.get("HERMES_UI_TOKEN", "").strip()
+    if token:
+        return token
+    env_path = Path(__file__).resolve().parents[2] / ".env"
+    try:
+        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+            if raw_line.startswith("HERMES_UI_TOKEN="):
+                return raw_line.split("=", 1)[1].strip().strip("'\"")
+    except OSError:
+        pass
+    return ""
+
+
 client = TestClient(app)
+if (token := _configured_ui_token()):
+    client.headers.update({"Authorization": f"Bearer {token}"})
 
 
 def _seed_test_source():

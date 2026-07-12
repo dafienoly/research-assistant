@@ -82,6 +82,76 @@ class TestAtomicCsvPersistence:
         assert list(tmp_path.glob(".symbol.csv.*.tmp")) == []
 
 
+class TestIncrementalAppendPath:
+    def test_append_rows_without_rewrite_keeps_history_and_adds_newline(self, tmp_path):
+        output = tmp_path / "symbol.csv"
+        output.write_text("trade_date,close\n20260709,10", encoding="utf-8")
+
+        added = data_pipeline_module._append_rows_without_rewrite(
+            output, pd.DataFrame([{"trade_date": "20260710", "close": 11}])
+        )
+
+        assert added == 1
+        assert output.read_text(encoding="utf-8").splitlines() == [
+            "trade_date,close",
+            "20260709,10",
+            "20260710,11",
+        ]
+
+    def test_incremental_daily_uses_append_only_after_completed_day(self, tmp_path, monkeypatch):
+        daily_dir = tmp_path / "market"
+        daily_dir.mkdir(exist_ok=True)
+        output = daily_dir / "000001.SZ.csv"
+        output.write_text(
+            "ts_code,trade_date,close\n000001.SZ,20260709,10\n", encoding="utf-8"
+        )
+        state_path = tmp_path / "incremental_state.json"
+        state_path.write_text(
+            json.dumps({"version": 1, "datasets": {"daily": {"last_trade_date": "20260709"}}}),
+            encoding="utf-8",
+        )
+        client = MagicMock()
+        client._query.return_value = pd.DataFrame(
+            [{"ts_code": "000001.SZ", "trade_date": "20260710", "close": 11}]
+        )
+        monkeypatch.setattr(data_pipeline_module, "DAILY_DIR", daily_dir)
+        monkeypatch.setattr(data_pipeline_module, "INCREMENTAL_STATE_PATH", state_path)
+        monkeypatch.setattr(data_pipeline_module, "_get_ts_client", lambda: client)
+        monkeypatch.setattr(
+            data_pipeline_module,
+            "_append_to_csv",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("merge path used")),
+        )
+
+        result = data_pipeline_module.incremental_daily("20260710")
+
+        assert result["status"] == "ok"
+        assert result["write_mode"] == "append_only"
+        assert len(pd.read_csv(output)) == 2
+
+    def test_incremental_daily_does_not_recreate_missing_history(self, tmp_path, monkeypatch):
+        daily_dir = tmp_path / "market"
+        daily_dir.mkdir(exist_ok=True)
+        state_path = tmp_path / "incremental_state.json"
+        state_path.write_text(
+            json.dumps({"version": 1, "datasets": {"daily": {"last_trade_date": "20260709"}}}),
+            encoding="utf-8",
+        )
+        client = MagicMock()
+        client._query.return_value = pd.DataFrame(
+            [{"ts_code": "000001.SZ", "trade_date": "20260710", "close": 11}]
+        )
+        monkeypatch.setattr(data_pipeline_module, "DAILY_DIR", daily_dir)
+        monkeypatch.setattr(data_pipeline_module, "INCREMENTAL_STATE_PATH", state_path)
+        monkeypatch.setattr(data_pipeline_module, "_get_ts_client", lambda: client)
+
+        result = data_pipeline_module.incremental_daily("20260710")
+
+        assert result["status"] == "partial"
+        assert not (daily_dir / "000001.SZ.csv").exists()
+        assert "existing canonical output missing" in result["errors"][0]
+
+
 class TestTradeDateStaging:
     @staticmethod
     def _frame(day: str) -> pd.DataFrame:
@@ -665,3 +735,40 @@ class TestGapReport:
             assert item["status"] == "UNKNOWN"
         assert "✅ 日线 kline" not in captured.out
         assert "⚠️ 日线 kline" in captured.out
+
+    def test_weekly_concept_industry_uses_canonical_fetcher(self, monkeypatch):
+        canonical = {
+            "status": "PARTIAL",
+            "concept": {"rows": 12, "source": "mx_data:search"},
+            "industry": {"rows": 0, "source": "mx_data:search"},
+            "errors": ["tushare unavailable"],
+        }
+        monkeypatch.setattr(
+            data_pipeline_module, "pull_concept_industry_mx", lambda: canonical
+        )
+        result = data_pipeline_module.incremental_concept_industry()
+        assert result["status"] == "partial"
+        assert result["concept_list"] == 12
+        assert result["industry"] == 0
+        assert result["concept_source"] == "mx_data:search"
+        assert result["errors"] == ["tushare unavailable"]
+
+    def test_fina_latest_circuit_breaker_preserves_gap_without_api_storm(
+        self, monkeypatch, capsys
+    ):
+        client = MagicMock()
+        client._query.side_effect = [
+            pd.DataFrame({"ts_code": [f"{i:06d}.SZ" for i in range(20)]}),
+            *[pd.DataFrame() for _ in range(3)],
+        ]
+        monkeypatch.setattr(data_pipeline_module, "_get_ts_client", lambda: client)
+        monkeypatch.setattr(data_pipeline_module, "BATCH_SIZE", 2)
+        monkeypatch.setattr(data_pipeline_module, "FUNDAMENTAL_EMPTY_STREAK_LIMIT", 3)
+
+        result = data_pipeline_module.incremental_fina_latest()
+
+        assert result["status"] == "upstream_unavailable"
+        assert result["processed"] == 3
+        assert result["skipped_due_to_upstream"] == 17
+        assert client._query.call_count == 4  # stock_basic + 3 bounded probes
+        assert "上游缺口" in capsys.readouterr().out

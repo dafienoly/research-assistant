@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """验证: ETF 替代方案 + 整手/尾盘规则"""
-import sys, os
+import sys, os, tempfile
+from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 print("=" * 60)
@@ -134,6 +135,13 @@ print(f"  ✓ round_to_lot_size 导入正常")
 # 2c. 验证 standing_paper_trading 的整手规则
 print("\n测试 2c: standing_paper_trading 整手规则")
 from factor_lab.paper.standing_paper_trading import StandingPaperTrading
+# This legacy script is imported during pytest collection; never reuse the
+# durable Paper ledger because collection must be read-only for production data.
+_paper_test_dir = Path(tempfile.mkdtemp(prefix="hermes-paper-test-"))
+StandingPaperTrading.STATE_DIR = _paper_test_dir
+StandingPaperTrading.PORTFOLIO_FILE = _paper_test_dir / "portfolio.json"
+StandingPaperTrading.TRADES_FILE = _paper_test_dir / "trades.jsonl"
+StandingPaperTrading.EQUITY_FILE = _paper_test_dir / "equity.csv"
 pt = StandingPaperTrading(initial_capital=100000)
 # 测试买入 150 股 → 应为 100 股
 result = pt.execute_buy("688012", price=50.0, shares=150, date="2026-07-08")

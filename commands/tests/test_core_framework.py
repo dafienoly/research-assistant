@@ -82,8 +82,12 @@ def test_alpha_schema():
     assert a.status == "draft"
 
 
-def test_alpha_registry():
+def test_alpha_registry(tmp_path, monkeypatch):
     from factor_lab.alpha.schema import AlphaSpec
+    import factor_lab.alpha.registry as registry
+
+    monkeypatch.setattr(registry, "REGISTRY_ROOT", tmp_path)
+    monkeypatch.setattr(registry, "REGISTRY_INDEX", tmp_path / "registry_index.json")
     spec = AlphaSpec(name="core_test_alpha")
     result = register_alpha(spec)
     assert "alpha_id" in result

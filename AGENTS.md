@@ -1,11 +1,13 @@
+> **2026-07-12 operational override:** GitNexus indexing, anti-cheat auto-audit, and commit/push audit hooks are retired. Do not run them during ordinary development. Use `commands/scripts/major_code_audit.sh <version> [base]` only for an explicitly approved major release; it is source-only and excludes data/temp/generated trees.
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **research-assistant** (19969 symbols, 36539 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **research-assistant** (19322 symbols, 36352 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
-## Always Do
+## Historical GitNexus guidance (disabled by the operational override above)
 
 - **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
 - **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
@@ -42,27 +44,27 @@ This project is indexed by GitNexus as **research-assistant** (19969 symbols, 36
 
 <!-- gitnexus:end -->
 
-## Auto-Audit (Hermes Plugin)
+## Historical Auto-Audit guidance (disabled)
 
-A Hermes plugin (`anti-cheat-auto-audit`) automatically runs the anti-cheat
-audit after every `write_file` / `patch` on `.py` files in this project.
+The former Hermes plugin (`anti-cheat-auto-audit`) is retired and must not run
+after `write_file` / `patch` on `.py` files in this project.
 
 ### 自动触发
-- **Triggered by:** any `.py` file write in this project (3-second debounce
+- **Historical trigger (disabled):** any `.py` file write in this project (3-second debounce
   batches multi-file changes into one audit)
-- **Runs:** `leader:anti-cheat-audit --skip gate4 --enable-gate5` as background
+- **Historical command (disabled):** `leader:anti-cheat-audit --skip gate4 --enable-gate5` as background
   subprocess (Gates 1-3 + Gate 5 LLM review)
-- **FAIL auto-notify:** When the audit finds problems, the plugin injects
+- **Historical behavior (disabled):** When the audit found problems, the plugin injected
   a ⚠️  notice into the next LLM user message via the `pre_llm_call` hook.
   The agent sees the findings and can proactively fix them — no manual
   check needed.
-- **pre-push hook** still acts as final gate — this plugin is additive.
+- **pre-push hook** is intentionally a no-op.
 
-### Gate 5 — LLM 审查 + 映射验证 (A+C)
+### Historical Gate 5 — LLM 审查 + 映射验证 (retired)
 
 Gate 5 能检测"没有按需求执行"的问题，但依赖 agent 产出映射表：
 
-**你必须做：** 当实现多步需求时，在最后一步写入一个 traceability mapping 文件：
+历史流程曾要求多步需求写入 traceability mapping；当前 release-only source audit 不执行 Gate 5，mapping 仅作为项目文档保留：
 ```
 agent_tasks/traceability/latest_mapping.json
 ```

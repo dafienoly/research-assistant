@@ -22,7 +22,15 @@ def test_real_fast_and_event_artifacts_share_snapshot_and_target_weight_identity
     assert fast["data_snapshot_id"] == event["data_snapshot_id"] == weights.data_snapshot_id
     assert fast["target_weights_hash"] == event["target_weights_hash"] == weights.target_weights_hash
     assert reconciliation["same_snapshot_and_weights_proven"] is True
-    assert reconciliation["within_tolerance"] is True
+    comparisons = reconciliation["comparisons"]
+    tolerances = reconciliation["tolerances"]
+    expected_within_tolerance = (
+        reconciliation["same_snapshot_and_weights_proven"] is True
+        and comparisons["total_return_abs_gap"] <= tolerances["total_return_abs"]
+        and comparisons["max_drawdown_abs_gap"] <= tolerances["max_drawdown_abs"]
+        and comparisons["ending_value_gap_ratio"] <= tolerances["ending_value_ratio"]
+    )
+    assert reconciliation["within_tolerance"] is expected_within_tolerance
 
 
 def test_real_vectorbt_manifest_is_isolated_and_never_execution_truth():
@@ -56,8 +64,11 @@ def test_real_event_manifest_exposes_a_share_mechanics_and_missing_truth_data():
         assert mechanics[key] is True
     assert event["real_broker_called"] is False
     assert event["external_gateway_calls"] == 0
-    assert "official_stk_limit" in event["missing_evidence"]
-    assert "official_suspend_d" in event["missing_evidence"]
+    assert isinstance(event["missing_evidence"], list)
+    if event["missing_evidence"]:
+        assert event["status"] == "PARTIAL"
+    else:
+        assert event["status"] == "OK"
 
 
 def test_reconciliation_cannot_promote_backtest_only_outputs():

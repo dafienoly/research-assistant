@@ -7,6 +7,22 @@ from factor_lab.api_server.main import app
 from factor_lab.leader.ops_dashboard import OpsManager, SERVICE_DEFS, reset_manager
 
 
+def _configured_ui_token():
+    import os
+
+    token = os.environ.get("HERMES_UI_TOKEN", "").strip()
+    if token:
+        return token
+    env_path = Path(__file__).resolve().parents[1].parent / ".env"
+    try:
+        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+            if raw_line.startswith("HERMES_UI_TOKEN="):
+                return raw_line.split("=", 1)[1].strip().strip("'\"")
+    except OSError:
+        pass
+    return ""
+
+
 @pytest.fixture(autouse=True)
 def reset_ops_manager():
     reset_manager()
@@ -16,7 +32,10 @@ def reset_ops_manager():
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    client = TestClient(app)
+    if token := _configured_ui_token():
+        client.headers.update({"Authorization": f"Bearer {token}"})
+    return client
 
 
 def test_service_catalog_contains_only_operations_services():

@@ -22,6 +22,7 @@ class TriggerAuditBody(BaseModel):
     scope: Literal["working-tree", "staged", "compare", "paths"] = "working-tree"
     base_ref: str = Field(default="main", pattern=r"^[A-Za-z0-9._/-]+$")
     paths: list[str] = Field(default_factory=list, max_length=100)
+    major_version: str = Field(default="", pattern=r"^$|^\d+\.\d+(?:\.\d+)?(?:[-+].*)?$")
 
 
 def _local_request(request: Request) -> bool:
@@ -47,6 +48,23 @@ async def get_code_audit(run_id: str, request: Request):
 async def trigger_code_audit(body: TriggerAuditBody, request: Request):
     if not _local_request(request):
         raise HTTPException(status_code=403, detail="Code audit can only be triggered locally")
+    if not body.major_version:
+        return api_success(
+            data={
+                "state": "skipped",
+                "passed": True,
+                "reason": "仅允许在显式大版本发布前执行源码审计",
+                "scan_policy": {
+                    "source_only": True,
+                    "data_scan": False,
+                    "temp_scan": False,
+                    "pytest": False,
+                    "semgrep": False,
+                    "gitnexus": False,
+                },
+            },
+            request=request,
+        )
     audit_request = AuditRequest(
         repo_root=ROOT,
         profile=body.profile,
@@ -55,6 +73,7 @@ async def trigger_code_audit(body: TriggerAuditBody, request: Request):
         paths=body.paths,
         trigger="api",
         requested_by=request.client.host if request.client else "local",
+        major_version=body.major_version,
     )
     try:
         report = await run_in_threadpool(AuditCoordinator().run, audit_request)

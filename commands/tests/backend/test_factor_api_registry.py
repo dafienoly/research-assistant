@@ -35,6 +35,21 @@ from factor_lab.backend.services.factor_registry_service import (
 from factor_lab.api_server.main import app
 
 
+def _configured_ui_token() -> str:
+    """Resolve the private test token without printing or hardcoding it."""
+    token = os.environ.get("HERMES_UI_TOKEN", "").strip()
+    if token:
+        return token
+    env_path = _COMMANDS.parent / ".env"
+    try:
+        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+            if raw_line.startswith("HERMES_UI_TOKEN="):
+                return raw_line.split("=", 1)[1].strip().strip("'\"")
+    except OSError:
+        pass
+    return ""
+
+
 # ════════════════════════════════════════════════════════════
 # 服务层测试
 # ════════════════════════════════════════════════════════════
@@ -152,8 +167,10 @@ class TestFactorRegistryService:
 
 class TestFactorApiEndpoints:
 
-    _token = os.environ.get("HERMES_UI_TOKEN", "")
-    client = TestClient(app, headers={"Authorization": f"Bearer {_token}"} if _token else {})
+    client = TestClient(app)
+    _token = _configured_ui_token()
+    if _token:
+        client.headers.update({"Authorization": f"Bearer {_token}"})
 
     def test_list_factors_ge_100(self):
         """GET /api/factors 返回 >= 100 个因子"""

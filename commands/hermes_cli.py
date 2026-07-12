@@ -196,7 +196,8 @@ def show_help():
                                 实盘前门禁检查: 6 道 Gate + Checklist (V2.14)
   live-readiness:v4              V4.9 小资金实盘 Readiness Gate: 13道门禁检查
   live-gate:v4-report            V4.9 Readiness Gate 详细报告 (含证据+修复建议)
-  architecture:audit             全局架构审计: 模块/CLI/Gate/Safety/V3 Readiness (V2.14.1)
+  architecture:audit [--major-version 2.0.0]
+                                  仅大版本发布前执行源码架构审计；默认跳过
   alpha:register --spec <path>  Alpha Factory: 注册外部 AlphaSpec (V3.0)
   alpha:list                     Alpha Factory: 列出已注册 Alpha (V3.0)
   alpha:show --alpha-id <id>    Alpha Factory: 查看 Alpha 详情 (V3.0)
@@ -216,7 +217,8 @@ def show_help():
   leader:ops-restart <id>      重启服务
   leader:ops-backup            备份配置与日志
   leader:ops-diagnostics       全面诊断报告
-  audit:code --profile fast|full|security --scope working-tree|staged|compare
+  audit:code --major-version 2.0.0 --scope compare --base origin/main
+                                  仅大版本发布前执行受控源码审计
                                 运行代码审计
   leader:anti-cheat-audit      audit:code 的弃用兼容别名
 
@@ -1388,7 +1390,7 @@ run_daily_premarket(no_notify=True)
         _handle_sector_signals()
     elif command == "architecture:audit":
         from factor_lab.architecture.architecture_audit import run_architecture_audit
-        run_architecture_audit()
+        run_architecture_audit(major_version=_arg_value(args, "--major-version", ""))
 
     # === V4.9 小资金实盘 Readiness Gate ===
     elif command == "live-readiness:v4":

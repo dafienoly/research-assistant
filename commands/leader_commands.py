@@ -48,7 +48,12 @@ def handle(command: str, args: list[str]) -> bool:
 
     if command == "architecture:audit":
         from factor_lab.architecture.architecture_audit import run_architecture_audit
-        run_architecture_audit()
+        major_version = ""
+        for index, value in enumerate(args):
+            if value == "--major-version" and index + 1 < len(args):
+                major_version = args[index + 1]
+                break
+        run_architecture_audit(major_version=major_version)
         return True
 
     if _ops(command, args):

@@ -1449,6 +1449,32 @@ class TestAuditTrailGate:
 class TestWeChatNotifyGate:
     """WeChatNotifyGate — 企业微信通知正常"""
 
+    def test_runtime_env_loader_is_allowlisted_and_non_shell(self, tmp_path, monkeypatch):
+        import live_readiness
+        import os
+
+        ui_token_before = os.environ.get("HERMES_UI_TOKEN")
+
+        for key in live_readiness.RUNTIME_ENV_KEYS:
+            monkeypatch.delenv(key, raising=False)
+        runtime = tmp_path / "runtime.env"
+        runtime.write_text(
+            "export TELEGRAM_BOT_TOKEN=token\n"
+            "export TELEGRAM_CHAT_ID=chat\n"
+            "export WECHAT_WEBHOOK_URL=https://example.invalid/hook\n"
+            "export HERMES_UI_TOKEN=must-not-load\n",
+            encoding="utf-8",
+        )
+
+        loaded = live_readiness._load_runtime_env_file(runtime)
+
+        assert set(loaded) == {
+            "TELEGRAM_BOT_TOKEN",
+            "TELEGRAM_CHAT_ID",
+            "WECHAT_WEBHOOK_URL",
+        }
+        assert os.environ.get("HERMES_UI_TOKEN") == ui_token_before
+
     def test_check_runs(self):
         """Gate 可执行"""
         checker = LiveReadinessChecker()

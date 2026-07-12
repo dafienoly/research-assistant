@@ -120,9 +120,8 @@ hermes alpha:migrate-existing-factors       # 现有因子迁入 Registry
 投研主链之外仅保留运维中心与代码审计中心。自动版本推进、Roadmap、Agent Console、任务队列和通用 Runner 已退役；历史归档位于 `~/.hermes/archive/research-assistant/`。
 
 - 运维：`hermes leader:ops-health`、`hermes leader:ops-diagnostics`
-- 快速审计：`hermes audit:code --profile fast`
-- 完整审计：`hermes audit:code --profile full`
-- 安全审计：`hermes audit:code --profile security`
+- 大版本源码审计：`commands/scripts/major_code_audit.sh 2.0.0 origin/main`
+- 普通 `audit:code`/pre-commit/pre-push 已停用，不扫描数据、临时文件或生成物
 
 ## 快速开始
 
