@@ -1501,6 +1501,43 @@
       ],
       "expected_keywords": ["legacy data/market/daily_kline checks retired", "pytestmark", "__test__ = False", "audit_endpoint"],
       "behavior": "日常 pytest 不扫描遗留数据目录，也不启动网络 API 审计；V5 endpoint smoke 仅在显式人工/发布流程调用 main() 时运行。"
+    },
+    {
+      "id": "P2-NOTIFICATION-CLAIM-01",
+      "title": "通知 outbox 与 L2 摘要使用锁外发送的租约领取",
+      "code_locations": [
+        {"file": "commands/factor_lab/decision_loop/notifications.py", "function": "deliver_pending", "line": 83},
+        {"file": "commands/factor_lab/decision_loop/notifications.py", "function": "_claim_next", "line": 148},
+        {"file": "commands/factor_lab/decision_loop/notifications.py", "function": "_reserve_l2_digest", "line": 338},
+        {"file": "commands/tests/test_decision_loop.py", "function": "test_notification_claim_prevents_duplicate_concurrent_delivery", "line": 385}
+      ],
+      "expected_keywords": ["CLAIM_LEASE_SECONDS", "claims.jsonl", "in_flight", "_record_receipt", "update_json"],
+      "behavior": "跨进程 worker 只在领取和写回时持锁，网络发送在锁外执行；租约、幂等 receipt 和 L2 游标避免慢通道阻塞与重复发送。"
+    },
+    {
+      "id": "P2-AUTHORIZATION-SINGLE-FLIGHT-01",
+      "title": "日级授权读改写使用交易日 operation lock",
+      "code_locations": [
+        {"file": "commands/factor_lab/decision_loop/authorization.py", "function": "_operation_lock", "line": 29},
+        {"file": "commands/factor_lab/decision_loop/authorization.py", "function": "activate", "line": 91},
+        {"file": "commands/factor_lab/decision_loop/authorization.py", "function": "validate_runtime", "line": 143},
+        {"file": "commands/tests/test_decision_loop_production.py", "function": "test_authorization_activation_is_single_flight", "line": 130}
+      ],
+      "expected_keywords": ["daily authorization already exists", "authorization/", "operation", "not pending", "activated_audits"],
+      "behavior": "创建、激活、过期、撤销和运行时校验在同一交易日锁内完成，防止双击确认、并发撤权或参数变化覆盖。"
+    },
+    {
+      "id": "P1-DATA-API-MANIFEST-01",
+      "title": "数据 API 与 cron 只消费 DataHub health manifest",
+      "code_locations": [
+        {"file": "commands/factor_lab/api_server/routes_data.py", "function": "data_coverage", "line": 293},
+        {"file": "commands/factor_lab/api_server/routes_data.py", "function": "data_manifests", "line": 316},
+        {"file": "commands/data_pipeline.py", "function": "run_data_audit", "line": 824},
+        {"file": "commands/hermes_cli.py", "function": "data:coverage", "line": 1435},
+        {"file": "commands/tests/test_routes_data_datahub.py", "function": "test_data_routes_do_not_glob_or_delegate_to_legacy_data_quality", "line": 59}
+      ],
+      "expected_keywords": ["coverage.json", "factor_input_projection.json", "EXPLICIT_MANIFESTS", "datahub:audit/health", "cmd_data_coverage", "daily_kline_index"],
+      "behavior": "状态 API 和生产 cron 不再扫描 CSV 或调用第二套 data_audit；只读取 DataHub 已生成的覆盖率、新鲜度、缺口、完整性和投影 manifest。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

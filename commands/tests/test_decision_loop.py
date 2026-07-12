@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from threading import Event, Thread
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -351,6 +352,80 @@ def test_notification_outbox_enqueue_has_no_network_and_delivery_is_idempotent(t
     assert calls == [event.event_id]
 
 
+def test_notification_worker_releases_lock_while_sender_is_in_flight(tmp_path):
+    started = Event()
+    release = Event()
+    calls = []
+    worker_store = store(tmp_path)
+    competing_store = store(tmp_path)
+
+    def slow_sender(payload):
+        calls.append(payload["event_id"])
+        started.set()
+        assert release.wait(timeout=2)
+        return {"ok": True}
+
+    notifier = DualChannelNotifier(worker_store, {"telegram": slow_sender})
+    event = ProfitGuard(worker_store)._card(
+        position(), quote(107, datetime.now().astimezone()), "L3", "reduce_half",
+        7, 10, 3, AdviceMode.EXECUTABLE, "test", 500,
+    )
+    notifier.enqueue(event)
+    result_holder = {}
+    thread = Thread(
+        target=lambda: result_holder.update(notifier.deliver_pending(event_id=event.event_id)),
+        daemon=True,
+    )
+    thread.start()
+    assert started.wait(timeout=2)
+    try:
+        with competing_store.exclusive("notifications/outbox-worker", timeout=0.5):
+            lock_acquired = True
+    except TimeoutError:
+        lock_acquired = False
+    assert lock_acquired is True
+    release.set()
+    thread.join(timeout=2)
+    assert not thread.is_alive()
+    assert result_holder["channels"]["telegram"]["delivered"] is True
+    assert calls == [event.event_id]
+
+
+def test_notification_claim_prevents_duplicate_concurrent_delivery(tmp_path):
+    started = Event()
+    release = Event()
+    calls = []
+
+    def slow_sender(payload):
+        calls.append(payload["event_id"])
+        started.set()
+        assert release.wait(timeout=2)
+        return {"ok": True}
+
+    first = DualChannelNotifier(store(tmp_path), {"telegram": slow_sender})
+    second = DualChannelNotifier(store(tmp_path), {"telegram": slow_sender})
+    event = ProfitGuard(store(tmp_path))._card(
+        position(), quote(107, datetime.now().astimezone()), "L3", "reduce_half",
+        7, 10, 3, AdviceMode.EXECUTABLE, "test", 500,
+    )
+    first.enqueue(event)
+    result_holder = {}
+    thread = Thread(
+        target=lambda: result_holder.update(first.deliver_pending(event_id=event.event_id)),
+        daemon=True,
+    )
+    thread.start()
+    assert started.wait(timeout=2)
+    observed = second.deliver_pending(event_id=event.event_id)
+    assert observed["attempted"] == 0
+    assert observed["channels"]["telegram"]["status"] == "in_flight"
+    release.set()
+    thread.join(timeout=2)
+    assert not thread.is_alive()
+    assert calls == [event.event_id]
+    assert result_holder["channels"]["telegram"]["delivered"] is True
+
+
 def test_l2_digest_keeps_failed_channel_cursor_for_retry(tmp_path):
     attempts = {"telegram": 0, "enterprise_wechat": 0}
 
@@ -375,6 +450,38 @@ def test_l2_digest_keeps_failed_channel_cursor_for_retry(tmp_path):
     assert first["status"] == "partial"
     assert second["count"] == 1
     assert attempts == {"telegram": 1, "enterprise_wechat": 2}
+
+
+def test_l2_digest_claim_prevents_duplicate_concurrent_flush(tmp_path):
+    started = Event()
+    release = Event()
+    attempts = []
+
+    def slow_sender(_):
+        attempts.append("telegram")
+        started.set()
+        assert release.wait(timeout=2)
+        return {"ok": True}
+
+    first = DualChannelNotifier(store(tmp_path), {"telegram": slow_sender})
+    second = DualChannelNotifier(store(tmp_path), {"telegram": slow_sender})
+    event = ProfitGuard(store(tmp_path))._card(
+        position(), quote(108, datetime.now().astimezone()), "L2", "warn",
+        8, 10, 2, AdviceMode.EXECUTABLE, "test",
+    )
+    first.enqueue(event)
+    result_holder = {}
+    thread = Thread(target=lambda: result_holder.update(first.flush_l2_digest()), daemon=True)
+    thread.start()
+    assert started.wait(timeout=2)
+    observed = second.flush_l2_digest()
+    assert observed["channels"] == {}
+    assert observed["count"] == 1
+    release.set()
+    thread.join(timeout=2)
+    assert not thread.is_alive()
+    assert attempts == ["telegram"]
+    assert result_holder["status"] == "delivered"
 
 
 def test_acknowledge_rejects_unknown_event(tmp_path):

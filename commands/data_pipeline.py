@@ -822,38 +822,105 @@ def _update_registry_after_weekly(results: dict) -> None:
 
 
 def run_data_audit() -> dict:
-    """运行数据新鲜度检查和缺口报告"""
+    """读取 DataHub 已生成的健康清单，不重复扫描 CSV 数据目录。
+
+    数据审计由受控 DataHub ingestion 任务负责生成 coverage/freshness/
+    missing/integrity；cron 只读取这些 durable manifests，避免每次状态查询
+    再次遍历数千个分区文件或调用旧的第二套 ``data_audit`` 实现。
+    """
     print(f"{'='*50}")
     print("🔍 DataHub 新鲜度检查")
     print(f"{'='*50}")
 
     try:
-        from data_quality import FreshnessChecker, DataGapReporter
-        fc = FreshnessChecker()
-        fresh = fc.run()
+        health_root = BASE / "data" / "audit" / "health"
 
-        dgr = DataGapReporter()
-        gaps = dgr.report()
+        def read_health(name: str) -> dict[str, Any]:
+            path = health_root / name
+            if not path.is_file():
+                return {"status": "MISSING", "path": str(path), "error": "manifest_missing"}
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+                return {"status": "INVALID", "path": str(path), "error": type(exc).__name__}
+            return payload if isinstance(payload, dict) else {"status": "INVALID", "path": str(path)}
 
-        from data_audit import run_all_audits
-
-        health_reports = run_all_audits()
-        canonical_freshness = {}
-        canonical_integrity = {}
+        canonical_freshness = read_health("freshness.json")
+        canonical_integrity = read_health("integrity.json")
+        missing = read_health("missing.json")
+        projection_path = BASE / "data" / "audit" / "manifests" / "factor_input_projection.json"
         try:
-            canonical_freshness = json.loads(Path(health_reports["freshness"]).read_text(encoding="utf-8"))
-        except (KeyError, OSError, json.JSONDecodeError):
-            pass
-        try:
-            canonical_integrity = json.loads(Path(health_reports["integrity"]).read_text(encoding="utf-8"))
-        except (KeyError, OSError, json.JSONDecodeError):
-            pass
+            projection = json.loads(projection_path.read_text(encoding="utf-8")) if projection_path.is_file() else {}
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            projection = {}
+
+        auxiliary_statuses = {
+            name: str((item or {}).get("status", "MISSING")).upper()
+            for name, item in (projection.get("datasets") or {}).items()
+        }
+        fresh = {
+            "check_time": canonical_freshness.get("generated_at", ""),
+            "overall_status": "ok" if auxiliary_statuses and all(status in {"OK", "COMPLETE"} for status in auxiliary_statuses.values()) else "partial",
+            "source": "datahub:audit/health/freshness.json+factor_input_projection.json",
+            "datasets": auxiliary_statuses,
+            "blocking": False,
+        }
+        gaps = {
+            "report_time": missing.get("generated_at", ""),
+            "source": "datahub:audit/health/missing.json+factor_input_projection.json",
+            "gaps": [],
+            "summary": {"total_gaps": 0, "blocking_gaps": 0, "partial_gaps": 0, "blocking_codex": False},
+        }
+        missing_count = int(missing.get("missing_stocks", 0) or 0)
+        if missing_count:
+            gaps["gaps"].append({
+                "name": "canonical_market",
+                "description": f"{missing_count} 个 U0 标的缺少 canonical 行情",
+                "category": "market",
+                "gap_type": "missing_canonical_data",
+                "impact": "blocking",
+                "blocking_codex": True,
+                "affected_stocks": missing.get("missing_codes_sample", []),
+            })
+        for name, status in auxiliary_statuses.items():
+            if status not in {"OK", "COMPLETE"}:
+                gaps["gaps"].append({
+                    "name": name,
+                    "description": f"DataHub projection status={status}",
+                    "category": "auxiliary",
+                    "gap_type": "manifest_status",
+                    "impact": "partial",
+                    "blocking_codex": False,
+                    "status": status,
+                })
+        if not auxiliary_statuses:
+            gaps["gaps"].append({
+                "name": "factor_input_projection",
+                "description": "DataHub factor input projection manifest missing or invalid",
+                "category": "auxiliary",
+                "gap_type": "manifest_missing",
+                "impact": "partial",
+                "blocking_codex": False,
+                "status": "MISSING",
+            })
+        gaps["summary"] = {
+            "total_gaps": len(gaps["gaps"]),
+            "blocking_gaps": sum(1 for item in gaps["gaps"] if item.get("blocking_codex")),
+            "partial_gaps": sum(1 for item in gaps["gaps"] if not item.get("blocking_codex")),
+            "blocking_codex": any(item.get("blocking_codex") for item in gaps["gaps"]),
+        }
+        health_reports = {
+            name.removesuffix(".json"): str(health_root / name)
+            for name in ("coverage.json", "freshness.json", "missing.json", "integrity.json", "survivorship.json")
+        }
         core_status = canonical_freshness.get("status", "UNKNOWN")
         integrity_status = canonical_integrity.get("status", "UNKNOWN")
         overall_status = (
             "ok"
             if core_status == "OK"
             and integrity_status == "OK"
+            and fresh["overall_status"] == "ok"
+            and gaps["summary"].get("partial_gaps", 0) == 0
             and not gaps["summary"].get("blocking_codex", False)
             else "partial"
         )
@@ -1476,111 +1543,8 @@ def pull_concept_industry_mx() -> dict:
 
 
 def gap_report_and_plan() -> dict:
-    """数据缺口报告 + 推荐拉取计划"""
-    print(f"{'='*50}")
-    print("📋 DataHub 数据缺口报告")
-    print(f"{'='*50}")
-    print()
-
-    tc = _get_ts_client()
-    sb = tc._query("stock_basic", fields="ts_code", list_status="L")
-    total = len(sb)
-    u0_codes = {str(code).split(".")[0] for code in sb.get("ts_code", pd.Series(dtype=str)).dropna()}
-    print(f"全A股票: {total} 只")
-    print()
-
-    # 逐股数据盘点
-    canonical_daily_dir = BASE / "data" / "market" / "daily_kline"
-    shared_daily_dir = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline")
-    normalized_daily = [p for p in DAILY_DIR.glob("*.csv") if not p.name.startswith("valuation_")]
-    canonical_daily = list(canonical_daily_dir.glob("*.csv"))
-    shared_daily = list(shared_daily_dir.glob("*.csv")) if shared_daily_dir.exists() else []
-    def _daily_code(path: Path) -> str:
-        return path.stem.replace("_daily_kline", "").split(".")[0]
-    daily_count = len({_daily_code(p) for p in [*normalized_daily, *canonical_daily, *shared_daily]} & u0_codes)
-    val_count = len({p.stem.replace("valuation_", "").split(".")[0] for p in VALUATION_DIR.glob("valuation_*.csv")} & u0_codes)
-    ff_count = len({p.stem.split(".")[0] for p in FUND_FLOW_DIR.glob("*.csv")} & u0_codes)
-    fina_count = len({p.stem.split(".")[0] for p in FINA_DIR.glob("*.csv")} & u0_codes)
-
-    stock_datasets = [
-        ("日线 kline", daily_count),
-        ("估值 (PE/PB)", val_count),
-        ("资金流向", ff_count),
-        ("财务指标", fina_count),
-    ]
-    gaps = []
-    for dataset_type, have in stock_datasets:
-        if total > 0:
-            gap = max(total - have, 0)
-            status = "OK" if gap == 0 else "PARTIAL"
-            need: int | str = total
-        else:
-            gap = "UNKNOWN"
-            status = "UNKNOWN"
-            need = "UNKNOWN"
-        gaps.append({
-            "type": dataset_type,
-            "have": have,
-            "need": need,
-            "gap": gap,
-            "status": status,
-        })
-
-    # 概念/行业
-    concept_path = ETC_DIR / "concept" / "concept_list.csv"
-    industry_path = ETC_DIR / "industry" / "industry_list.csv"
-    concept_list = _read_csv_safe(concept_path)
-    industry_list = _read_csv_safe(industry_path)
-    for dataset_type, dataset, target in [
-        ("概念板块", concept_list, 380),
-        ("行业分类", industry_list, 80),
-    ]:
-        have = len(dataset)
-        gap = max(target - have, 0)
-        status = "OK" if gap == 0 else "MISSING" if have == 0 else "PARTIAL"
-        gaps.append({
-            "type": dataset_type,
-            "have": have,
-            "need": target,
-            "gap": gap,
-            "status": status,
-        })
-
-    print(f"{'─'*60}")
-    print(f"{'数据集':16s} {'已有':>8s} {'总需':>8s} {'缺口':>10s}")
-    print(f"{'─'*60}")
-    for g in gaps:
-        have_str = str(g["have"])
-        need_str = str(g["need"])
-        gap_str = str(g["gap"]) if isinstance(g["gap"], str) else str(g["gap"])
-        icon = "✅" if isinstance(g["gap"], int) and g["gap"] == 0 else "⚠️"
-        print(f"  {icon} {g['type']:12s}  {have_str:>8s}  {need_str:>8s}  {gap_str:>10s}")
-
-    print()
-    print(f"{'='*50}")
-    print("推荐拉取计划")
-    print(f"{'='*50}")
-    print()
-    td_count = len(_get_trade_days("20210101"))
-    print("  优先级1️⃣  按交易日全量（当前立即执行）:")
-    print(f"    - 日线    按交易日遍历 {td_count}天  API~1,400次  耗时~12min")
-    print("    - 估值    按交易日遍历 1,439天  API~1,400次  耗时~12min")
-    print("    - 资金流  按交易日遍历 1,439天  API~1,400次  耗时~12min")
-    print(f"    合计: ~3,000次调用 / ~36min / 补齐{total}只×1,400行")
-    print()
-    print("  优先级2️⃣  财务指标（收盘后逐股）:")
-    print(f"    - 财务    fina_indicator 逐股  {total}次调用  耗时~50min")
-    print("    - 建议: 集成到每周维护中，分批完成")
-    print()
-    print("  优先级3️⃣  概念/行业/ETF持仓（周末维护）:")
-    print("    - concept/industry: 各 1 次 → 已集成 weekly-maintenance")
-    print("    - ETF 持仓: 4 次 → 已集成 weekly-maintenance")
-    print()
-    print("  优先级4️⃣  每日增量（收盘后自动）:")
-    print("    - 15:05 datahub_cron.sh daily-incremental → 4 次调用/天")
-    print()
-
-    return {"status": "ok", "total_stocks": total, "gaps": gaps}
+    """Return the durable DataHub gap report; never query or scan inputs."""
+    return run_data_audit().get("gaps", {})
 
 
 def _recoverable_batch_pull(
@@ -1939,6 +1903,32 @@ def cmd_data_audit(args: list[str]) -> None:
         raise SystemExit(2)
 
 
+def _print_health_manifest(name: str) -> None:
+    """Print one existing DataHub health report without recomputing it."""
+    path = BASE / "data" / "audit" / "health" / name
+    if not path.is_file():
+        print(json.dumps({"status": "MISSING", "path": str(path)}, ensure_ascii=False, indent=2))
+        raise SystemExit(2)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        print(json.dumps({"status": "INVALID", "path": str(path), "error": type(exc).__name__}, ensure_ascii=False, indent=2))
+        raise SystemExit(2) from exc
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def cmd_data_coverage(args: list[str]) -> None:
+    """处理 data:coverage：只读取 DataHub 已生成的 coverage manifest。"""
+    del args
+    _print_health_manifest("coverage.json")
+
+
+def cmd_data_survivorship(args: list[str]) -> None:
+    """处理 data:survivorship：只读取 DataHub 已生成的 survivorship manifest。"""
+    del args
+    _print_health_manifest("survivorship.json")
+
+
 def cmd_full_init(args: list[str]) -> None:
     """处理 data:full-init 命令"""
     full_init_pipeline()
@@ -1993,7 +1983,9 @@ def cmd_full_init_by_date(args: list[str]) -> None:
 
 def cmd_gap_report(args: list[str]) -> None:
     """处理 data:gap-plan 命令"""
-    gap_report_and_plan()
+    del args
+    result = run_data_audit()
+    print(json.dumps(result.get("gaps", {}), ensure_ascii=False, indent=2))
 
 
 def cmd_backfill_timeseries(args: list[str]) -> None:

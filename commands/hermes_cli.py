@@ -646,7 +646,9 @@ for fdef in list_factors():
 pivot = df.pivot_table(index='date', columns='symbol', values='f')
 close_pivot = df.pivot_table(index='date', columns='symbol', values='close')
 
-bench = pd.read_csv('/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline/000001.csv', encoding='utf-8-sig')
+from factor_lab.datahub_access import daily_kline_path
+bench_path = daily_kline_path('000300.SH')
+bench = pd.read_csv(bench_path, encoding='utf-8-sig')
 bench['date'] = pd.to_datetime(bench['date'])
 bench = bench[(bench['date']>='2025-01-01') & (bench['date']<='2026-06-30')]
 bench_ret = bench.set_index('date')['close'].pct_change().dropna()
@@ -950,8 +952,8 @@ from factor_lab.factor_engine import load_stock_kline
 from factor_lab.factor_base import compute_factor, list_factors
 from factor_lab.validate_factor import TOP_FACTORS, FACTOR_NAME_MAP
 
-kline_dir = "/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline"
-all_syms = sorted([f.stem for f in __import__('pathlib').Path(kline_dir).glob('*.csv')])
+from factor_lab.datahub_access import daily_kline_index
+all_syms = sorted(daily_kline_index())
 symbols = all_syms[:500]
 print(f"\\U0001f4e6 股票池: {{len(symbols)}} 只")
 
@@ -1433,12 +1435,12 @@ run_daily_premarket(no_notify=True)
 
     # === V4.2 数据审计 ===
     elif command == "data:coverage":
-        from data_audit import cmd_coverage
-        cmd_coverage(args)
+        from data_pipeline import cmd_data_coverage
+        cmd_data_coverage(args)
 
     elif command == "data:survivorship":
-        from data_audit import cmd_survivorship
-        cmd_survivorship(args)
+        from data_pipeline import cmd_data_survivorship
+        cmd_data_survivorship(args)
 
     elif command == "data:incremental-update":
         from data_pipeline import cmd_incremental_update
@@ -1482,14 +1484,13 @@ run_daily_premarket(no_notify=True)
 
     # === 数据质量类 ===
     elif command == "data:freshness-check":
-        from data_quality import FreshnessChecker
-        fc = FreshnessChecker()
-        fc.run()
+        from data_pipeline import run_data_audit
+        result = run_data_audit()
+        _print_json(result.get("auxiliary_freshness", {}))
 
     elif command == "data:gap-report":
-        from data_quality import DataGapReporter
-        dgr = DataGapReporter()
-        report = dgr.report()
+        from data_pipeline import run_data_audit
+        report = run_data_audit().get("gaps", {})
         summary = report["summary"]
         print(f"📋 数据缺口报告: {summary['total_gaps']} 缺口, {summary['blocking_gaps']} 阻塞")
         for g in report["gaps"]:

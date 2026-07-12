@@ -680,61 +680,56 @@ class TestGapReport:
         assert set(concept["quality_status"]) == {"OK"}
         assert set(industry["quality_status"]) == {"OK"}
 
-    def test_partial_concept_and_industry_are_reported_as_gaps(
-        self, monkeypatch, clean_normalized_dirs, capsys
+    def test_gap_report_reads_projection_manifest_without_provider_or_csv_scan(
+        self, monkeypatch, tmp_path
     ):
-        ts_client = MagicMock()
-        ts_client._query.return_value = pd.DataFrame(
-            {"ts_code": [f"{i:06d}.SZ" for i in range(100)]}
+        health = tmp_path / "data" / "audit" / "health"
+        health.mkdir(parents=True)
+        for name, payload in {
+            "freshness.json": {"status": "OK"},
+            "integrity.json": {"status": "OK"},
+            "missing.json": {"missing_stocks": 0},
+        }.items():
+            (health / name).write_text(json.dumps(payload), encoding="utf-8")
+        projection = tmp_path / "data" / "audit" / "manifests"
+        projection.mkdir(parents=True)
+        (projection / "factor_input_projection.json").write_text(
+            json.dumps({"datasets": {
+                "concept": {"status": "PARTIAL"},
+                "industry": {"status": "MISSING"},
+            }}),
+            encoding="utf-8",
         )
-        monkeypatch.setattr(data_pipeline_module, "_get_ts_client", lambda: ts_client)
-        monkeypatch.setattr(data_pipeline_module, "_get_trade_days", lambda _start: [])
-
-        concept_path = data_pipeline_module.ETC_DIR / "concept" / "concept_list.csv"
-        industry_path = data_pipeline_module.ETC_DIR / "industry" / "industry_list.csv"
-        concept_path.parent.mkdir(parents=True, exist_ok=True)
-        industry_path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({"code": range(16)}).to_csv(concept_path, index=False)
-        pd.DataFrame({"code": range(1)}).to_csv(industry_path, index=False)
+        monkeypatch.setattr(data_pipeline_module, "BASE", tmp_path)
+        monkeypatch.setattr(
+            data_pipeline_module,
+            "_get_ts_client",
+            lambda: (_ for _ in ()).throw(AssertionError("gap report must not query provider")),
+        )
 
         result = data_pipeline_module.gap_report_and_plan()
-        captured = capsys.readouterr()
-        by_type = {item["type"]: item for item in result["gaps"]}
+        by_name = {item["name"]: item for item in result["gaps"]}
+        assert by_name["concept"]["status"] == "PARTIAL"
+        assert by_name["industry"]["status"] == "MISSING"
+        assert result["summary"]["blocking_codex"] is False
 
-        assert by_type["概念板块"] == {
-            "type": "概念板块",
-            "have": 16,
-            "need": 380,
-            "gap": 364,
-            "status": "PARTIAL",
-        }
-        assert by_type["行业分类"] == {
-            "type": "行业分类",
-            "have": 1,
-            "need": 80,
-            "gap": 79,
-            "status": "PARTIAL",
-        }
-        assert "⚠️ 概念板块" in captured.out
-        assert "⚠️ 行业分类" in captured.out
-
-    def test_missing_stock_baseline_is_unknown_not_complete(
-        self, monkeypatch, clean_normalized_dirs, capsys
+    def test_gap_report_marks_missing_projection_without_fabricating_baseline(
+        self, monkeypatch, tmp_path
     ):
-        ts_client = MagicMock()
-        ts_client._query.return_value = pd.DataFrame()
-        monkeypatch.setattr(data_pipeline_module, "_get_ts_client", lambda: ts_client)
-        monkeypatch.setattr(data_pipeline_module, "_get_trade_days", lambda _start: [])
+        health = tmp_path / "data" / "audit" / "health"
+        health.mkdir(parents=True)
+        for name, payload in {
+            "freshness.json": {"status": "MISSING"},
+            "integrity.json": {"status": "MISSING"},
+            "missing.json": {"missing_stocks": 0},
+        }.items():
+            (health / name).write_text(json.dumps(payload), encoding="utf-8")
+        monkeypatch.setattr(data_pipeline_module, "BASE", tmp_path)
 
         result = data_pipeline_module.gap_report_and_plan()
-        captured = capsys.readouterr()
-
-        for item in result["gaps"][:4]:
-            assert item["need"] == "UNKNOWN"
-            assert item["gap"] == "UNKNOWN"
-            assert item["status"] == "UNKNOWN"
-        assert "✅ 日线 kline" not in captured.out
-        assert "⚠️ 日线 kline" in captured.out
+        gap = next(item for item in result["gaps"] if item["name"] == "factor_input_projection")
+        assert gap["status"] == "MISSING"
+        assert gap["impact"] == "partial"
 
     def test_weekly_concept_industry_uses_canonical_fetcher(self, monkeypatch):
         canonical = {

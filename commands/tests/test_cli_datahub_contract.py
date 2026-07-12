@@ -50,8 +50,23 @@ def test_live_readiness_requires_fresh_canonical_audits(monkeypatch, tmp_path: P
 def test_cli_production_data_paths_use_datahub_facade() -> None:
     factor_source = Path(factor_commands.__file__).read_text(encoding="utf-8")
     readiness_source = Path(live_readiness.__file__).read_text(encoding="utf-8")
+    hermes_source = (Path(__file__).parents[1] / "hermes_cli.py").read_text(encoding="utf-8")
     forbidden = "/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/daily_kline"
     assert forbidden not in factor_source
     assert forbidden not in readiness_source
+    assert forbidden not in hermes_source
     assert "daily_kline_path" in factor_source
     assert "daily_kline_index" in factor_source
+
+
+def test_production_data_audit_commands_read_health_manifests() -> None:
+    pipeline_source = (Path(__file__).parents[1] / "data_pipeline.py").read_text(encoding="utf-8")
+    cli_source = (Path(__file__).parents[1] / "hermes_cli.py").read_text(encoding="utf-8")
+    assert "run_all_audits" not in pipeline_source
+    assert "FreshnessChecker" not in pipeline_source
+    assert "DataGapReporter" not in pipeline_source
+    assert "from data_quality" not in cli_source
+    assert "from data_audit" not in cli_source
+    assert "factor_input_projection.json" in pipeline_source
+    assert "from data_pipeline import cmd_data_coverage" in cli_source
+    assert "from data_pipeline import cmd_data_survivorship" in cli_source

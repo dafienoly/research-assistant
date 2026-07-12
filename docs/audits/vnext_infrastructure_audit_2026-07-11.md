@@ -340,3 +340,28 @@ Event Truth 读取增加 DataHub manifest 约束：每个标的必须存在 `run
 - 本轮定向验证为 `1 skipped`、Ruff 全部通过、`git diff --check` 通过；不创建、不删除、不修补任何数据文件。
 
 这保证“代码审计只在大版本发布前执行”的边界不会被旧测试文件绕过：日常 pytest 不扫描数据和临时目录，发布前仍使用显式 `--major-version` 的 source-only 审计入口。
+
+## 2026-07-12 第九轮复核：通知与授权账本的锁粒度
+
+P2 并发复核发现，通知 outbox 原先把 `notifications/outbox-worker` 锁持有到 Telegram/企业微信网络调用返回；慢通道会阻塞其它 worker，L2 摘要则没有跨进程领取状态，两个 worker 可同时发送同一摘要。授权接口也存在“先读 pending、再分别写 active”的竞争窗口，双击确认可能产生两条激活审计。
+
+现已修复：
+
+- 普通通知采用短锁领取、锁外发送、短锁幂等写回；`claims.jsonl` 记录 120 秒租约，租约内其它 worker 返回 `in_flight`，过期后仍以 `delivery:{event}:{channel}:{attempt}` 去重。
+- L2 摘要按通道在 `l2_digest_state.json` 中原子登记游标和租约，发送后只推进成功通道游标；失败通道可立即重试，新增事件不会被旧批次吞掉。
+- 每个交易日授权的创建、激活、过期、撤销和运行时校验统一使用日级 operation lock；同一 nonce 并发激活最多一条成功审计，撤销不可被竞争写回覆盖。
+
+验收：决策闭环、授权、通知和生产存储回归 `52 passed`；Ruff 与并发锁专项通过。网络发送仍只在锁外执行，真实双通道送达回执保持独立记录。
+
+## 2026-07-12 第十轮复核：Data API 与 cron 停止重复扫描
+
+架构复查发现，`/api/data/coverage`、`/api/data/manifests` 和 `data:audit` cron 入口仍会调用旧 `data_quality`/`data_audit`，自行 glob `daily_kline`、估值、资金流和基本面 CSV；这与 DataHub 已生成的 health manifest 形成第二套事实来源，也会在状态查询时重复读数千文件。
+
+现已修复：
+
+- `/api/data/coverage` 只读取 `data/audit/health/coverage.json`；`/api/data/freshness` 和 `/api/data/gaps` 只读取 canonical health 与 `factor_input_projection.json`。
+- `/api/data/manifests` 只读取显式列出的 DataHub manifest 和五份 health 报告，不再自动探测目录、估算文件数量或回退到 `data/manifest.json`。
+- `data_pipeline.run_data_audit` 改为只读 health/projection 清单；`hermes data:coverage`、`hermes data:survivorship` 不再进入旧扫描器。旧 `data_audit.py` 仅保留隔离迁移测试兼容，不再有生产调度调用路径。
+- 因子回测 CLI 的沪深 300 基准和验证股票索引改走 `daily_kline_path/index` DataHub facade，移除 Windows 机器绝对路径。
+
+验收：DataHub API/管线/调度专项 `54 passed`；路由源码无 `.glob(`、`data_quality` 或退役 `data/market/daily_kline` 路径；三份修改后的 Python 文件可编译，未触碰任何数据文件。

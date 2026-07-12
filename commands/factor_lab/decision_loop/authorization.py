@@ -26,6 +26,10 @@ class AuthorizationService:
     def __init__(self, store: DecisionLoopStore | None = None):
         self.store = store or DecisionLoopStore()
 
+    def _operation_lock(self, trading_date: str):
+        """Serialize the read/validate/write lifecycle for one trading day."""
+        return self.store.exclusive(f"authorization/{trading_date}.operation", timeout=1.0)
+
     def create_plan(
         self,
         trading_date: str,
@@ -70,13 +74,16 @@ class AuthorizationService:
             confirmation_nonce_hash=_hash(nonce),
             expires_at=expiry,
         )
-        self.store.write_json(
-            f"authorization/{trading_date}.json", auth.model_dump(mode="json")
-        )
-        self.store.append_jsonl(
-            "authorization/audit.jsonl",
-            {"action": "created", **auth.model_dump(mode="json")},
-        )
+        with self._operation_lock(trading_date):
+            if self.store.read_json(f"authorization/{trading_date}.json"):
+                raise ValueError("daily authorization already exists")
+            self.store.write_json(
+                f"authorization/{trading_date}.json", auth.model_dump(mode="json")
+            )
+            self.store.append_jsonl(
+                "authorization/audit.jsonl",
+                {"action": "created", **auth.model_dump(mode="json")},
+            )
         return auth, nonce
 
     def activate(
@@ -86,50 +93,48 @@ class AuthorizationService:
         displayed_plan_hash: str,
         now: datetime | None = None,
     ) -> DailyAuthorization:
-        auth = self._load(trading_date)
         now = (now or datetime.now(CST)).astimezone(CST)
-        if auth.status != "pending":
-            raise ValueError("authorization is not pending")
-        if auth.expires_at <= now:
-            return self._expire(auth, now)
-        if now.date().isoformat() != trading_date:
-            raise ValueError("authorization can only be activated on its trading date")
-        if (
-            _hash(nonce) != auth.confirmation_nonce_hash
-            or displayed_plan_hash != auth.plan.plan_hash
-        ):
-            raise ValueError("authorization confirmation mismatch")
-        active = auth.model_copy(update={"status": "active", "activated_at": now})
-        self._save(active, "activated")
-        return active
+        with self._operation_lock(trading_date):
+            auth = self._load(trading_date)
+            if auth.status != "pending":
+                raise ValueError("authorization is not pending")
+            if auth.expires_at <= now:
+                return self._expire(auth, now)
+            if now.date().isoformat() != trading_date:
+                raise ValueError("authorization can only be activated on its trading date")
+            if (
+                _hash(nonce) != auth.confirmation_nonce_hash
+                or displayed_plan_hash != auth.plan.plan_hash
+            ):
+                raise ValueError("authorization confirmation mismatch")
+            active = auth.model_copy(update={"status": "active", "activated_at": now})
+            self._save(active, "activated")
+            return active
 
     def current(
         self, trading_date: str, now: datetime | None = None
     ) -> DailyAuthorization | None:
-        raw = self.store.read_json(f"authorization/{trading_date}.json")
-        if not raw:
-            return None
-        auth = DailyAuthorization.model_validate(raw)
         now = (now or datetime.now(CST)).astimezone(CST)
-        if auth.status in {"pending", "active"} and auth.expires_at <= now:
-            return self._expire(auth, now)
-        return auth
+        with self._operation_lock(trading_date):
+            return self._current_unlocked(trading_date, now)
 
     def revoke(
         self, trading_date: str, reason: str, now: datetime | None = None
     ) -> DailyAuthorization:
-        auth = self._load(trading_date)
-        if auth.status in {"revoked", "expired"}:
-            return auth
-        revoked = auth.model_copy(
-            update={
-                "status": "revoked",
-                "revoked_at": now or datetime.now(CST),
-                "revoke_reason": reason,
-            }
-        )
-        self._save(revoked, "revoked")
-        return revoked
+        now = (now or datetime.now(CST)).astimezone(CST)
+        with self._operation_lock(trading_date):
+            auth = self._load(trading_date)
+            if auth.status in {"revoked", "expired"}:
+                return auth
+            revoked = auth.model_copy(
+                update={
+                    "status": "revoked",
+                    "revoked_at": now,
+                    "revoke_reason": reason,
+                }
+            )
+            self._save(revoked, "revoked")
+            return revoked
 
     def validate_runtime(
         self,
@@ -141,28 +146,49 @@ class AuthorizationService:
         risk_mode: str,
         now: datetime | None = None,
     ) -> DailyAuthorization | None:
-        auth = self.current(trading_date, now)
-        if not auth or auth.status != "active":
-            return auth
-        reason = None
-        if (
-            parameter_version != auth.plan.parameter_version
-            or plan_hash != auth.plan.plan_hash
-        ):
-            reason = "parameters_or_plan_changed"
-        elif not data_executable:
-            reason = "data_degraded"
-        elif not audit_passed:
-            reason = "code_audit_failed"
-        elif risk_mode != "normal":
-            reason = f"risk_mode:{risk_mode}"
-        return self.revoke(trading_date, reason, now) if reason else auth
+        now = (now or datetime.now(CST)).astimezone(CST)
+        with self._operation_lock(trading_date):
+            auth = self._current_unlocked(trading_date, now)
+            if not auth or auth.status != "active":
+                return auth
+            reason = None
+            if (
+                parameter_version != auth.plan.parameter_version
+                or plan_hash != auth.plan.plan_hash
+            ):
+                reason = "parameters_or_plan_changed"
+            elif not data_executable:
+                reason = "data_degraded"
+            elif not audit_passed:
+                reason = "code_audit_failed"
+            elif risk_mode != "normal":
+                reason = f"risk_mode:{risk_mode}"
+            if not reason:
+                return auth
+            revoked = auth.model_copy(
+                update={
+                    "status": "revoked",
+                    "revoked_at": now,
+                    "revoke_reason": reason,
+                }
+            )
+            self._save(revoked, "revoked")
+            return revoked
 
     def _load(self, trading_date: str) -> DailyAuthorization:
         raw = self.store.read_json(f"authorization/{trading_date}.json")
         if not raw:
             raise KeyError("authorization not found")
         return DailyAuthorization.model_validate(raw)
+
+    def _current_unlocked(self, trading_date: str, now: datetime) -> DailyAuthorization | None:
+        raw = self.store.read_json(f"authorization/{trading_date}.json")
+        if not raw:
+            return None
+        auth = DailyAuthorization.model_validate(raw)
+        if auth.status in {"pending", "active"} and auth.expires_at <= now:
+            return self._expire(auth, now)
+        return auth
 
     def _expire(self, auth: DailyAuthorization, now: datetime) -> DailyAuthorization:
         expired = auth.model_copy(

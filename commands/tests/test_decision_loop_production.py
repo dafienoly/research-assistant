@@ -87,6 +87,45 @@ def test_qmt_consecutive_failures_revoke_daily_authorization(tmp_path, monkeypat
     assert auths.current(trading_date, now).revoke_reason == "qmt_consecutive_read_failures"
 
 
+def test_authorization_activation_is_single_flight(tmp_path):
+    store = DecisionLoopStore(tmp_path)
+    auths = AuthorizationService(store)
+    now = datetime.now().astimezone().replace(hour=10, minute=0, second=0, microsecond=0)
+    trading_date = now.date().isoformat()
+    auth, nonce = auths.create_plan(
+        trading_date=trading_date,
+        strategy_summary="test",
+        risk_budget={"swing": 0.5},
+        max_order_amount=10_000,
+        max_total_amount=20_000,
+        orders=[PlannedOrder(
+            order_id="o1", symbol="588200.SH", side="SELL", quantity=100,
+            limit_price=1.2, book=Book.SWING, strategy="test", reason="test",
+        )],
+        parameter_version="v1",
+        now=now,
+    )
+
+    def activate_once(_):
+        try:
+            activated = auths.activate(trading_date, nonce, auth.plan.plan_hash, now=now)
+            return "ok", activated.status
+        except ValueError as exc:
+            return "error", str(exc)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(activate_once, range(2)))
+    assert [item[0] for item in outcomes].count("ok") == 1
+    assert [item[0] for item in outcomes].count("error") == 1
+    assert "not pending" in next(item[1] for item in outcomes if item[0] == "error")
+    assert auths.current(trading_date, now).status == "active"
+    activated_audits = [
+        row for row in store.read_jsonl("authorization/audit.jsonl")
+        if row.get("action") == "activated"
+    ]
+    assert len(activated_audits) == 1
+
+
 def test_store_cross_process_style_idempotency_and_corruption_recovery(tmp_path):
     store = DecisionLoopStore(tmp_path)
     with ThreadPoolExecutor(max_workers=8) as pool:

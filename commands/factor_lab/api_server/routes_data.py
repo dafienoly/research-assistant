@@ -3,20 +3,62 @@
 提供数据源健康状态、数据新鲜度、数据缺口和拉取日志的 API 端点。
 核心原则: 数据失败明确展示，禁止静默 fallback。
 """
+from collections import deque
 from fastapi import APIRouter, Query
 from pathlib import Path
 import json
-import os
 
 from datetime import datetime, timezone, timedelta
 
-from factor_lab.api_server.response import api_response, api_success
+from factor_lab.api_server.response import api_success
 from factor_lab.data_source.registry import DataRegistry
 from factor_lab.data_source.health import HealthTracker
 
 CST = timezone(timedelta(hours=8))
 
 router = APIRouter()
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+HEALTH_ROOT = PROJECT_ROOT / "data" / "audit" / "health"
+PROJECTION_MANIFEST = PROJECT_ROOT / "data" / "audit" / "manifests" / "factor_input_projection.json"
+EXPLICIT_MANIFESTS = {
+    "reference": PROJECT_ROOT / "data" / "normalized" / "reference" / "manifest.json",
+    "live_snapshot": PROJECT_ROOT / "data" / "normalized" / "market" / "live_snapshot.manifest.json",
+    "market_turnover": PROJECT_ROOT / "data" / "normalized" / "derived" / "market_turnover" / "manifest.json",
+    "benchmarks": PROJECT_ROOT / "data" / "normalized" / "derived" / "benchmarks" / "manifest.json",
+    "etf_holdings": PROJECT_ROOT / "data" / "normalized" / "etf_holdings" / "holdings.manifest.json",
+    "corporate_events": PROJECT_ROOT / "data" / "normalized" / "events" / "corporate_events" / "manifest.json",
+    "regulatory_watchlist": PROJECT_ROOT / "data" / "normalized" / "events" / "regulatory_watchlist.manifest.json",
+    "event_truth": PROJECT_ROOT / "data" / "normalized" / "events" / "event_truth" / "manifest.json",
+}
+
+
+def _read_json(path: Path) -> dict:
+    """Read one durable manifest; never discover sibling data files."""
+    if not path.is_file():
+        return {"status": "MISSING", "path": str(path), "error": "manifest_missing"}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {"status": "INVALID", "path": str(path), "error": type(exc).__name__}
+    if not isinstance(payload, dict):
+        return {"status": "INVALID", "path": str(path), "error": "manifest_not_object"}
+    return payload
+
+
+def _health(name: str) -> dict:
+    return _read_json(HEALTH_ROOT / name)
+
+
+def _projection() -> dict:
+    return _read_json(PROJECTION_MANIFEST)
+
+
+def _display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
 
 
 def _get_registry_and_tracker():
@@ -151,7 +193,7 @@ async def data_fetch_log(limit: int = Query(50, ge=1, le=500)):
     from config import PATHS
 
     fetch_log_path = PATHS["audit"] / "fetch_log.jsonl"
-    entries = []
+    entries = deque(maxlen=limit)
 
     if fetch_log_path.exists():
         with open(fetch_log_path, "r", encoding="utf-8") as f:
@@ -164,8 +206,7 @@ async def data_fetch_log(limit: int = Query(50, ge=1, le=500)):
                         continue
 
     # 取最近的 limit 条
-    entries.reverse()
-    entries = entries[:limit]
+    entries = list(reversed(entries))
 
     return {
         "total": len(entries),
@@ -179,38 +220,68 @@ async def data_fetch_log(limit: int = Query(50, ge=1, le=500)):
 
 
 def _run_freshness_check() -> dict:
-    """运行 FreshnessChecker 检查"""
-    try:
-        from data_quality import FreshnessChecker
-
-        checker = FreshnessChecker()
-        report = checker.check_all()
-        return report
-    except Exception as e:
-        return {
-            "check_time": "",
-            "overall_status": "error",
-            "blocking": True,
-            "files": [],
-            "error": str(e),
-        }
+    """Read the DataHub freshness manifest without rescanning CSV files."""
+    report = _health("freshness.json")
+    status = str(report.get("status", "MISSING")).upper()
+    return {
+        **report,
+        "check_time": report.get("generated_at", ""),
+        "overall_status": "ok" if status == "OK" else status.lower(),
+        "blocking": status not in {"OK", "PARTIAL"},
+        "source": "datahub:audit/health/freshness.json",
+    }
 
 
 def _run_gap_report() -> dict:
-    """运行 DataGapReporter 报告"""
-    try:
-        from data_quality import DataGapReporter
-
-        reporter = DataGapReporter()
-        report = reporter.report()
-        return report
-    except Exception as e:
-        return {
-            "report_time": "",
-            "gaps": [],
-            "summary": {"total_gaps": 0, "blocking_gaps": 0, "partial_gaps": 0, "blocking_codex": False},
-            "error": str(e),
-        }
+    """Read canonical missing-data and auxiliary projection manifests."""
+    missing = _health("missing.json")
+    projection = _projection()
+    gaps: list[dict] = []
+    missing_count = int(missing.get("missing_stocks", 0) or 0)
+    if missing_count:
+        gaps.append({
+            "name": "canonical_market",
+            "description": f"{missing_count} 个 U0 标的缺少 canonical 行情",
+            "category": "market",
+            "gap_type": "missing_canonical_data",
+            "impact": "blocking",
+            "blocking_codex": True,
+            "affected_stocks": missing.get("missing_codes_sample", []),
+        })
+    for name, item in (projection.get("datasets") or {}).items():
+        status = str((item or {}).get("status", "MISSING")).upper()
+        if status not in {"OK", "COMPLETE"}:
+            gaps.append({
+                "name": name,
+                "description": f"DataHub projection status={status}",
+                "category": "auxiliary",
+                "gap_type": "manifest_status",
+                "impact": "partial",
+                "blocking_codex": False,
+                "status": status,
+                "source": (item or {}).get("source"),
+            })
+    if not projection.get("datasets"):
+        gaps.append({
+            "name": "factor_input_projection",
+            "description": "DataHub factor input projection manifest missing or invalid",
+            "category": "auxiliary",
+            "gap_type": "manifest_missing",
+            "impact": "partial",
+            "blocking_codex": False,
+            "status": "MISSING",
+        })
+    return {
+        "report_time": missing.get("generated_at") or projection.get("generated_at", ""),
+        "source": "datahub:audit/health/missing.json+factor_input_projection.json",
+        "gaps": gaps,
+        "summary": {
+            "total_gaps": len(gaps),
+            "blocking_gaps": sum(1 for item in gaps if item.get("blocking_codex")),
+            "partial_gaps": sum(1 for item in gaps if not item.get("blocking_codex")),
+            "blocking_codex": any(item.get("blocking_codex") for item in gaps),
+        },
+    }
 
 
 # =========================================================================
@@ -222,233 +293,82 @@ def _run_gap_report() -> dict:
 
 @router.get("/data/coverage")
 async def data_coverage():
-    """扫描数据目录，返回各数据集的覆盖统计（匹配 datahub 管线实际产出）"""
-    import csv
-    from pathlib import Path
-
-    base = Path(__file__).resolve().parent.parent.parent.parent  # .../research-assistant/
-    data_dir = base / "data"
-    kline_dir = data_dir / "market" / "daily_kline"
-    norm_dir = data_dir / "normalized"
-    fund_flow_dir = norm_dir / "fund_flow"
-    market_dir = norm_dir / "market"
-    fundamentals_dir = norm_dir / "fundamentals"
-
-    coverage = []
-    total_stocks = 0
-    total_rows = 0
-
-    # helper: 快速读 CSV 首尾行获取起止日期和行数
-    def _read_csv_meta(files, date_col, symbol_col=None):
-        if not files:
-            return 0, "", "", 0
-        dates = []
-        row_count = 0
-        for f in files[:50]:  # 抽样提速，但文件数少时全读
-            try:
-                with open(f, newline="", encoding="utf-8-sig") as fh:
-                    lines = fh.readlines()
-                    if len(lines) < 2:
-                        continue
-                    header = lines[0].strip().split(",")
-                    if date_col not in header:
-                        continue
-                    di = header.index(date_col)
-                    # 第一行数据
-                    first = lines[1].strip().split(",")
-                    if di < len(first):
-                        dates.append(first[di])
-                    # 最后一行
-                    last = lines[-1].strip().split(",")
-                    if di < len(last):
-                        dates.append(last[di])
-                    row_count += len(lines) - 1
-            except Exception:
-                continue
-        valid = [d for d in dates if d]
-        return len(files), min(valid) if valid else "", max(valid) if valid else "", row_count
-
-    # K线日线
-    if kline_dir.exists():
-        kfiles = sorted(kline_dir.glob("*_daily_kline.csv"))
-        if kfiles:
-            all_dates = []
-            for f in kfiles:
-                try:
-                    with open(f, newline="") as fh:
-                        reader = csv.DictReader(fh)
-                        rows = list(reader)
-                        dates = [r.get("timeString", "") for r in rows if r.get("timeString")]
-                        all_dates.extend(dates)
-                except Exception:
-                    continue
-            valid = [d for d in all_dates if d]
-            coverage.append({
-                "dataset": "daily_kline",
-                "stock_count": len(kfiles),
-                "row_count": len(all_dates),
-                "trade_days": [min(valid), max(valid)] if valid else ["", ""],
-                "latest_date": max(valid) if valid else "",
-                "missing_rate": 0,
-            })
-            total_stocks += len(kfiles)
-            total_rows += len(all_dates)
-
-    # 个股估值
-    if market_dir.exists():
-        mfiles = sorted(market_dir.glob("valuation_*.csv"))
-        if mfiles:
-            cnt, d_min, d_max, r_cnt = _read_csv_meta(mfiles, "trade_date")
-            coverage.append({
-                "dataset": "valuation",
-                "stock_count": cnt,
-                "row_count": r_cnt,
-                "trade_days": [d_min, d_max] if d_min else ["", ""],
-                "latest_date": d_max or "",
-                "missing_rate": 0,
-            })
-            total_stocks += cnt
-            total_rows += r_cnt
-
-    # 个股资金流
-    if fund_flow_dir.exists():
-        ffiles = sorted(fund_flow_dir.glob("*.csv"))
-        if ffiles:
-            cnt, d_min, d_max, r_cnt = _read_csv_meta(ffiles, "trade_date")
-            coverage.append({
-                "dataset": "fund_flow",
-                "stock_count": cnt,
-                "row_count": r_cnt,
-                "trade_days": [d_min, d_max] if d_min else ["", ""],
-                "latest_date": d_max or "",
-                "missing_rate": round((1 - cnt / 5863) * 100, 1) if cnt < 5863 else 0,
-            })
-            total_stocks += cnt
-            total_rows += r_cnt
-
-    # 个股基本面（新增）
-    if fundamentals_dir.exists():
-        fafiles = sorted(fundamentals_dir.glob("*.csv"))
-        if fafiles:
-            cnt, d_min, d_max, r_cnt = _read_csv_meta(fafiles, "end_date")
-            coverage.append({
-                "dataset": "fundamentals",
-                "stock_count": cnt,
-                "row_count": r_cnt,
-                "trade_days": [d_min, d_max] if d_min else ["", ""],
-                "latest_date": d_max or "",
-                "missing_rate": round((1 - cnt / 5528) * 100, 1) if cnt < 5528 else 0,
-            })
-            total_stocks += cnt
-            total_rows += r_cnt
-
+    """Return coverage already computed by the DataHub audit pipeline."""
+    report = _health("coverage.json")
+    if report.get("status") == "MISSING":
+        return api_success(data={"status": "MISSING", "coverage": [], "source": report})
+    latest = report.get("latest_date", "")
+    projection = _projection()
+    projection_rows = []
+    for name, item in (projection.get("datasets") or {}).items():
+        item = item or {}
+        projection_rows.append({
+            "dataset": name,
+            "stock_count": item.get("records") or item.get("symbols") or 0,
+            "row_count": item.get("rows") or item.get("record_count") or 0,
+            "trade_days": [item.get("start_date", ""), item.get("end_date", "")],
+            "latest_date": item.get("observed_at", "") or item.get("end_date", ""),
+            "missing_rate": None,
+            "manifest_status": str(item.get("status", "MISSING")).upper(),
+        })
     return api_success(data={
-        "coverage": coverage,
-        "total_stocks": total_stocks,
-        "total_rows": total_rows,
+        "status": report.get("universe_status", "MISSING"),
+        "source": "datahub:audit/health/coverage.json",
+        "coverage": [{
+            "dataset": "daily_kline",
+            "stock_count": report.get("stocks_with_data", 0),
+            "row_count": report.get("total_rows", 0),
+            "trade_days": [report.get("earliest_date", ""), latest],
+            "latest_date": latest,
+            "missing_rate": 0 if not report.get("total_stocks") else round(
+                100 * report.get("active_missing_files", 0) / report.get("total_stocks", 1), 3
+            ),
+            "manifest_status": report.get("universe_status", "MISSING"),
+        }, *projection_rows],
+        "total_stocks": report.get("total_stocks", 0),
+        "total_rows": report.get("total_rows", 0),
+        "generated_at": report.get("generated_at", ""),
     })
 
 
 @router.get("/data/manifests")
 async def data_manifests():
-    """读取 data/manifest.json + 自动探测其他数据集的清单"""
-    from pathlib import Path
-
-    base = Path(__file__).resolve().parent.parent.parent.parent
-    data_dir = base / "data"
-    manifest_file = data_dir / "manifest.json"
-    norm_dir = data_dir / "normalized"
-    fund_flow_dir = norm_dir / "fund_flow"
-    market_dir = norm_dir / "market"
-    fundamentals_dir = norm_dir / "fundamentals"
-
+    """Return only explicit DataHub manifests and audit-health reports."""
     manifests = []
-
-    # ── manifest.json (daily_kline) ──
-    if manifest_file.exists():
-        with open(manifest_file) as f:
-            m = json.load(f)
+    for manifest_id, path in EXPLICIT_MANIFESTS.items():
+        payload = _read_json(path)
+        status = str(payload.get("status", "MISSING")).upper()
+        if manifest_id == "event_truth" and (
+            payload.get("run_status") != "COMPLETE"
+            or any(not item.get("sha256") for item in payload.get("results", []) if isinstance(item, dict))
+        ):
+            status = "LEGACY_UNVERIFIED"
         manifests.append({
-            "manifest_id": "main",
-            "source_id": "kline_refresh",
-            "dataset": "daily_kline",
-            "file": str(manifest_file),
-            "record_count": m.get("summary", {}).get("total_kline_files", 0),
-            "file_size": manifest_file.stat().st_size,
-            "file_hash": "",
-            "created_at": m.get("generated_at", ""),
-            "lineage": ["Tushare daily"],
-            "children": [f["file"] for f in m.get("files_analyzed", [])][:20],
+            "manifest_id": manifest_id,
+            "source_id": payload.get("source") or "datahub",
+            "dataset": manifest_id,
+            "file": _display_path(path),
+            "record_count": payload.get("rows") or payload.get("total_records") or payload.get("records") or 0,
+            "file_size": path.stat().st_size if path.is_file() else 0,
+            "file_hash": payload.get("sha256", ""),
+            "created_at": payload.get("generated_at", ""),
+            "lineage": [payload.get("source")] if payload.get("source") else [],
+            "children": [],
+            "status": status,
         })
-
-    # ── universes.json ──
-    uf = data_dir / "universes.json"
-    if uf.exists():
+    for name in ("coverage.json", "freshness.json", "missing.json", "integrity.json", "survivorship.json"):
+        payload = _health(name)
         manifests.append({
-            "manifest_id": "universes",
-            "source_id": "universe_builder",
-            "dataset": "universe",
-            "file": str(uf),
-            "record_count": uf.stat().st_size,
-            "file_size": uf.stat().st_size,
-            "file_hash": "",
-            "created_at": datetime.fromtimestamp(uf.stat().st_mtime, tz=CST).isoformat(),
-            "lineage": ["Tushare stock_basic", "Tushare daily_basic"],
-            "children": ["U0", "U1", "U2", "U3", "U4", "ETF"],
+            "manifest_id": f"audit:{name.removesuffix('.json')}",
+            "source_id": "datahub:audit",
+            "dataset": f"audit_{name.removesuffix('.json')}",
+            "file": _display_path(HEALTH_ROOT / name),
+            "record_count": payload.get("total_rows") or payload.get("files_checked") or 0,
+            "file_size": (HEALTH_ROOT / name).stat().st_size if (HEALTH_ROOT / name).is_file() else 0,
+            "file_hash": payload.get("sha256", ""),
+            "created_at": payload.get("generated_at", ""),
+            "lineage": [payload.get("source")] if payload.get("source") else [],
+            "children": [],
+            "status": str(payload.get("status") or payload.get("universe_status") or "MISSING").upper(),
         })
-
-    # ── 自动探测: valuation ──
-    if market_dir.exists():
-        mfiles = sorted(market_dir.glob("valuation_*.csv"))
-        if mfiles:
-            total_size = sum(f.stat().st_size for f in mfiles[:100])  # 抽样
-            manifests.append({
-                "manifest_id": "valuation",
-                "source_id": "datahub",
-                "dataset": "valuation",
-                "file": str(market_dir),
-                "record_count": len(mfiles),
-                "file_size": total_size * (len(mfiles) // 100 + 1),
-                "file_hash": "",
-                "created_at": datetime.fromtimestamp(mfiles[0].stat().st_mtime, tz=CST).isoformat(),
-                "lineage": ["Tushare daily_basic"],
-                "children": [f.name for f in mfiles[:5]] + (["..."] if len(mfiles) > 5 else []),
-            })
-
-    # ── 自动探测: fund_flow ──
-    if fund_flow_dir.exists():
-        ffiles = sorted(fund_flow_dir.glob("*.csv"))
-        if ffiles:
-            total_size = sum(f.stat().st_size for f in ffiles[:100])
-            manifests.append({
-                "manifest_id": "fund_flow",
-                "source_id": "datahub",
-                "dataset": "fund_flow",
-                "file": str(fund_flow_dir),
-                "record_count": len(ffiles),
-                "file_size": total_size * (len(ffiles) // 100 + 1),
-                "file_hash": "",
-                "created_at": datetime.fromtimestamp(ffiles[0].stat().st_mtime, tz=CST).isoformat(),
-                "lineage": ["Tushare fund_flow"],
-                "children": [f.name for f in ffiles[:5]] + (["..."] if len(ffiles) > 5 else []),
-            })
-
-    # ── 自动探测: fundamentals ──
-    if fundamentals_dir.exists():
-        fafiles = sorted(fundamentals_dir.glob("*.csv"))
-        if fafiles:
-            total_size = sum(f.stat().st_size for f in fafiles[:100])
-            manifests.append({
-                "manifest_id": "fundamentals",
-                "source_id": "datahub",
-                "dataset": "fundamentals",
-                "file": str(fundamentals_dir),
-                "record_count": len(fafiles),
-                "file_size": total_size * (len(fafiles) // 100 + 1),
-                "file_hash": "",
-                "created_at": datetime.fromtimestamp(fafiles[0].stat().st_mtime, tz=CST).isoformat(),
-                "lineage": ["Tushare fina_indicator"],
-                "children": [f.name for f in fafiles[:5]] + (["..."] if len(fafiles) > 5 else []),
-            })
-
-    return api_success(data={"manifests": manifests})
+    return api_success(data={"manifests": manifests, "source": "datahub:explicit-manifests"})
