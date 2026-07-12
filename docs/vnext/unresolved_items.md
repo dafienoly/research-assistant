@@ -16,6 +16,7 @@
 - 自动 Research Skill 的 strategy-report/factor-mining/sector-rotation 也已 fail-closed，demo 参数不能再生成“completed”结果。真实 handler 尚需接入 DataHub snapshot、manifest SHA、universe version、forward return 与行业映射；旧随机实现目前不可达但仍应在重建时物理删除。
 - 已退役的 research:loop/AutoResearchLoop 公共启动函数现统一 BLOCKED，不再评估、入队或注册自动候选。`research_loop.py` 与同名 package 的双实现仍需物理合并；历史类不可作为恢复自动 Agent 开发系统的依据。
 - Live Readiness 的 Paper 状态缺失函数和 Benchmark 错误导入已修复：真实 Paper 权益为 21 日，六个 canonical benchmark 均可用。Telegram/企业微信凭据已从 Windows 用户环境桥接到权限 600 的非仓库 runtime env，实际 cron worker 显式加载；基础 13 门禁现为 13 pass/0 blocker/0 warning。API 额外 QMT、确认持仓、授权、认证门禁仍禁止实盘。
+- 决策认证回放使用 WSL `/tmp` 后通过半导体设备 ETF 高开横盘后收跌 7% 案例，2 点 L2、3 点减半、结构破位 10 分钟退出和事件去重均为 true；Stage 1 Paper 通过。Stage 2 仍缺连续真实 Shadow、配对成交和权益曲线，保持未通过。Stage 3 因无 MiniQMT 权限按用户要求跳过实测，同时永久保持实盘关闭。
 - 行级完整性审计当前为 OK（活跃 5,530 文件、0 问题行）；曾污染的 3 个文件已从最早干净 D 盘快照恢复，污染原件保留在 `quarantine_polluted_market_20260712_0134`。该事件说明备份恢复已生效，但恢复后的连续每日门禁仍需观察。
 - 监管公告 ingestion 与覆盖感知门禁已实现并安装 08:57 cron。真实 smoke 曾发现 CNINFO 缺 orgId 时返回全市场公告，原“30 条”证据已撤销；现按上游 `secCode` 验证并二阶段使用 `688012,orgId` 拉取，得到 1 条证券专属公告、覆盖 `OK`。该证据仅证明 688012，不代表全市场覆盖。
 - Antifragile Review 缺 realized Regime/Semi/Style 标签、滚动模型衰减历史及连续 Paper/Shadow 权益曲线，因此相关六项指标为 null。
@@ -24,7 +25,7 @@
 ## 外部运行条件
 
 - Telegram 与企业微信已完成一次真实双通道 HTTP 200 发送；共享确认和单通道失败隔离已通过测试。后续仍需持续运行回执监控，实盘执行不由通知成功自动解锁。
-- QMT Bridge 已配置且行情侧可用，但 `XtQuantTrader connect failed: -1`，账户/持仓不能连续读取；订单通道继续 DISABLED。
+- 用户已明确说明没有 MiniQMT 权限，并豁免本次真实账户/持仓/小额白名单实测。QMT Bridge 行情侧和接口自动化测试保留，`XtQuantTrader connect failed: -1` 属预期无权限状态；订单通道继续 DISABLED，不以 mock 解锁，也不再把该外部实测列为本次交付阻断。
 - 应用内浏览器运行时可加载，但本轮 `agent.browsers.list()` 返回空列表；HTTP、DOM、lint、Vitest 和生产构建已通过，真实浏览器 console/点击证据仍 BLOCKED。
 - `scripts/mx_fetch_step.py` 曾包含硬编码高熵凭据，现已改为 `MX_APIKEY` 环境变量；旧凭据必须在提供方撤销/轮换，代码删除不能清除 Git 历史。
 - `dive_prediction/datahub_supplement.py` 曾明文保存 JoinQuant 账号密码，现已物理删除并退役直连入口；该 JoinQuant 密码同样必须在提供方轮换，Git 历史按泄露凭据处理。
