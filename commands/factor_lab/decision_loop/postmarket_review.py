@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import csv
 from datetime import datetime
+from pathlib import Path
+
+from factor_lab.datahub_access import daily_kline_path
 
 from .benchmark import BenchmarkMatcher
 from .models import Book, ReviewRecord
@@ -41,16 +45,18 @@ class PostMarketReviewService:
             entry = float(position.get("cost_price") or payload.get("limit_price") or 0)
             exit_price = float(payload.get("limit_price") or entry)
             quantity = int(payload.get("quantity") or 0)
-            path = price_paths.get(symbol) or ([entry, exit_price] if entry > 0 else [])
+            canonical_path = self._canonical_path(symbol, trading_date)
+            path = self._position_path(entry, canonical_path, price_paths.get(symbol), exit_price)
             instrument_type = str(position.get("instrument_type") or "stock")
             benchmark = benchmark_matcher.match_instrument(symbol, instrument_type)
+            benchmark_prices = self._canonical_path(benchmark.primary, trading_date) if benchmark.primary else None
             metrics = None
             if entry > 0 and exit_price > 0 and quantity > 0:
                 metrics = calculate_review(
                     entry_price=entry,
                     path_prices=path,
                     exit_price=exit_price,
-                    benchmark_prices=None,
+                    benchmark_prices=benchmark_prices,
                     recommended_exit_price=exit_price,
                     quantity=quantity,
                     fees=float((row.get("broker_response") or {}).get("fees") or 0),
@@ -88,6 +94,52 @@ class PostMarketReviewService:
         self.store.write_json(f"reviews/{trading_date}.json", summary)
         self.store.write_json("reviews/latest.json", summary)
         return records
+
+    @staticmethod
+    def _canonical_path(symbol: str | None, trading_date: str) -> list[float]:
+        """Read a single symbol's verified DataHub-facing daily path.
+
+        No directory discovery or provider fallback is performed here. A
+        missing/conflicting canonical path simply leaves the corresponding
+        review horizon unavailable instead of manufacturing a return.
+        """
+        if not symbol:
+            return []
+        try:
+            path = daily_kline_path(symbol)
+        except (FileNotFoundError, OSError, ValueError):
+            return []
+        values: list[float] = []
+        try:
+            with Path(path).open("r", encoding="utf-8-sig", newline="") as stream:
+                for row in csv.DictReader(stream):
+                    date_value = str(row.get("trade_date") or row.get("date") or "").replace("-", "")[:8]
+                    if date_value < trading_date.replace("-", ""):
+                        continue
+                    try:
+                        close = float(row.get("close") or row.get("last") or 0)
+                    except (TypeError, ValueError):
+                        continue
+                    if close > 0:
+                        values.append(close)
+        except (OSError, UnicodeError, csv.Error):
+            return []
+        return values
+
+    @staticmethod
+    def _position_path(
+        entry: float,
+        canonical: list[float],
+        observed: list[float] | None,
+        exit_price: float,
+    ) -> list[float]:
+        if canonical:
+            # The first canonical row is the entry session; subsequent rows
+            # provide forward 1/5/20-day observations.
+            return [entry, *canonical[1:]]
+        if observed:
+            return observed
+        return [entry, exit_price] if entry > 0 else []
 
     def propose_weekly_candidates(self, week_id: str) -> list[dict]:
         reviews = self.store.read_jsonl("reviews/records.jsonl")
@@ -131,5 +183,5 @@ class PostMarketReviewService:
             "generated_at": datetime.now().astimezone().isoformat(),
             "record_count": len(records),
             "by_book": by_book,
-            "note": "1/5/20d, benchmark excess, MFE/MAE and costs remain null until sufficient durable observations exist",
+            "note": "1/5/20d and benchmark excess use canonical DataHub paths when available; missing horizons remain null",
         }

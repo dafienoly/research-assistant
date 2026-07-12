@@ -1416,6 +1416,29 @@
       ],
       "expected_keywords": ["major-version-only", "data_scan", "temp_scan", "pytest", "gitnexus", "exit 0"],
       "behavior": "普通审计入口与 Git hooks 结构化跳过；只有显式 major_version 进入 source-only 内核，且不扫描数据/临时/构建目录，不运行旧 Gate、pytest、Semgrep 或 GitNexus。"
+    },
+    {
+      "id": "P1-AUX-MANIFEST-01",
+      "title": "分钟辅助数据门禁只消费 DataHub 投影 manifest",
+      "code_locations": [
+        {"file": "commands/factor_lab/decision_loop/data_health.py", "function": "_read_projection_manifest", "line": 66},
+        {"file": "commands/factor_lab/decision_loop/data_health.py", "function": "_manifest_item", "line": 105},
+        {"file": "commands/factor_lab/decision_loop/data_health.py", "function": "_atomic_json", "line": 52},
+        {"file": "commands/tests/test_decision_loop.py", "function": "test_auxiliary_gate_is_fail_closed_without_projection_manifest", "line": 894}
+      ],
+      "expected_keywords": ["factor_input_projection.json", "datahub_manifest", "manifest_status", "os.replace", "dataset manifest entry missing"],
+      "behavior": "news、资金流和基本面不再 glob 数据目录或读取 CSV mtime；仅按 DataHub manifest 的状态、观测时间、来源和冲突返回门禁，并原子发布健康快照。"
+    },
+    {
+      "id": "P1-REVIEW-CANONICAL-PATH-01",
+      "title": "盘后复盘使用 canonical DataHub 价格和动态基准",
+      "code_locations": [
+        {"file": "commands/factor_lab/decision_loop/postmarket_review.py", "function": "_canonical_path", "line": 126},
+        {"file": "commands/factor_lab/decision_loop/postmarket_review.py", "function": "generate", "line": 21},
+        {"file": "commands/tests/test_decision_loop.py", "function": "test_postmarket_review_uses_canonical_paths_for_horizons_and_excess", "line": 777}
+      ],
+      "expected_keywords": ["daily_kline_path", "canonical DataHub", "benchmark_prices", "missing horizons remain null"],
+      "behavior": "1/5/20 日收益和基准超额优先使用 DataHub canonical 日线；路径缺失或冲突时保留 null，不使用 provider fallback、目录发现或合成数据。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

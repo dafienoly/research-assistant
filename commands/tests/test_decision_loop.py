@@ -11,6 +11,7 @@ from factor_lab.decision_loop.benchmark import BenchmarkMatcher
 from factor_lab.decision_loop.calendar import TradingCalendarGate
 from factor_lab.decision_loop.data_gate import evaluate_data_gate
 from factor_lab.decision_loop import data_health
+from factor_lab.decision_loop import postmarket_review
 from factor_lab.decision_loop.execution import GovernedExecutionGateway
 from factor_lab.decision_loop.models import (
     AdviceMode,
@@ -773,6 +774,51 @@ def test_postmarket_review_uses_verified_dynamic_benchmark(tmp_path, monkeypatch
     assert records[0].benchmark_missing_reason is None
 
 
+def test_postmarket_review_uses_canonical_paths_for_horizons_and_excess(tmp_path, monkeypatch):
+    review_store = store(tmp_path)
+    review_store.write_json("opportunities/current.json", {"decision_id": "decision-path"})
+    review_store.write_json(
+        "positions/current.json",
+        {"positions": [{"symbol": "600000.SH", "instrument_type": "stock", "cost_price": 10}]},
+    )
+    trading_date = "2026-06-01"
+    stock_path = tmp_path / "600000.SH.csv"
+    benchmark_path = tmp_path / "512480.SH.csv"
+    stock_path.write_text(
+        "trade_date,close\n" + "\n".join(f"202606{day:02d},{10 + day / 10:.2f}" for day in range(1, 22)) + "\n",
+        encoding="utf-8",
+    )
+    benchmark_path.write_text(
+        "trade_date,close\n" + "\n".join(f"202606{day:02d},{100 + day / 20:.2f}" for day in range(1, 22)) + "\n",
+        encoding="utf-8",
+    )
+    paths = {"600000.SH": stock_path, "512480.SH": benchmark_path}
+    monkeypatch.setattr(postmarket_review, "daily_kline_path", lambda symbol: paths[str(symbol)])
+    matcher = BenchmarkMatcher(
+        {"600000.SH": {"benchmark": "512480.SH", "source": "verified-registry"}},
+        {},
+    )
+    monkeypatch.setattr(BenchmarkMatcher, "from_durable_registry", classmethod(lambda cls: matcher))
+    review_store.append_jsonl(
+        "execution/audit.jsonl",
+        {
+            "timestamp": f"{trading_date}T15:01:00+08:00",
+            "status": "filled",
+            "payload": {"symbol": "600000.SH", "book": "swing", "quantity": 100, "limit_price": 11, "event_id": "event-path", "order_id": "order-path"},
+            "broker_response": {"filled_quantity": 100, "fees": 5},
+        },
+    )
+    records = PostMarketReviewService(review_store).generate(trading_date)
+    metrics = records[0].metrics
+    assert metrics is not None
+    assert metrics.returns["1d"] is not None
+    assert metrics.returns["5d"] is not None
+    assert metrics.returns["20d"] is not None
+    assert metrics.excess_returns["1d"] is not None
+    assert metrics.mfe_pct > 0
+    assert metrics.total_cost == 5
+
+
 def test_weekly_candidate_inherits_review_lineage(tmp_path):
     review_store = store(tmp_path)
     for index in range(5):
@@ -794,13 +840,35 @@ def test_weekly_candidate_inherits_review_lineage(tmp_path):
 
 def test_auxiliary_gate_reads_durable_source_time_and_conflicts(tmp_path, monkeypatch):
     monkeypatch.setattr(data_health, "BASE", tmp_path)
-    fund_flow = tmp_path / "data/normalized/fund_flow/600000.csv"
-    fund_flow.parent.mkdir(parents=True)
-    fund_flow.write_text(
-        "trade_date,source_provider\n20260711,tushare\n", encoding="utf-8"
+    manifest_path = tmp_path / "data/audit/manifests/factor_input_projection.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(
+        json.dumps({
+            "generated_at": "2026-07-11T15:00:00+08:00",
+            "datasets": {
+                "fund-flow": {
+                    "status": "PARTITIONED",
+                    "observed_at": "2026-07-11T15:00:00+08:00",
+                    "source": "tushare",
+                    "evidence": {"input_files": 1},
+                },
+                "fundamentals": {
+                    "status": "OK",
+                    "observed_at": "2026-07-11T15:00:00+08:00",
+                    "source": "tushare",
+                },
+                "sentiment": {
+                    "status": "OK",
+                    "observed_at": "2026-07-11T15:00:00+08:00",
+                    "source": "regulatory",
+                },
+            },
+        }),
+        encoding="utf-8",
     )
+    monkeypatch.setattr(data_health, "PROJECTION_MANIFEST", manifest_path)
     conflict_log = tmp_path / "data/audit/source_conflicts.jsonl"
-    conflict_log.parent.mkdir(parents=True)
+    conflict_log.parent.mkdir(parents=True, exist_ok=True)
     conflict_log.write_text(
         '{"dataset":"capital_flow","source_a":"tushare","source_b":"backup"}\n',
         encoding="utf-8",
@@ -813,6 +881,23 @@ def test_auxiliary_gate_reads_durable_source_time_and_conflicts(tmp_path, monkey
     assert capital_flow.source == "tushare"
     assert conflicts[0]["dataset"] == "capital_flow"
     assert manifest["datasets"]["capital_flow"]["conflict_count"] == 1
+    published = json.loads(
+        (tmp_path / "data/audit/health/decision_gate_manifest.json").read_text(encoding="utf-8")
+    )
+    assert published["source"] == "datahub_manifest"
+    assert published["datasets"]["capital_flow"]["conflict_count"] == 1
+
+
+def test_auxiliary_gate_is_fail_closed_without_projection_manifest(tmp_path, monkeypatch):
+    monkeypatch.setattr(data_health, "BASE", tmp_path)
+    monkeypatch.setattr(data_health, "PROJECTION_MANIFEST", tmp_path / "missing.json")
+    items, conflicts, manifest = data_health.load_auxiliary_gate(
+        datetime.fromisoformat("2026-07-11T16:00:00+08:00")
+    )
+    assert conflicts == []
+    assert manifest["source"] == "datahub_manifest"
+    assert {item.name for item in items} == {"news", "capital_flow", "fundamentals"}
+    assert all(not item.available for item in items)
 
 
 def test_jsonl_archive_is_atomic_and_preserves_current_rows(tmp_path):
