@@ -1303,8 +1303,18 @@
       ],
       "expected_keywords": ["paper equity history missing", "available_days", "基准体系缺少可验证收益序列", "get_paper_trading_status"],
       "behavior": "Paper gate 只读并验证真实权益历史；Benchmark gate 检查六个 canonical projection 的实际可用天数，缺失或损坏 fail-closed。"
+    },
+    {
+      "id": "P1-NOTIFICATION-RUNTIME-ENV-01",
+      "title": "Cron 双通道通知使用受控非仓库凭据",
+      "code_locations": [
+        {"file": "commands/scripts/crontab/hermes-crontab", "function": "decision_notification_worker", "line": 20},
+        {"file": "commands/tests/test_scheduling.py", "function": "test_production_data_dependencies_and_runtime_are_explicit", "line": 136}
+      ],
+      "expected_keywords": ["source ~/.config/hermes/runtime.env", "decision_notification_worker.py", "* 8-20 * * *"],
+      "behavior": "权限 600 的非仓库 runtime env 由用户环境配置生成；cron 只在通知 worker 启动前显式加载，凭据不写代码、日志或测试产物。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-12T10:20:00+08:00"
+  "generated_at": "2026-07-12T10:30:00+08:00"
 }

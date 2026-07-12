@@ -149,6 +149,10 @@ def test_production_data_dependencies_and_runtime_are_explicit() -> None:
     assert "* 8-20 * * *" in next(
         line for line in crontab.splitlines() if "decision_notification_worker.py" in line
     )
+    worker_line = next(
+        line for line in crontab.splitlines() if "decision_notification_worker.py" in line
+    )
+    assert "source ~/.config/hermes/runtime.env" in worker_line
     assert "datahub_live_snapshot.py" in crontab
     assert "datahub_regulatory_events.py" in " ".join(registry.jobs["regulatory_events"].command)
     assert "PYTHONPATH=commands .venv_quant/bin/python3" in crontab
