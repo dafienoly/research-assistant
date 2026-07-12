@@ -87,7 +87,7 @@ class ShadowTradingEngine:
 
         Args:
             date: 交易日 YYYY-MM-DD
-            factor_signals: 因子信号列表 (None 则使用默认模拟信号)
+            factor_signals: 经数据门禁验证的因子信号列表；必须显式提供
             market_data: 市场数据 DataFrame (含 date/symbol/close/prev_close/volume)
             constraints: 组合约束覆盖
 

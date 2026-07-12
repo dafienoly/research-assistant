@@ -1238,8 +1238,19 @@
       ],
       "expected_keywords": ["QMTAccountGate", "live_activation_allowed", "portfolio_optimization.json", "artifact_sha256", "read_benchmark_projection", "synthetic", "THEME_STATUS_SCHEMA_NOT_INTEGRATED"],
       "behavior": "实盘就绪来自真实门禁并叠加四项执行 blocker；组合只读 VNext 优化产物；主题历史验证三份 DataHub SHA 后计算 NAV，未接能力 fail-visible。"
+    },
+    {
+      "id": "INFRA-SIGNAL-TRUTH-01",
+      "title": "策略、组合和 Paper/Shadow 禁止伪造信号兜底",
+      "code_locations": [
+        {"file": "commands/strategy_lab/orchestrator.py", "function": "build_latest_signals", "line": 132},
+        {"file": "commands/portfolio_builder.py", "function": "cmd_build_lowfreq", "line": 575},
+        {"file": "commands/factor_lab/paper/standing_paper_trading.py", "function": "run_paper", "line": 322}
+      ],
+      "expected_keywords": ["DataHub", "缺少 --signal-file", "factor_signals 必须显式提供", "禁止使用随机或内置兜底信号"],
+      "behavior": "未接 canonical runner 时不写固定信号；组合构建必须输入真实信号文件；Paper/Shadow 缺少显式信号即 fail-closed，历史产物保留但不进入执行链。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-12T07:25:00+08:00"
+  "generated_at": "2026-07-12T08:15:00+08:00"
 }

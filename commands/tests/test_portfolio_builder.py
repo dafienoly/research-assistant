@@ -6,11 +6,11 @@ V4.7 低频组合构建与推荐系统 — 单元测试
   - FactorSignalItem / PortfolioStock / Portfolio 数据类
   - ConstraintViolation / RiskStatus 数据类
   - PortfolioBuilder._normalize_signals
-  - PortfolioBuilder.build_portfolio (模拟信号)
+  - PortfolioBuilder.build_portfolio (测试信号)
   - PortfolioBuilder.apply_constraints (各类约束)
   - PortfolioBuilder.build_etf_replacement
   - PortfolioBuilder.portfolio_report
-  - 兜底模拟信号生成
+  - CLI 缺少真实信号时安全阻断
   - 边界条件: 空信号、单只信号、所有信号不可交易等
 """
 
@@ -35,7 +35,6 @@ from portfolio_builder import (
     RiskStatus,
     DEFAULT_CONSTRAINTS,
     ETF_REPLACEMENT_POOL,
-    _fallback_mock_signals,
 )
 
 CST = timezone(timedelta(hours=8))
@@ -259,7 +258,13 @@ class TestApplyConstraints:
 
     def test_constraints_non_tradable_marked(self, builder):
         """不可交易标记应在风控中体现"""
-        signals = [_fallback_mock_signals()[0]]
+        signals = [{
+            "ts_code": "688012.SH",
+            "symbol": "688012",
+            "name": "测试标的",
+            "factor_value": 0.035,
+            "signal_source": "pytest_fixture",
+        }]
         portfolio = builder.build_portfolio(signals)
         # 检查风控结构
         assert hasattr(portfolio.stocks[0], "risk")
@@ -388,18 +393,6 @@ class TestPortfolioReport:
         assert "min_turnover" in cs
 
 
-class TestMockSignals:
-    def test_fallback_mock_signals(self):
-        signals = _fallback_mock_signals()
-        assert len(signals) > 0
-        assert all("ts_code" in s for s in signals)
-        assert all("symbol" in s for s in signals)
-        assert all("factor_value" in s for s in signals)
-        # 因子值应该有波动
-        values = [s["factor_value"] for s in signals]
-        assert max(values) != min(values)
-
-
 class TestDetermineThemePosition:
     def test_full_position(self):
         p = Portfolio(stocks=[PortfolioStock(ts_code="A", symbol="A", is_tradable=True)])
@@ -508,15 +501,17 @@ class TestETFPool:
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestCLICommands:
-    def test_cmd_build_lowfreq_defaults(self):
-        """无参数调用不崩溃 (使用模拟信号)"""
+    def test_cmd_build_lowfreq_defaults_are_blocked(self, capsys):
         PortfolioBuilder.cmd_build_lowfreq([])
+        assert "缺少 --signal-file" in capsys.readouterr().out
 
-    def test_cmd_build_lowfreq_custom_top_n(self):
+    def test_cmd_build_lowfreq_custom_top_n_is_blocked(self, capsys):
         PortfolioBuilder.cmd_build_lowfreq(["--top-n", "3"])
+        assert "缺少 --signal-file" in capsys.readouterr().out
 
-    def test_cmd_build_lowfreq_custom_capital(self):
+    def test_cmd_build_lowfreq_custom_capital_is_blocked(self, capsys):
         PortfolioBuilder.cmd_build_lowfreq(["--capital", "200000"])
+        assert "缺少 --signal-file" in capsys.readouterr().out
 
     def test_cmd_recommend(self):
         PortfolioBuilder.cmd_recommend([])

@@ -329,7 +329,7 @@ class PaperTradingV4:
 
         Args:
             date: 交易日 YYYY-MM-DD
-            factor_signals: 因子信号列表 (如不传, 从 portfolio_builder 获取模拟信号)
+            factor_signals: 经数据门禁验证的因子信号列表；必须显式提供
             constraints: 组合约束覆盖
             market_data: 市场数据 DataFrame (含 date/symbol/close/open/high/low/volume/prev_close)
 
@@ -352,7 +352,9 @@ class PaperTradingV4:
             constraints_dict["top_n"] = 10
 
         if factor_signals is None:
-            factor_signals = self.portfolio_builder._generate_mock_signals()
+            raise ValueError(
+                "factor_signals 必须显式提供；Paper 禁止用随机或内置信号兜底"
+            )
 
         portfolio = self.portfolio_builder.build_portfolio(
             factor_signals, constraints_dict, signal_date=date

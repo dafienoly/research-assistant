@@ -575,7 +575,7 @@ class PortfolioBuilder:
     def cmd_build_lowfreq(args: list[str]) -> None:
         """CLI: portfolio:build-lowfreq
 
-        从模拟信号或指定信号文件构建低频组合。
+        从显式提供的真实信号文件构建低频组合。
         """
         signal_file = ""
         signal_date = datetime.now(CST).strftime("%Y-%m-%d")
@@ -600,17 +600,19 @@ class PortfolioBuilder:
 
         builder = PortfolioBuilder()
 
-        # 加载信号
-        if signal_file:
-            sig_path = Path(signal_file)
-            if not sig_path.exists():
-                print(f"❌ 信号文件不存在: {signal_file}")
-                return
-            with open(sig_path, "r", encoding="utf-8") as f:
-                factor_signals = json.load(f)
-        else:
-            # 生成模拟信号 (U3 股票池)
-            factor_signals = builder._generate_mock_signals()
+        if not signal_file:
+            print(
+                "❌ 缺少 --signal-file；组合构建禁止使用随机或内置兜底信号，"
+                "请提供经 DataHub 门禁验证的真实信号文件"
+            )
+            return
+
+        sig_path = Path(signal_file)
+        if not sig_path.exists():
+            print(f"❌ 信号文件不存在: {signal_file}")
+            return
+        with open(sig_path, "r", encoding="utf-8") as f:
+            factor_signals = json.load(f)
 
         if not factor_signals:
             print("❌ 因子信号为空")
@@ -1148,125 +1150,6 @@ class PortfolioBuilder:
                 tips.append(f"需要{'/'.join(board_needs)}权限, 未开通请使用ETF替代方案")
 
         return tips
-
-    @staticmethod
-    def _generate_mock_signals() -> list[dict[str, Any]]:
-        """生成模拟因子信号 (用于测试/演示)
-
-        从 U3 半导体核心池提取股票, 生成随机因子信号。
-        """
-        # 检查 universes.json 是否存在
-        from pathlib import Path as _P
-        _univ_file = _P(__file__).resolve().parent.parent / "data" / "universes.json"
-        if not _univ_file.exists():
-            return _fallback_mock_signals()
-
-        try:
-            from commands.universes import get_universe  # type: ignore
-        except ImportError:
-            try:
-                from universes import get_universe
-            except ImportError:
-                return _fallback_mock_signals()
-
-        try:
-            u3 = get_universe("U3")
-        except Exception:
-            return _fallback_mock_signals()
-
-        stocks = u3.get("stocks", [])
-        if not stocks:
-            return _fallback_mock_signals()
-
-        # 按 core_score 排序取前 30
-        sorted_stocks = sorted(
-            stocks, key=lambda x: x.get("core_score", 0), reverse=True
-        )[:30]
-
-        rng = np.random.default_rng(42)
-        signals = []
-        for s in sorted_stocks:
-            ts_code = s.get("ts_code", "")
-            symbol = ts_code.split(".")[0] if "." in ts_code else ts_code
-            signals.append({
-                "ts_code": ts_code,
-                "symbol": symbol,
-                "name": s.get("name", ""),
-                "factor_value": round(float(rng.normal(0.02, 0.05)), 6),
-                "signal_source": "模拟信号 (V4.7 Mock)",
-                "selection_reason": f"半导体核心票, "
-                                    f"细分={s.get('semiconductor_subsector', 'N/A')}, "
-                                    f"核心度={s.get('core_score', 0)}",
-            })
-
-        return signals
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Fallback 模拟信号 (当 universes 不可用时)
-# ═══════════════════════════════════════════════════════════════════════════
-
-_FALLBACK_SIGNALS = [
-    {"ts_code": "688012.SH", "symbol": "688012", "name": "中微公司",
-     "factor_value": 0.035, "signal_source": "模拟信号",
-     "selection_reason": "半导体设备龙头, 刻蚀/薄膜核心标的"},
-    {"ts_code": "688981.SH", "symbol": "688981", "name": "中芯国际",
-     "factor_value": 0.028, "signal_source": "模拟信号",
-     "selection_reason": "晶圆代工龙头, 国产替代核心标的"},
-    {"ts_code": "688126.SH", "symbol": "688126", "name": "沪硅产业",
-     "factor_value": 0.025, "signal_source": "模拟信号",
-     "selection_reason": "硅片材料龙头, 上游关键环节"},
-    {"ts_code": "688008.SH", "symbol": "688008", "name": "澜起科技",
-     "factor_value": 0.032, "signal_source": "模拟信号",
-     "selection_reason": "接口芯片设计龙头, DDR5渗透率提升"},
-    {"ts_code": "688396.SH", "symbol": "688396", "name": "华润微",
-     "factor_value": 0.022, "signal_source": "模拟信号",
-     "selection_reason": "功率半导体IDM, 特色工艺平台"},
-    {"ts_code": "002371.SZ", "symbol": "002371", "name": "北方华创",
-     "factor_value": 0.038, "signal_source": "模拟信号",
-     "selection_reason": "半导体设备平台型龙头"},
-    {"ts_code": "603501.SH", "symbol": "603501", "name": "韦尔股份",
-     "factor_value": 0.030, "signal_source": "模拟信号",
-     "selection_reason": "CIS图像传感器设计龙头"},
-    {"ts_code": "300661.SZ", "symbol": "300661", "name": "圣邦股份",
-     "factor_value": 0.026, "signal_source": "模拟信号",
-     "selection_reason": "模拟芯片设计龙头"},
-    {"ts_code": "688005.SH", "symbol": "688005", "name": "容百科技",
-     "factor_value": 0.020, "signal_source": "模拟信号",
-     "selection_reason": "正极材料龙头, 新能源产业链"},
-    {"ts_code": "600703.SH", "symbol": "600703", "name": "三安光电",
-     "factor_value": 0.024, "signal_source": "模拟信号",
-     "selection_reason": "化合物半导体龙头 (SiC/GaN)"},
-    {"ts_code": "688256.SH", "symbol": "688256", "name": "寒武纪",
-     "factor_value": 0.040, "signal_source": "模拟信号",
-     "selection_reason": "AI芯片设计龙头, 算力核心标的"},
-    {"ts_code": "300782.SZ", "symbol": "300782", "name": "卓胜微",
-     "factor_value": 0.018, "signal_source": "模拟信号",
-     "selection_reason": "射频前端芯片设计龙头"},
-    {"ts_code": "688099.SH", "symbol": "688099", "name": "晶晨股份",
-     "factor_value": 0.021, "signal_source": "模拟信号",
-     "selection_reason": "多媒体SoC设计龙头"},
-    {"ts_code": "002049.SZ", "symbol": "002049", "name": "紫光国微",
-     "factor_value": 0.027, "signal_source": "模拟信号",
-     "selection_reason": "FPGA/智能安全芯片龙头"},
-    {"ts_code": "688385.SH", "symbol": "688385", "name": "复旦微电",
-     "factor_value": 0.019, "signal_source": "模拟信号",
-     "selection_reason": "FPGA/安全芯片设计, 高可靠领域"},
-]
-
-
-def _fallback_mock_signals() -> list[dict[str, Any]]:
-    """兜底模拟信号"""
-    rng = np.random.default_rng(42)
-    result = []
-    for s in _FALLBACK_SIGNALS:
-        entry = dict(s)
-        # 稍微扰动因子值
-        noise = round(float(rng.normal(0, 0.005)), 6)
-        entry["factor_value"] = round(entry.get("factor_value", 0) + noise, 6)
-        result.append(entry)
-    return result
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Main

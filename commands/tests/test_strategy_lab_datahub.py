@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from strategy_lab import backtest, orchestrator, param_search, publisher, ranker, regime, universe, walk_forward
 
@@ -54,6 +55,18 @@ def test_strategy_lab_contains_no_machine_specific_data_paths() -> None:
         source = Path(module.__file__).read_text(encoding="utf-8")
         assert "/mnt/c/Users/" not in source
         assert "/home/ly/" not in source
+
+
+def test_latest_strategy_signals_fail_closed_without_canonical_runner(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(orchestrator, "load_strategy", lambda _name: {})
+    monkeypatch.setattr(orchestrator, "SIGNALS_DIR", tmp_path)
+
+    with pytest.raises(RuntimeError, match="DataHub"):
+        orchestrator.build_latest_signals("demo")
+
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_strategy_publisher_never_deletes_existing_package(monkeypatch, tmp_path: Path) -> None:

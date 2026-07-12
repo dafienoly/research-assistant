@@ -147,6 +147,11 @@ class TestPaperTradingV4:
         assert engine.holdings == {}
         assert engine.trades == []
 
+    def test_run_paper_requires_explicit_signals(self):
+        engine = PaperTradingV4(capital=self.capital)
+        with pytest.raises(ValueError, match="必须显式提供"):
+            engine.run_paper(date=self.dates[0], factor_signals=None)
+
     def test_run_paper_single_day(self):
         """测试单日模拟盘运行"""
         engine = PaperTradingV4(capital=self.capital)
@@ -310,6 +315,11 @@ class TestShadowTradingEngine:
         assert engine.capital == self.capital
         assert engine.top_n == self.top_n
         assert engine.BENCHMARK_NAME == "semiconductor_ew"
+
+    def test_run_shadow_requires_explicit_signals(self):
+        engine = ShadowTradingEngine(capital=self.capital, top_n=self.top_n)
+        with pytest.raises(ValueError, match="必须显式提供"):
+            engine.run_shadow(date=self.dates[0], factor_signals=None)
 
     def test_run_shadow_single_day(self):
         """测试单日影子交易"""

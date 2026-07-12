@@ -130,26 +130,12 @@ def run_backtest(strategy_name: str) -> dict:
 
 
 def build_latest_signals(strategy_name: str) -> list[dict]:
-    """生成最新策略信号"""
+    """阻断尚未接入规范数据管线的策略信号生成。"""
     load_strategy(strategy_name)
-    # TODO: full signal generation with live data
-    signals = [{
-        "date": now_str()[:10],
-        "strategy_name": strategy_name,
-        "symbol": "688012", "name": "中微公司",
-        "final_score": 72.5,
-        "signal": "buy_watch",
-        "rank": 1,
-        "reason": "趋势因子+成交量因子双确认",
-        "risk_flags": "",
-        "created_at": now_str(),
-    }]
-    SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
-    with open(SIGNALS_DIR / f"{strategy_name}_latest.csv", "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=list(signals[0].keys()))
-        w.writeheader()
-        w.writerows(signals)
-    return signals
+    raise RuntimeError(
+        "策略信号生成尚未接入 DataHub 规范数据与正式策略运行器；"
+        "为避免产生伪造交易信号，本命令已阻断且不会写入 latest 文件"
+    )
 
 
 def build_review_material(strategy_name: str) -> dict:
