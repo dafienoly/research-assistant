@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,7 @@ import pytest
 from factor_lab.scheduling import ScheduleRegistry, ScheduledDagRunner, ScheduledJob
 from factor_lab.decision_loop.storage import DecisionLoopStore
 from scripts.run_scheduled_dag import enqueue_failure_alert, trading_day_gate
+from scripts.datahub_live_snapshot import trading_day_gate as live_snapshot_trading_day_gate
 
 
 def job(job_id: str, *, depends_on: tuple[str, ...] = (), dataset: str | None = None, attempts: int = 1) -> ScheduledJob:
@@ -123,6 +125,9 @@ def test_crontab_routes_write_pipelines_through_scheduler() -> None:
 
     assert "run_scheduled_dag.py postmarket" in crontab
     assert "run_scheduled_dag.py weekly_datahub" in crontab
+    assert "run_scheduled_dag.py premarket" in crontab
+    assert "commands/scripts/vnext_passlist.py" not in crontab
+    assert "commands/scripts/datahub_regulatory_events.py" not in crontab
     assert "datahub_cron.sh daily-incremental" not in crontab
     assert "hermes_cli.py" not in legacy
     assert "run_scheduled_dag.py" in legacy
@@ -136,12 +141,13 @@ def test_production_data_dependencies_and_runtime_are_explicit() -> None:
     assert registry.jobs["postmarket_review"].depends_on == ("benchmark_projection",)
     assert registry.jobs["data_backup"].depends_on == ("datahub_daily",)
     assert registry.jobs["decision_ledger_archive"].depends_on == ("capability_status",)
+    assert registry.jobs["regulatory_events"].depends_on == ("vnext_passlist",)
     assert "normalized/events/corporate_events" in registry.jobs["event_truth"].owned_datasets
     crontab = (root / "commands/scripts/crontab/hermes-crontab").read_text(encoding="utf-8")
     assert "/usr/bin/python3" not in crontab
     assert "decision_notification_worker.py" in crontab
     assert "datahub_live_snapshot.py" in crontab
-    assert "datahub_regulatory_events.py" in crontab
+    assert "datahub_regulatory_events.py" in " ".join(registry.jobs["regulatory_events"].command)
     assert "PYTHONPATH=commands .venv_quant/bin/python3" in crontab
 
 
@@ -173,3 +179,15 @@ def test_postmarket_trading_day_gate_uses_canonical_calendar(tmp_path: Path, mon
     assert trading_day_gate("postmarket", "2026-07-10")["status"] == "OPEN"
     assert trading_day_gate("postmarket", "2026-07-11")["status"] == "CLOSED"
     assert trading_day_gate("weekly_datahub", "2026-07-12")["status"] == "NOT_REQUIRED"
+    assert trading_day_gate("premarket", "2026-07-10")["status"] == "OPEN"
+    assert trading_day_gate("premarket", "2026-07-11")["status"] == "CLOSED"
+
+
+def test_live_snapshot_gate_skips_holidays_and_fails_closed(monkeypatch) -> None:
+    import scripts.datahub_live_snapshot as module
+
+    monkeypatch.setattr(module, "calendar_row", lambda day: {"cal_date": day.strftime("%Y%m%d"), "is_open": 0})
+    assert live_snapshot_trading_day_gate(datetime.fromisoformat("2026-07-11").date())["status"] == "CLOSED"
+
+    monkeypatch.setattr(module, "calendar_row", lambda _day: (_ for _ in ()).throw(FileNotFoundError()))
+    assert live_snapshot_trading_day_gate(datetime.fromisoformat("2026-07-10").date())["status"] == "FAILED"

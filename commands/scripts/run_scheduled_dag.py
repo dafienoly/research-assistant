@@ -16,7 +16,7 @@ from factor_lab.datahub_access import calendar_row  # noqa: E402
 
 
 def trading_day_gate(dag_id: str, trading_date: str) -> dict:
-    if dag_id != "postmarket":
+    if dag_id == "weekly_datahub":
         return {"status": "NOT_REQUIRED"}
     try:
         day = datetime.fromisoformat(trading_date).date()

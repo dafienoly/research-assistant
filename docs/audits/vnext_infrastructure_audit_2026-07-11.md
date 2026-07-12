@@ -198,3 +198,9 @@ Vite/Rolldown 生产构建原有 1.14 MB 与 550 KB 大块。现按 charts、Ant
 ## Promotion Engine 并发持久化收口
 
 Promotion Queue 原来由各进程分别读取整个 JSON 后覆盖写回，`add/remove/update/clear` 并发时会互相覆盖；Promotion history 也直接无锁 append，异常被静默吞掉。现队列操作复用 Alpha storage 的跨进程 `flock`，在同一临界区完成完整读改写，并通过临时文件、`fsync`、`os.replace` 发布。历史使用加锁 `O_APPEND`、文件与目录 `fsync`，以 `candidate_id + alpha_id` 为幂等键；已存在的坏行保持原字节，不因重写或归档被删除。60 路并发队列写与 120 次含重复历史追加测试均证明无丢项、无重复。
+
+## 盘前与分钟调度收口
+
+盘前 PassList 与监管真值原来分别由 08:55/08:57 cron 直接启动，只有时间假设、没有依赖边，PassList 延迟时监管任务会读取旧 watchlist。现新增声明式 `premarket` DAG：`vnext_passlist → regulatory_events`，分别声明 watchlist 与 regulatory dataset 的唯一 writer、超时、重试、checkpoint 和数据集锁；休市日由 canonical DataHub 日历整体跳过，日历缺失则 fail-closed 并进入现有运维告警链。
+
+分钟实时快照仍需每分钟执行，不能使用日级 checkpoint DAG；其唯一 ingestion 入口现于获取全市场行情前读取同一 canonical 交易日历。休市日返回 `SKIPPED/non_trading_day`，日历缺失返回 FAILED，不访问上游、不覆盖上一个有效快照。Decision Cycle 自身的第二道交易日门禁保持不变。

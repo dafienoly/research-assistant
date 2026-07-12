@@ -1161,6 +1161,17 @@
       ],
       "expected_keywords": ["fcntl.flock", "os.replace", "os.O_APPEND", "os.fsync", "update_json", "unique_fields"],
       "behavior": "队列完整读改写位于同一 flock 临界区并原子替换；历史按 candidate_id+alpha_id 幂等加锁追加并同步文件和目录，不删除既有或损坏行。"
+    },
+    {
+      "id": "INFRA-PREMARKET-SCHEDULE-01",
+      "title": "盘前依赖 DAG 与分钟交易日门禁",
+      "code_locations": [
+        {"file": "commands/config/scheduled_jobs.json", "function": "premarket", "line": 20},
+        {"file": "commands/scripts/run_scheduled_dag.py", "function": "trading_day_gate", "line": 18},
+        {"file": "commands/scripts/datahub_live_snapshot.py", "function": "trading_day_gate", "line": 12}
+      ],
+      "expected_keywords": ["premarket", "vnext_passlist", "regulatory_events", "canonical_datahub", "non_trading_day", "trade_calendar_unavailable"],
+      "behavior": "PassList 成功后才运行监管 ingestion；两个 writer 由声明式 DAG 管理并在休市日跳过。分钟快照联网前读取 canonical 日历，缺失 fail-closed。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

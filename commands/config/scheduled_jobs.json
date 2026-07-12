@@ -16,6 +16,10 @@
     ],
     "weekly_datahub": [
       "datahub_weekly"
+    ],
+    "premarket": [
+      "vnext_passlist",
+      "regulatory_events"
     ]
   },
   "jobs": [
@@ -135,6 +139,28 @@
       "timeout_seconds": 10800,
       "retry_attempts": 2,
       "backoff_seconds": [300]
+    },
+    {
+      "job_id": "vnext_passlist",
+      "command": ["{python}", "{root}/commands/scripts/vnext_passlist.py"],
+      "depends_on": [],
+      "owned_datasets": ["decision_loop/watchlist"],
+      "writer_id": "vnext_passlist",
+      "timeout_seconds": 900,
+      "retry_attempts": 2,
+      "backoff_seconds": [60],
+      "environment": {"PYTHONPATH": "{root}/commands"}
+    },
+    {
+      "job_id": "regulatory_events",
+      "command": ["{python}", "{root}/commands/scripts/datahub_regulatory_events.py"],
+      "depends_on": ["vnext_passlist"],
+      "owned_datasets": ["normalized/events/regulatory_watchlist"],
+      "writer_id": "datahub_regulatory_events",
+      "timeout_seconds": 900,
+      "retry_attempts": 2,
+      "backoff_seconds": [60],
+      "environment": {"PYTHONPATH": "{root}/commands"}
     },
     {
       "job_id": "datahub_weekly",
