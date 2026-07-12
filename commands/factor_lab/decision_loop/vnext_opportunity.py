@@ -22,7 +22,7 @@ class VNextPassListService:
     def generate(self, now: datetime | None = None):
         now = now or datetime.now().astimezone()
         source = self._load(BASE / "data/vnext/candidates/latest.json")
-        health = self._load(BASE / "data/vnext/data-health/latest.json")
+        health = self._load_health(now)
         raw_candidates = (source.get("payload") or {}).get("raw_candidates") or []
         candidates = [self._convert(row, health, now) for row in raw_candidates if row.get("research_signal")]
         result = self.engine.build_pass_list(candidates, now)
@@ -43,6 +43,26 @@ class VNextPassListService:
                 })
         self.store.write_json("watchlist/current.json", {"decision_id": result.decision_id, "targets": targets})
         return result
+
+    @staticmethod
+    def _load_health(now: datetime) -> dict:
+        """Build health from current DataHub audit artifacts, never stale cache."""
+        try:
+            from factor_lab.vnext.service import VNextService
+
+            health = VNextService(
+                project_root=BASE,
+                artifact_root=BASE / "data" / "vnext",
+            ).build_data_health(now.date().isoformat())
+            return health if isinstance(health, dict) else {
+                "status": "MISSING",
+                "missing_evidence": ["vnext_data_health_invalid"],
+            }
+        except (OSError, ValueError, TypeError, KeyError, RuntimeError) as exc:
+            return {
+                "status": "MISSING",
+                "missing_evidence": [f"vnext_data_health_unavailable:{type(exc).__name__}"],
+            }
 
     @staticmethod
     def _convert(raw: dict, health: dict, now: datetime) -> Candidate:

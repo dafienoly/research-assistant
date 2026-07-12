@@ -1459,6 +1459,16 @@
       ],
       "expected_keywords": ["watch_only", "辅助/执行门禁观察", "mandatory execution checks missing", "保持现金"],
       "behavior": "没有主推荐时同时统计 BLOCKED 与 WATCH_ONLY，保留真实 DataGate 原因，禁止把辅助/执行缺口误报为核心数据阻断 0。"
+    },
+    {
+      "id": "P1-PASSLIST-HEALTH-FRESH-01",
+      "title": "VNext PassList 每次生成读取当前 DataHub 健康证据",
+      "code_locations": [
+        {"file": "commands/factor_lab/decision_loop/vnext_opportunity.py", "function": "_load_health", "line": 47},
+        {"file": "commands/factor_lab/decision_loop/vnext_opportunity.py", "function": "generate", "line": 22}
+      ],
+      "expected_keywords": ["VNextService", "build_data_health", "coverage", "freshness", "integrity", "status=MISSING"],
+      "behavior": "机会引擎不依赖陈旧 health latest 缓存；每次生成从当前 DataHub 审计证据构建门禁，异常 fail-closed 为 MISSING。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
