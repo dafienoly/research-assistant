@@ -170,10 +170,23 @@ class PositionIngestionService:
     def __init__(self, store: DecisionLoopStore | None = None):
         self.store = store or DecisionLoopStore()
 
-    def preview_text(self, text: str, source: str = "clipboard") -> PositionDiff:
+    def preview_text(
+        self,
+        text: str,
+        source: str = "clipboard",
+        *,
+        source_broker: str | None = None,
+        source_application: str | None = None,
+        source_account: str | None = None,
+    ) -> PositionDiff:
         if source not in {"csv", "clipboard", "manual", "miniqmt"}:
             raise ValueError("unsupported source")
-        return self.preview_positions(parse_delimited(text), source)
+        return self.preview_positions(
+            parse_delimited(text), source,
+            source_broker=source_broker,
+            source_application=source_application,
+            source_account=source_account,
+        )
 
     def preview_ocr(self, image_path: str | Path) -> PositionDiff:
         preview = self.preview_positions(parse_ocr_text(ocr_image(image_path)), "ocr")
@@ -187,11 +200,30 @@ class PositionIngestionService:
         return preview
 
     def preview_rows(
-        self, rows: list[dict[str, Any]], source: str = "manual"
+        self,
+        rows: list[dict[str, Any]],
+        source: str = "manual",
+        *,
+        source_broker: str | None = None,
+        source_application: str | None = None,
+        source_account: str | None = None,
     ) -> PositionDiff:
-        return self.preview_positions([_position_from_row(row) for row in rows], source)
+        return self.preview_positions(
+            [_position_from_row(row) for row in rows], source,
+            source_broker=source_broker,
+            source_application=source_application,
+            source_account=source_account,
+        )
 
-    def preview_positions(self, positions: list[Position], source: str) -> PositionDiff:
+    def preview_positions(
+        self,
+        positions: list[Position],
+        source: str,
+        *,
+        source_broker: str | None = None,
+        source_application: str | None = None,
+        source_account: str | None = None,
+    ) -> PositionDiff:
         now = datetime.now().astimezone()
         normalized = sorted(positions, key=lambda item: (item.symbol, item.book.value))
         payload = [item.model_dump(mode="json") for item in normalized]
@@ -204,6 +236,9 @@ class PositionIngestionService:
             source=source,
             positions=normalized,
             content_hash=content_hash,
+            source_broker=source_broker,
+            source_application=source_application,
+            source_account=source_account,
         )
         current_raw = self.store.read_json("positions/current.json")
         current = PositionSnapshot.model_validate(current_raw) if current_raw else None

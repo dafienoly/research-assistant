@@ -1313,8 +1313,19 @@
       ],
       "expected_keywords": ["source ~/.config/hermes/runtime.env", "decision_notification_worker.py", "* 8-20 * * *"],
       "behavior": "权限 600 的非仓库 runtime env 由用户环境配置生成；cron 只在通知 worker 启动前显式加载，凭据不写代码、日志或测试产物。"
+    },
+    {
+      "id": "P0-POSITION-PROVENANCE-01",
+      "title": "截图持仓与 QMT 账户来源结构化隔离",
+      "code_locations": [
+        {"file": "commands/factor_lab/decision_loop/models.py", "function": "PositionSnapshot", "line": 66},
+        {"file": "commands/factor_lab/decision_loop/position_ingestion.py", "function": "preview_rows", "line": 189},
+        {"file": "commands/factor_lab/api_server/routes_decision_loop.py", "function": "preview_positions", "line": 164}
+      ],
+      "expected_keywords": ["source_broker", "source_application", "source_account", "requires_correction", "confirmed"],
+      "behavior": "银河证券同花顺截图只能生成带来源和人工修正标记的预览；不会冒充国金 QMT 快照，也不会在未确认时进入执行链。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-12T10:30:00+08:00"
+  "generated_at": "2026-07-12T10:45:00+08:00"
 }

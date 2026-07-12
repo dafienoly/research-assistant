@@ -75,6 +75,9 @@ class PositionSnapshot(StrictModel):
     positions: list[Position]
     confirmed: bool = False
     content_hash: str
+    source_broker: str | None = None
+    source_application: str | None = None
+    source_account: str | None = None
 
 
 class PositionDiff(StrictModel):

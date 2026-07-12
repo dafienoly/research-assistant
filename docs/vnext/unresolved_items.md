@@ -17,6 +17,7 @@
 - 已退役的 research:loop/AutoResearchLoop 公共启动函数现统一 BLOCKED，不再评估、入队或注册自动候选。`research_loop.py` 与同名 package 的双实现仍需物理合并；历史类不可作为恢复自动 Agent 开发系统的依据。
 - Live Readiness 的 Paper 状态缺失函数和 Benchmark 错误导入已修复：真实 Paper 权益为 21 日，六个 canonical benchmark 均可用。Telegram/企业微信凭据已从 Windows 用户环境桥接到权限 600 的非仓库 runtime env，实际 cron worker 显式加载；基础 13 门禁现为 13 pass/0 blocker/0 warning。API 额外 QMT、确认持仓、授权、认证门禁仍禁止实盘。
 - 决策认证回放使用 WSL `/tmp` 后通过半导体设备 ETF 高开横盘后收跌 7% 案例，2 点 L2、3 点减半、结构破位 10 分钟退出和事件去重均为 true；Stage 1 Paper 通过。Stage 2 仍缺连续真实 Shadow、配对成交和权益曲线，保持未通过。Stage 3 因无 MiniQMT 权限按用户要求跳过实测，同时永久保持实盘关闭。
+- 银河证券同花顺远航版截图已形成只读持仓预览 `preview_23ce2b95135847a0a07362893b9e541d`，8 个标的且来源券商/应用/账户已结构化记录；预览未确认、未覆盖当前快照，不能替代国金 QMT 持仓。后续如要启用执行，必须人工复核截图字段并通过独立授权。
 - 行级完整性审计当前为 OK（活跃 5,530 文件、0 问题行）；曾污染的 3 个文件已从最早干净 D 盘快照恢复，污染原件保留在 `quarantine_polluted_market_20260712_0134`。该事件说明备份恢复已生效，但恢复后的连续每日门禁仍需观察。
 - 监管公告 ingestion 与覆盖感知门禁已实现并安装 08:57 cron。真实 smoke 曾发现 CNINFO 缺 orgId 时返回全市场公告，原“30 条”证据已撤销；现按上游 `secCode` 验证并二阶段使用 `688012,orgId` 拉取，得到 1 条证券专属公告、覆盖 `OK`。该证据仅证明 688012，不代表全市场覆盖。
 - Antifragile Review 缺 realized Regime/Semi/Style 标签、滚动模型衰减历史及连续 Paper/Shadow 权益曲线，因此相关六项指标为 null。

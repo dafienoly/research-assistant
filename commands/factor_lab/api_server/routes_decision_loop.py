@@ -40,6 +40,9 @@ class PositionPreviewBody(Body):
     content: str | None = None
     rows: list[dict[str, Any]] | None = None
     image_path: str | None = None
+    source_broker: str | None = None
+    source_application: str | None = None
+    source_account: str | None = None
 
 
 class PositionConfirmBody(Body):
@@ -166,9 +169,21 @@ async def preview_positions(body: PositionPreviewBody, request: Request):
                 raise ValueError("image_path is required for OCR")
             result = service.preview_ocr(body.image_path)
         elif body.rows is not None:
-            result = service.preview_rows(body.rows, body.source)
+            result = service.preview_rows(
+                body.rows,
+                body.source,
+                source_broker=body.source_broker,
+                source_application=body.source_application,
+                source_account=body.source_account,
+            )
         elif body.content is not None:
-            result = service.preview_text(body.content, body.source)
+            result = service.preview_text(
+                body.content,
+                body.source,
+                source_broker=body.source_broker,
+                source_application=body.source_application,
+                source_account=body.source_account,
+            )
         else:
             raise ValueError("content or rows is required")
     except (ValueError, FileNotFoundError, RuntimeError) as exc:

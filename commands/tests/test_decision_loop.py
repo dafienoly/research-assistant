@@ -170,6 +170,30 @@ def test_position_ingestion_requires_diff_hash_confirmation(tmp_path):
     assert service.current().positions[0].book == Book.CATALYST
 
 
+def test_position_preview_preserves_source_provenance(tmp_path):
+    service = PositionIngestionService(store(tmp_path))
+    preview = service.preview_rows(
+        [{
+            "symbol": "588710.SH",
+            "name": "科半导体",
+            "quantity": 100,
+            "available_quantity": 100,
+            "cost_price": 2.65,
+            "instrument_type": "ETF",
+        }],
+        "manual",
+        source_broker="银河证券",
+        source_application="同花顺远航版",
+        source_account="截图账户（未核验）",
+    )
+
+    snapshot = preview.proposed_snapshot
+    assert snapshot.confirmed is False
+    assert snapshot.source_broker == "银河证券"
+    assert snapshot.source_application == "同花顺远航版"
+    assert snapshot.source_account == "截图账户（未核验）"
+
+
 def test_csv_aliases_and_available_quantity_default():
     parsed = parse_delimited("code,name,quantity,cost\n600000.SH,浦发银行,100,10")
     assert parsed[0].available_quantity == 100
