@@ -836,8 +836,7 @@ class TestStrategyReportSkill:
                 return
         pytest.fail("strategy-report skill not found")
 
-    def test_skill_execute_demo(self, monkeypatch, tmp_path):
-        """通过 Runtime 执行 strategy-report skill (demo 模式)"""
+    def test_skill_execute_demo_is_blocked(self, monkeypatch, tmp_path):
         from factor_lab.research_skill import SkillRuntime
         from factor_lab.research_skill.skill_registry import SkillRegistry
         from factor_lab.research_skill.builtins import BUILTIN_SKILLS
@@ -851,9 +850,9 @@ class TestStrategyReportSkill:
         runtime = SkillRuntime(registry=registry, runtime_root=tmp_path / "skill_runs")
         result = runtime.run("strategy-report", params={"source": "demo"})
 
-        assert result.status == "completed", f"Skill failed: {result.error}"
-        assert result.data.get("status") == "completed"
-        assert "output_path" in result.data
+        assert result.status == "completed"
+        assert result.data.get("status") == "BLOCKED"
+        assert "禁止生成 demo/random" in result.data["error"]
 
     def test_skill_execute_with_custom_params(self, monkeypatch, tmp_path):
         """带自定义参数的 skill 执行"""
@@ -878,7 +877,7 @@ class TestStrategyReportSkill:
         )
 
         assert result.status == "completed"
-        assert "output_path" in result.data
+        assert result.data.get("status") == "BLOCKED"
 
 
 # ═══════════════════════════════════════════════════════════════════

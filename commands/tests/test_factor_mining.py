@@ -639,8 +639,7 @@ class TestFactorMiningSkill:
         assert "include_combinations" in param_names
         assert "generate_demo" in param_names
 
-    def test_skill_execute_with_demo_data(self, tmp_path, monkeypatch):
-        """Run the factor-mining skill with generated demo data"""
+    def test_skill_execute_with_demo_data_is_blocked(self, tmp_path, monkeypatch):
         from factor_lab.research_skill import SkillRegistry, SkillRuntime
         from factor_lab.research_skill.builtins import FACTOR_MINING_SKILL
         from factor_lab.research_skill.skill_runtime import RUNTIME_ROOT
@@ -656,10 +655,9 @@ class TestFactorMiningSkill:
         registry.register(FACTOR_MINING_SKILL)
         result = runtime.run("factor-mining", {"top_n": 5, "generate_demo": True})
 
-        assert result.status == "completed", f"Skill failed: {result.error}"
-        assert "report" in result.data
-        assert "top_candidates" in result.data
-        assert result.data["report"]["candidates_generated"] > 0
+        assert result.status == "completed"
+        assert result.data["status"] == "BLOCKED"
+        assert "禁止 demo/random" in result.data["error"]
 
     def test_skill_execute_minimal_params(self, tmp_path, monkeypatch):
         """Run with minimal params (defaults)"""
@@ -679,6 +677,7 @@ class TestFactorMiningSkill:
         # No params should use defaults
         result = runtime.run("factor-mining", {})
         assert result.status == "completed"
+        assert result.data["status"] == "BLOCKED"
 
 
 # ═══════════════════════════════════════════════════════════════════

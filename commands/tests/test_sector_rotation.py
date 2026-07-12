@@ -588,3 +588,12 @@ class TestEdgeCases:
         result = engine.run(ret, mapping)
         # Should still produce a valid result, not crash
         assert isinstance(result, RotationResult)
+
+
+def test_sector_rotation_research_skill_rejects_demo_data() -> None:
+    from factor_lab.research_skill.builtins import SECTOR_ROTATION_SKILL
+
+    result = SECTOR_ROTATION_SKILL.execute(None, {"generate_demo": True})
+
+    assert result["status"] == "BLOCKED"
+    assert "禁止 demo/random" in result["error"]

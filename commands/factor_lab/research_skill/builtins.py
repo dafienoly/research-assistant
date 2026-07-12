@@ -303,6 +303,15 @@ def _execute_strategy_report(ctx, params: dict) -> dict:
       - include_sections: 包含板块 (逗号分隔, 默认全部)
       - benchmark_name: 基准名称 (默认 CSI300)
     """
+    return {
+        "status": "BLOCKED",
+        "error": (
+            "strategy-report Research Skill 尚未接入经验证的收益序列契约；"
+            "禁止生成 demo/random 报告，请使用 strategy:report 的显式 CSV 入口"
+        ),
+        "required_input": ["date", "returns", "optional benchmark_returns"],
+    }
+
     results = {}
 
     source = params.get("source", "demo")
@@ -446,6 +455,14 @@ def _execute_factor_mining(ctx, params: dict) -> dict:
       - include_combinations: 是否包含组合变体 (默认 True)
       - generate_demo: 无真实数据时是否生成演示数据 (默认 True)
     """
+    return {
+        "status": "BLOCKED",
+        "error": (
+            "factor-mining Research Skill 尚未接入 DataHub snapshot、"
+            "universe version 与真实 forward return；禁止 demo/random 数据"
+        ),
+    }
+
     results = {}
     top_n = params.get("top_n", 10)
 
@@ -583,6 +600,14 @@ def _execute_sector_rotation(ctx, params: dict) -> dict:
       - benchmark: 基准名称 (默认 CSI300)
       - generate_demo: 无真实数据时生成演示数据 (默认 True)
     """
+    return {
+        "status": "BLOCKED",
+        "error": (
+            "sector-rotation Research Skill 尚未接入 DataHub 行业收益、"
+            "版本化行业映射与真实基准；禁止 demo/random 数据"
+        ),
+    }
+
     results = {}
 
     strategy_name = params.get("strategy", "momentum")

@@ -1270,8 +1270,19 @@
       ],
       "expected_keywords": ["不会生成演示行情或候选", "缺少 --from-strategy-returns", "随机演示行情", "candidate/promotion"],
       "behavior": "真实 CLI 第一层分发阻断未治理的因子挖掘/注册；策略报告只读显式收益 CSV；行业研究在 DataHub 行业收益接入前 fail-visible。"
+    },
+    {
+      "id": "INFRA-RESEARCH-SKILL-TRUTH-01",
+      "title": "自动 Research Skill 禁止随机完成结果",
+      "code_locations": [
+        {"file": "commands/factor_lab/research_skill/builtins.py", "function": "_execute_strategy_report", "line": 292},
+        {"file": "commands/factor_lab/research_skill/builtins.py", "function": "_execute_factor_mining", "line": 448},
+        {"file": "commands/factor_lab/research_skill/builtins.py", "function": "_execute_sector_rotation", "line": 588}
+      ],
+      "expected_keywords": ["status\": \"BLOCKED", "禁止生成 demo/random", "禁止 demo/random 数据", "DataHub snapshot"],
+      "behavior": "策略报告、因子挖掘和行业轮动 Skill 在真实版本化输入契约接入前统一 fail-closed，显式 demo 参数也不会产出报告、候选或绩效。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-12T09:30:00+08:00"
+  "generated_at": "2026-07-12T09:45:00+08:00"
 }
