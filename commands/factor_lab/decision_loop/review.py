@@ -148,6 +148,10 @@ class ParameterPromotionService:
     def __init__(self, store: DecisionLoopStore | None = None):
         self.store = store or DecisionLoopStore()
 
+    def _candidate_lock(self, candidate_id: str):
+        """Serialize candidate state transitions across weekly workers."""
+        return self.store.exclusive(f"parameters/candidate-{candidate_id}", timeout=1.0)
+
     def propose(
         self,
         parameter: str,
@@ -175,64 +179,75 @@ class ParameterPromotionService:
     def record_oos(
         self, candidate_id: str, passed: bool, metrics: dict[str, Any]
     ) -> ParameterCandidate:
-        candidate = self._find(candidate_id)
-        evidence = {**candidate.evidence, "oos_metrics": metrics}
-        updated = candidate.model_copy(
-            update={
-                "oos_status": "passed" if passed else "failed",
-                "evidence": evidence,
-                "status": "candidate" if passed else "rejected",
-            }
-        )
-        self._save(updated, "oos_evaluated")
-        return updated
+        with self._candidate_lock(candidate_id):
+            candidate = self._find(candidate_id)
+            if candidate.status == "promoted":
+                return candidate
+            evidence = {**candidate.evidence, "oos_metrics": metrics}
+            updated = candidate.model_copy(
+                update={
+                    "oos_status": "passed" if passed else "failed",
+                    "evidence": evidence,
+                    "status": "candidate" if passed else "rejected",
+                }
+            )
+            self._save(updated, "oos_evaluated")
+            return updated
 
     def weekly_decide(
         self, candidate_id: str, approved: bool, reviewer: str
     ) -> ParameterCandidate:
-        candidate = self._find(candidate_id)
-        if approved and candidate.oos_status != "passed":
-            raise ValueError(
-                "parameter cannot be promoted before OOS validation passes"
-            )
-        now = datetime.now().astimezone()
-        updated = candidate.model_copy(
-            update={
-                "human_status": "approved" if approved else "rejected",
-                "status": "promoted" if approved else "rejected",
-                "promoted_at": now if approved else None,
-                "evidence": {**candidate.evidence, "weekly_reviewer": reviewer},
-            }
-        )
-        self._save(updated, "weekly_decision")
-        if approved:
-            production = {
-                "version": 0,
-                "values": {},
-            }
-            def promote(current: dict[str, Any]) -> dict[str, Any]:
-                values = {
-                    **(current.get("values", {}) if isinstance(current, dict) else {}),
-                    updated.parameter: updated.proposed_value,
+        with self._candidate_lock(candidate_id):
+            candidate = self._find(candidate_id)
+            if candidate.status in {"promoted", "rejected"}:
+                return candidate
+            if approved and candidate.oos_status != "passed":
+                raise ValueError(
+                    "parameter cannot be promoted before OOS validation passes"
+                )
+            now = datetime.now().astimezone()
+            updated = candidate.model_copy(
+                update={
+                    "human_status": "approved" if approved else "rejected",
+                    "status": "promoted" if approved else "rejected",
+                    "promoted_at": now if approved else None,
+                    "evidence": {**candidate.evidence, "weekly_reviewer": reviewer},
                 }
-                production.update({
-                    "version": int(current.get("version", 0) if isinstance(current, dict) else 0) + 1,
-                    "values": values,
-                    "promoted_at": now.isoformat(),
-                    "candidate_id": candidate_id,
-                    "decision_id": updated.decision_id,
-                    "event_id": updated.event_id,
-                    "order_id": updated.order_id,
-                })
-                return production
-
-            self.store.update_json(
-                "parameters/production.json",
-                {"version": 0, "values": {}},
-                promote,
             )
-            self.store.append_jsonl("parameters/production_history.jsonl", production)
-        return updated
+            self._save(updated, "weekly_decision")
+            if approved:
+                production = {
+                    "version": 0,
+                    "values": {},
+                }
+
+                def promote(current: dict[str, Any]) -> dict[str, Any]:
+                    values = {
+                        **(current.get("values", {}) if isinstance(current, dict) else {}),
+                        updated.parameter: updated.proposed_value,
+                    }
+                    production.update({
+                        "version": int(current.get("version", 0) if isinstance(current, dict) else 0) + 1,
+                        "values": values,
+                        "promoted_at": now.isoformat(),
+                        "candidate_id": candidate_id,
+                        "decision_id": updated.decision_id,
+                        "event_id": updated.event_id,
+                        "order_id": updated.order_id,
+                    })
+                    return production
+
+                self.store.update_json(
+                    "parameters/production.json",
+                    {"version": 0, "values": {}},
+                    promote,
+                )
+                self.store.append_unique_jsonl(
+                    "parameters/production_history.jsonl",
+                    production,
+                    f"promotion:{candidate_id}",
+                )
+            return updated
 
     def _find(self, candidate_id: str) -> ParameterCandidate:
         rows = self.store.read_jsonl("parameters/candidates.jsonl")

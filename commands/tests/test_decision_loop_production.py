@@ -13,6 +13,7 @@ from factor_lab.decision_loop.cycle import MinuteDecisionCycle
 from factor_lab.decision_loop.models import Book, PlannedOrder
 from factor_lab.decision_loop.qmt_sync import QMTReconciliationService
 from factor_lab.decision_loop.position_ingestion import PositionIngestionService, parse_ocr_text
+from factor_lab.decision_loop.review import ParameterPromotionService
 from factor_lab.decision_loop.storage import DecisionLoopStore
 from factor_lab.decision_loop.service import DecisionLoopService
 from factor_lab.decision_loop.vnext_opportunity import VNextPassListService
@@ -151,6 +152,22 @@ def test_store_update_json_serializes_concurrent_read_modify_write(tmp_path):
     with ThreadPoolExecutor(max_workers=8) as pool:
         list(pool.map(increment, range(80)))
     assert store.read_json("parameters/production.json")["version"] == 80
+
+
+def test_parameter_promotion_is_single_flight_per_candidate(tmp_path):
+    service = ParameterPromotionService(DecisionLoopStore(tmp_path))
+    candidate = service.propose("giveback_points", 3.0, 2.5, {"samples": 40})
+    service.record_oos(candidate.candidate_id, True, {"sharpe_delta": 0.2})
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(
+            lambda _index: service.weekly_decide(candidate.candidate_id, True, "ly"),
+            range(2),
+        ))
+    assert {item.status for item in outcomes} == {"promoted"}
+    assert service.store.read_json("parameters/production.json")["version"] == 1
+    history = service.store.read_jsonl("parameters/production_history.jsonl")
+    assert len(history) == 1
 
 
 def test_store_does_not_steal_old_but_live_lock(tmp_path):

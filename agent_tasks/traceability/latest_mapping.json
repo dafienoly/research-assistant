@@ -1549,6 +1549,17 @@
       ],
       "expected_keywords": ["tradable_benchmarks", "dynamic_exposure_mapped", "unmapped", "mapping_evidence", "no reliable tradable"],
       "behavior": "组合不再直接复制持仓代码作为基准；只接受可靠且可交易的映射，按暴露归一化混合权重，无法映射时保留 null 和逐标的原因。"
+    },
+    {
+      "id": "P2-PARAMETER-CANDIDATE-SINGLE-FLIGHT-01",
+      "title": "参数 candidate 周度晋级单飞且 history 幂等",
+      "code_locations": [
+        {"file": "commands/factor_lab/decision_loop/review.py", "function": "_candidate_lock", "line": 147},
+        {"file": "commands/factor_lab/decision_loop/review.py", "function": "weekly_decide", "line": 198},
+        {"file": "commands/tests/test_decision_loop_production.py", "function": "test_parameter_promotion_is_single_flight_per_candidate", "line": 156}
+      ],
+      "expected_keywords": ["candidate-", "status in", "production_history.jsonl", "promotion:", "update_json"],
+      "behavior": "并发周度决定在 candidate 锁内完成状态迁移和生产版本写入；已晋级/拒绝请求幂等返回，production history 使用 candidate id 去重。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
