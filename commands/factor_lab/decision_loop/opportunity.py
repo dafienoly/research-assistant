@@ -53,8 +53,18 @@ class OpportunityEngine:
             blocked = sum(
                 item.data_gate.mode == AdviceMode.BLOCKED for item in evaluated
             )
+            watch_only = sum(
+                item.data_gate.mode == AdviceMode.WATCH_ONLY for item in evaluated
+            )
+            gate_reasons = []
+            for item in evaluated:
+                gate_reasons.extend(item.data_gate.reasons)
+            reason_text = "; ".join(dict.fromkeys(gate_reasons))
+            detail = f"核心数据阻断 {blocked} 项，辅助/执行门禁观察 {watch_only} 项"
+            if reason_text:
+                detail += f"；原因：{reason_text}"
             no_reason = (
-                f"今日无满足质量与执行门槛的机会；核心数据阻断 {blocked} 项，保持现金"
+                f"今日无满足质量与执行门槛的机会；{detail}，保持现金"
             )
         signature = (
             "|".join(item.candidate_id for item in primary + backup)

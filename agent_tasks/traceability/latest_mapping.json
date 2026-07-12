@@ -1449,6 +1449,16 @@
       ],
       "expected_keywords": ["canonical_live_snapshot_unavailable", "canonical_live_snapshot_amount_invalid", "invalid_amount_rows", "read_market_turnover"],
       "behavior": "实时快照缺失或金额字段全不可解析时返回 MISSING，不把零成交额当作正常市场状态；有效快照再结合 DataHub turnover projection 计算异常。"
+    },
+    {
+      "id": "P1-PASSLIST-REASON-01",
+      "title": "VNext 空 PassList 明确解释 watch-only 门禁",
+      "code_locations": [
+        {"file": "commands/factor_lab/decision_loop/opportunity.py", "function": "build_pass_list", "line": 44},
+        {"file": "commands/tests/test_decision_loop.py", "function": "test_empty_passlist_explains_watch_only_gate", "line": 612}
+      ],
+      "expected_keywords": ["watch_only", "辅助/执行门禁观察", "mandatory execution checks missing", "保持现金"],
+      "behavior": "没有主推荐时同时统计 BLOCKED 与 WATCH_ONLY，保留真实 DataGate 原因，禁止把辅助/执行缺口误报为核心数据阻断 0。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

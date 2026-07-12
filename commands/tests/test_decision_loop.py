@@ -609,6 +609,20 @@ def test_watch_only_candidate_cannot_be_primary():
     assert result.backup[0].candidate_id == "c1"
 
 
+def test_empty_passlist_explains_watch_only_gate():
+    item = candidate(1, 50, AdviceMode.WATCH_ONLY)
+    item = item.model_copy(update={"data_gate": DataGateResult(
+        mode=AdviceMode.WATCH_ONLY,
+        confidence_multiplier=0.35,
+        reasons=["mandatory execution checks missing"],
+        evaluated_at=datetime.now().astimezone(),
+    )})
+    result = OpportunityEngine().build_pass_list([item])
+    assert result.primary == []
+    assert "观察 1 项" in result.no_opportunity_reason
+    assert "mandatory execution checks missing" in result.no_opportunity_reason
+
+
 def test_three_book_and_through_theme_constraints():
     positions = [
         position(
