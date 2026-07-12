@@ -5,7 +5,9 @@ from datetime import datetime
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from factor_lab.api_server import routes_decision_loop
 from factor_lab.api_server.routes_decision_loop import router
+from factor_lab.decision_loop.benchmark import BenchmarkMatcher
 
 
 def client(tmp_path, monkeypatch) -> TestClient:
@@ -103,3 +105,28 @@ def test_parameter_api_never_promotes_without_oos(tmp_path, monkeypatch):
         json={"approved": True, "reviewer": "ly"},
     )
     assert promoted.json()["data"]["status"] == "promoted"
+
+
+def test_portfolio_benchmark_api_requires_verified_tradable_mapping(tmp_path, monkeypatch):
+    matcher = BenchmarkMatcher(
+        {"600000.SH": {"benchmark": "512480.SH", "source": "verified"}}, {}
+    )
+    monkeypatch.setattr(
+        routes_decision_loop.BenchmarkMatcher,
+        "from_durable_registry",
+        classmethod(lambda cls: matcher),
+    )
+    api = client(tmp_path, monkeypatch)
+    response = api.post(
+        "/api/decision-loop/benchmarks/portfolio",
+        json={
+            "exposure_weights": {"600000.SH": 0.8, "000300.SH": 0.2},
+            "tradable": ["600000.SH", "000300.SH"],
+            "tradable_benchmarks": ["512480.SH"],
+            "instrument_types": {"600000.SH": "stock", "000300.SH": "stock"},
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["components"] == {"512480.SH": 1.0}
+    assert data["unmapped"]["000300.SH"]
