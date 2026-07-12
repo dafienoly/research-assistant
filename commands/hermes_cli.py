@@ -714,114 +714,16 @@ print(json.dumps({{"factor": report["factor_name"], "windows": len(report["windo
 
     # === 因子挖掘类 ===
     elif command == "factor:mine":
-        """因子挖掘: 因子自动发现 + IC 评估 + 排名"""
-        top_n = 10
-        if args:
-            try:
-                top_n = int(args[0])
-            except ValueError:
-                pass
-        include_window = True
-        include_xs = True
-        include_combo = True
-
-        print(f"🔬 因子挖掘 Agent (V6.6)")
-        print(f"   策略: ", end="")
-        strategies = []
-        if include_window: strategies.append("窗口变体")
-        if include_xs: strategies.append("横截面")
-        if include_combo: strategies.append("组合")
-        print(" + ".join(strategies))
-        print(f"   Top-N: {top_n}\n")
-
-        try:
-            from factor_lab.factor_mining import FactorMiningEngine
-
-            # 生成演示 K 线数据
-            print("[1/4] 生成演示数据...")
-            import numpy as np
-            import pandas as pd
-            rng = np.random.default_rng(42)
-            dates = pd.date_range("2025-01-02", periods=252, freq="B")
-            symbols = [f"{i:06d}.SZ" for i in range(1, 101)]
-            rows = []
-            for sym in symbols:
-                price = 50.0 + rng.random() * 100
-                for d in dates:
-                    ret = rng.normal(0, 0.025)
-                    price *= (1 + ret)
-                    rows.append({
-                        "date": d, "symbol": sym,
-                        "close": price,
-                        "volume": max(1, int(rng.exponential(5e6))),
-                    })
-            df = pd.DataFrame(rows)
-            df["ret1"] = df.groupby("symbol")["close"].transform(
-                lambda x: x.pct_change(-1)
-            )
-            print(f"   {len(symbols)} 只股票 x {len(dates)} 交易日")
-
-            print("[2/4] 加载因子注册表...")
-            engine = FactorMiningEngine()
-            print(f"   {engine.config}")
-
-            print("[3/4] 生成候选因子...")
-            print("[4/4] 评估候选因子 (IC/ICIR/分层)...")
-
-            report = engine.mine(df)
-            report.print_summary()
-
-            # 输出详细结果
-            print(f"\n{'─'*60}")
-            print(f"  Top-{top_n} 候选详情:")
-            for i, cand in enumerate(report.top_candidates[:top_n], 1):
-                info = cand.get("candidate", {})
-                print(f"\n  [{i}] {info.get('name', '?')}")
-                print(f"      分类: {info.get('category', '?')}")
-                print(f"      描述: {info.get('description', '?')}")
-                print(f"      方法: {info.get('generation_method', '?')}")
-                print(f"      来源: {info.get('source', '?')}")
-                print(f"      IC: {cand.get('ic_mean', 0):.4f}  "
-                      f"ICIR: {cand.get('ic_ir', 0):.2f}  "
-                      f"正IC比: {cand.get('ic_positive_ratio', 0):.0%}  "
-                      f"多空差: {cand.get('spread_ret', 0):.4f}")
-                print(f"      评分: {cand.get('score', 0):.2f}")
-
-            print(f"\n{'─'*60}")
-            print(f"  注册命令: python3 hermes_cli.py factor:mine-register")
-            print(f"  使用 Research Skill: python3 hermes_cli.py research:run-skill --skill-id factor-mining --params top_n=10")
-
-        except ImportError as e:
-            print(f"❌ 导入失败: {e}")
-            print("   请确保 factor_mining 包已正确安装")
-        except Exception as e:
-            import traceback
-            print(f"❌ 执行失败: {e}")
-            traceback.print_exc()
+        print(
+            "❌ factor:mine 已阻断：公开 CLI 尚未接入 DataHub snapshot、"
+            "universe version 和真实 forward return；不会生成演示行情或候选。"
+        )
 
     elif command == "factor:mine-register":
-        """注册挖掘出的 Top-N 候选到因子注册表"""
-        top_n = 5
-        if args:
-            try:
-                top_n = int(args[0])
-            except ValueError:
-                pass
-        print(f"🔬 注册 Top-{top_n} 候选因子\n")
-        try:
-            from factor_lab.factor_mining import FactorMiningEngine
-            engine = FactorMiningEngine()
-            registered = engine.register_top_candidates(
-                "demo",  # placeholder — would need a stored report
-                top_n=top_n,
-                confirm=False,
-            )
-            if registered:
-                print(f"\n✅ 已注册: {', '.join(registered)}")
-            else:
-                print("\n⚠️ 没有注册任何因子 (可能已存在或需人工确认)")
-        except Exception as e:
-            print(f"❌ 注册失败: {e}")
+        print(
+            "❌ factor:mine-register 已阻断：不得用 demo 占位报告注册候选；"
+            "请通过受治理的 Alpha candidate/promotion 状态机。"
+        )
 
     elif command == "factor:list":
         # 检查 --alpha 标志
@@ -1791,17 +1693,14 @@ run_daily_premarket(no_notify=True)
 # ── V6.5 Strategy Report CLI Handlers ──────────────────────────
 
 def _handle_strategy_report(args):
-    """strategy:report — 生成策略报告"""
-    from_portfolio_result = None
+    """strategy:report — 从显式真实收益 CSV 生成策略报告。"""
     from_strategy_returns = None
     title = ""
     benchmark = "CSI300"
     output_dir = ""
 
     for i, a in enumerate(args):
-        if a == "--from-portfolio-result" and i + 1 < len(args):
-            from_portfolio_result = args[i + 1]
-        elif a == "--from-strategy-returns" and i + 1 < len(args):
+        if a == "--from-strategy-returns" and i + 1 < len(args):
             from_strategy_returns = args[i + 1]
         elif a == "--title" and i + 1 < len(args):
             title = args[i + 1]
@@ -1810,57 +1709,54 @@ def _handle_strategy_report(args):
         elif a == "--output-dir" and i + 1 < len(args):
             output_dir = args[i + 1]
 
+    if not from_strategy_returns:
+        print(
+            "❌ 缺少 --from-strategy-returns CSV；禁止用随机演示收益生成策略报告。"
+        )
+        return
+
+    import pandas as pd
     from factor_lab.strategy_report import StrategyReportGenerator
 
-    gen = StrategyReportGenerator(output_dir=output_dir) if output_dir else StrategyReportGenerator()
-
-    if from_portfolio_result:
-        # 从 PortfolioResult JSON 文件生成
-        import json
-        print(f"\n📂 加载 PortfolioResult: {from_portfolio_result}")
-        try:
-            with open(from_portfolio_result, "r") as f:
-                data = json.load(f)
-            # TODO(V6.5+): 从 JSON 重建 PortfolioResult
-            print("⚠ 从 JSON 文件重建 PortfolioResult 需要 V6.4 完整反序列化")
-            print(f"   PortfolioResult {data.get('run_id', '?')} 已加载")
-            print(f"   指标: {json.dumps(data.get('metrics', {}), indent=2, ensure_ascii=False)}")
-        except Exception as e:
-            print(f"❌ 加载失败: {e}")
-    else:
-        # 使用演示数据生成报告
-        import numpy as np
-        import pandas as pd
-
-        rng = np.random.default_rng(42)
-        dates = pd.date_range("2024-01-02", periods=504, freq="B")
-        n = len(dates)
-
-        demo_ret = pd.Series(rng.normal(0.15 / 252, 0.15 / np.sqrt(252), n), index=dates)
-        bm_ret = pd.Series(rng.normal(0.08 / 252, 0.18 / np.sqrt(252), n), index=dates)
-
-        report_title = title or f"策略分析报告_{__import__('datetime').datetime.now().strftime('%Y%m%d')}"
-
-        report = gen.from_strategy_returns(
-            strategy_returns=demo_ret,
-            strategy_name=report_title,
-            benchmark_returns=bm_ret,
-            benchmark_name=benchmark,
+    source = Path(from_strategy_returns)
+    if not source.is_file():
+        print(f"❌ 策略收益文件不存在: {source}")
+        return
+    frame = pd.read_csv(source)
+    required = {"date", "returns"}
+    if not required.issubset(frame.columns):
+        print("❌ 策略收益 CSV 必须包含 date, returns 列")
+        return
+    dates = pd.to_datetime(frame["date"], errors="coerce")
+    returns = pd.to_numeric(frame["returns"], errors="coerce")
+    valid = dates.notna() & returns.notna()
+    strategy_returns = pd.Series(
+        returns[valid].to_numpy(), index=dates[valid], name="strategy"
+    ).sort_index()
+    if len(strategy_returns) < 20:
+        print("❌ 有效真实收益不足 20 个交易日")
+        return
+    benchmark_returns = None
+    if "benchmark_returns" in frame.columns:
+        benchmark_values = pd.to_numeric(
+            frame.loc[valid, "benchmark_returns"], errors="coerce"
         )
+        if benchmark_values.notna().all():
+            benchmark_returns = pd.Series(
+                benchmark_values.to_numpy(), index=dates[valid], name=benchmark
+            ).sort_index()
 
-        print(f"\n{'='*62}")
-        print(f"  📊 策略报告生成完成")
-        print(f"{'='*62}")
-        print(f"  标题:      {report.title}")
-        print(f"  类型:      {report.report_type}")
-        print(f"  板块:      {len(report.sections_generated)} 个")
-        print(f"  交易日:    {report.n_days}")
-        print(f"  耗时:      {report.duration_ms}ms")
-        print(f"  输出路径:  {report.output_path}")
-        if report.warnings:
-            for w in report.warnings:
-                print(f"  ⚠ {w}")
-        print(f"{'='*62}\n")
+    gen = (
+        StrategyReportGenerator(output_dir=output_dir)
+        if output_dir else StrategyReportGenerator()
+    )
+    report = gen.from_strategy_returns(
+        strategy_returns=strategy_returns,
+        strategy_name=title or source.stem,
+        benchmark_returns=benchmark_returns,
+        benchmark_name=benchmark,
+    )
+    print(f"✅ 策略报告生成完成: {report.output_path}")
 
 
 def _handle_strategy_report_list(args):
@@ -1988,6 +1884,12 @@ def _handle_sector_rotation(args):
       --benchmark NAME:  基准名称 CSI300/CSI500/CSI_ALL (默认 CSI300)
       --output PATH:     输出报告路径 (可选)
     """
+    print(
+        "❌ sector:rotation 已阻断：当前 CLI 仅有随机演示行情，"
+        "尚未接入 DataHub 行业收益与版本化映射。"
+    )
+    return
+
     top_n = _parse_int(args, "--top-n", 5)
     strategy_str = _parse_str(args, "--strategy", "momentum")
     freq = _parse_str(args, "--freq", "monthly")
@@ -2140,6 +2042,12 @@ def _handle_sector_list():
 
 def _handle_sector_rankings(args):
     """sector:rankings — 行业评分排名"""
+    print(
+        "❌ sector:rankings 已阻断：当前 CLI 仅有随机演示行情，"
+        "尚未接入 DataHub 行业收益与版本化映射。"
+    )
+    return
+
     top_n = _parse_int(args, "--top-n", 10)
 
     try:

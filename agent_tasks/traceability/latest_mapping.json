@@ -1258,8 +1258,20 @@
       ],
       "expected_keywords": ["synthetic_benchmark: bool = False", "method=\"synthetic\" if synthetic_benchmark else \"api\"", "基准加载失败"],
       "behavior": "组合回测默认读取真实基准；合成基准只允许调用方在隔离测试中显式开启，真实数据失败时 warning 且不制造基准收益。"
+    },
+    {
+      "id": "INFRA-RESEARCH-CLI-TRUTH-01",
+      "title": "公开研究 CLI 不生成随机正式结果",
+      "code_locations": [
+        {"file": "commands/factor_commands.py", "function": "handle", "line": 28},
+        {"file": "commands/hermes_cli.py", "function": "_handle_strategy_report", "line": 1691},
+        {"file": "commands/hermes_cli.py", "function": "_handle_sector_rotation", "line": 1874},
+        {"file": "commands/hermes_cli.py", "function": "_handle_sector_rankings", "line": 2041}
+      ],
+      "expected_keywords": ["不会生成演示行情或候选", "缺少 --from-strategy-returns", "随机演示行情", "candidate/promotion"],
+      "behavior": "真实 CLI 第一层分发阻断未治理的因子挖掘/注册；策略报告只读显式收益 CSV；行业研究在 DataHub 行业收益接入前 fail-visible。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-12T09:10:00+08:00"
+  "generated_at": "2026-07-12T09:30:00+08:00"
 }

@@ -142,35 +142,17 @@ else:
         return True
 
     elif command == "factor:mine":
-        from factor_lab.factor_mining import FactorMiningEngine, MiningConfig
-        from factor_lab.factor_engine import load_stock_kline
-        start = _arg_value(args, "--start", "2025-01-02")
-        end = _arg_value(args, "--end", "2026-06-30")
-        top_n = int(_arg_value(args, "--top-n", "5"))
-        # 加载 K 线数据（限制数量控制内存）
-        all_symbols = sorted(daily_kline_index())
-        symbols = all_symbols[:500]
-        print(f"  加载 {len(symbols)} 只股票/共 {len(all_symbols)} 只 K线数据 ({start} ~ {end})...")
-        df = load_stock_kline(symbols, start_date=start, end_date=end)
-        if df.empty:
-            print("  ⚠️ 无 K线数据")
-            return True
-        print(f"  加载完成: {len(df)} 行, {df['symbol'].nunique()} 只股票\n")
-        # 执行因子挖掘
-        config = MiningConfig(top_n=top_n)
-        engine = FactorMiningEngine(config=config)
-        report = engine.mine(df=df)
-        report.print_summary()
+        print(
+            "❌ factor:mine 已阻断：公开 CLI 尚未接入 DataHub snapshot、"
+            "universe version 和真实 forward return；不会生成演示行情或候选。"
+        )
         return True
 
     elif command == "factor:mine-register":
-        from factor_lab.alpha.registry import bulk_register_candidates
-        top_n = int(args[0]) if args else 5
-        from factor_lab.factor_engine import Engine
-        e = Engine(); e.load_all()
-        results = e.mine(start="2025-01-02", end="2026-06-30")
-        registered = bulk_register_candidates(results[:top_n])
-        print(f"  注册 {registered} 个候选因子")
+        print(
+            "❌ factor:mine-register 已阻断：不得用隐式重跑或 demo 报告注册候选；"
+            "请通过受治理的 Alpha candidate/promotion 状态机。"
+        )
         return True
 
     elif command == "factor:list":
