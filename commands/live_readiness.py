@@ -615,12 +615,13 @@ class LiveReadinessChecker:
 
             shadow_days = status.get("shadow_days", 0)
             correlation = status.get("correlation_with_paper", 0)
-            deviation = status.get("deviation_pct", 0)
+            deviation = status.get("deviation_pct")
+            deviation_text = f"{deviation:.2f}%" if deviation is not None else "n/a"
 
             evidence_parts.append(
                 f"影子天数: {shadow_days}, "
                 f"与Paper相关性: {correlation:.2f}, "
-                f"偏差: {deviation:.2f}%"
+                f"偏差: {deviation_text}"
             )
 
             if shadow_days >= 5 and correlation > 0.7:
@@ -640,16 +641,16 @@ class LiveReadinessChecker:
                 gate.severity = "warning"
                 gate.message = (
                     f"Shadow Trading 与 Paper 偏差较大 "
-                    f"(相关性={correlation:.2f}, 偏差={deviation:.2f}%)"
+                    f"(相关性={correlation:.2f}, 偏差={deviation_text})"
                 )
-                gate.fix_suggestion = "检查 Shadow 和 Paper 策略配置是否一致"
+                gate.fix_suggestion = "补齐 canonical Shadow 观测、配对成交和权益序列后再验收"
 
         except ImportError as e:
             evidence_parts.append(f"Shadow Forward 模块未就绪: {e}")
             gate.passed = True
             gate.severity = "warning"
             gate.message = "Shadow Trading 模块未就绪, 跳过验证"
-            gate.fix_suggestion = "实现 Shadow Forward 模块"
+            gate.fix_suggestion = "接入 canonical Shadow 观测、配对成交和权益序列"
         except Exception as e:
             evidence_parts.append(f"Shadow Trading 状态读取失败: {e}")
             gate.passed = True

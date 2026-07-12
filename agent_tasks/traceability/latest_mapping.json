@@ -282,11 +282,11 @@
         {"file": "commands/factor_lab/datahub_access.py", "function": "factor_input_locations", "line": 49},
         {"file": "commands/factor_lab/datahub_access.py", "function": "read_stock_industry_map", "line": 69},
         {"file": "commands/factor_lab/factor_engine.py", "function": "load_stock_kline", "line": 220},
-        {"file": "commands/factor_lab/adaptive/shadow_forward.py", "function": "_compute_stock_returns", "line": 474},
-        {"file": "commands/factor_lab/adaptive/shadow_forward.py", "function": "run_daily", "line": 550}
+        {"file": "commands/factor_lab/adaptive/shadow_forward.py", "function": "StandingShadowForward._compute_stock_returns", "line": 112},
+        {"file": "commands/factor_lab/adaptive/shadow_forward.py", "function": "StandingShadowForward.run_daily", "line": 98}
       ],
-      "expected_keywords": ["factor_input_locations", "read_stock_industry_map", "trade_date", "schema 不兼容", "incomplete_real_market_returns"],
-      "behavior": "因子核心、验证和 Shadow 统一读取 DataHub；空目录不抢占 canonical 数据，YYYYMMDD 正确解析，市场级 schema 不广播到个股，行业映射不触发外部 provider。"
+      "expected_keywords": ["factor_input_locations", "read_stock_industry_map", "trade_date", "schema 不兼容", "canonical"],
+      "behavior": "因子核心、验证和 Shadow 统一读取 DataHub；空目录不抢占 canonical 数据，YYYYMMDD 正确解析，市场级 schema 不广播到个股，行业映射不触发外部 provider；Shadow 缺少真实 canonical 观测时阻断。"
     },
     {
       "id": "INFRA-EVENT-TRUTH-01",
@@ -1324,6 +1324,17 @@
       ],
       "expected_keywords": ["source_broker", "source_application", "source_account", "requires_correction", "confirmed"],
       "behavior": "银河证券同花顺截图只能生成带来源和人工修正标记的预览；不会冒充国金 QMT 快照，也不会在未确认时进入执行链。"
+    },
+    {
+      "id": "P1-SHADOW-CANONICAL-01",
+      "title": "Shadow Forward 仅允许真实 canonical 观测",
+      "code_locations": [
+        {"file": "commands/factor_lab/adaptive/shadow_forward.py", "function": "run_shadow_forward", "line": 41},
+        {"file": "commands/factor_lab/adaptive/shadow_forward.py", "function": "StandingShadowForward.run_daily", "line": 98},
+        {"file": "commands/factor_lab/adaptive/shadow_forward.py", "function": "ShadowForwardEngine.get_status", "line": 21}
+      ],
+      "expected_keywords": ["legacy shadow-forward generator retired", "canonical", "BLOCKED", "paired fills"],
+      "behavior": "旧 Shadow 生成器不再写入合成收益、虚构事件或订单；只有显式注入的 canonical 市场收益且证据完整时才记录观察，否则 fail-closed。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
