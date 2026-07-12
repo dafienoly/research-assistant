@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
@@ -60,6 +61,11 @@ class EventTruthIngestion:
                     "symbol": symbol,
                     "path": str(destination),
                     "rows": len(merged),
+                    "sha256": (
+                        hashlib.sha256(destination.read_bytes()).hexdigest()
+                        if destination.exists()
+                        else None
+                    ),
                     "coverage": {name: len(frame) for name, frame in datasets.items()},
                     "errors": errors,
                     "write_status": write_status,

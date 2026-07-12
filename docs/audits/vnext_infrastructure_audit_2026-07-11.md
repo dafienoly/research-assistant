@@ -325,3 +325,5 @@ VNext PassList 烟测得到 0 主推荐、0 备选，符合不凑数策略；原
 PassList 的健康来源也已收口：每次生成调用只读 `VNextService.build_data_health`，重新读取当前 DataHub coverage/freshness/integrity 与 VNext data-audit 证据；不再把 `data/vnext/data-health/latest.json` 当作权威缓存。构建失败直接标记 `MISSING`，因此候选最多进入 watch-only，不会因旧快照解锁 BUY。
 
 参数晋级账本补充跨进程原子更新：`production.json` 的版本递增和参数合并现在在同一锁内完成 read-modify-write，临时文件 `fsync` 后替换；并发 80 次更新回归最终版本为 80，未发现丢更新。历史 JSONL 仍单独追加，保留每次晋级的 decision/event/order lineage。
+
+Event Truth 读取增加 DataHub manifest 约束：每个标的必须存在 `run_status=COMPLETE` 的 event-truth manifest、状态为 `OK` 的结果行和匹配的 SHA-256；旧 manifest 没有哈希时按缺失处理，等待下一次受控 ingestion，不通过兼容回退放行旧 CSV。限价、停牌、复权和分红的 provider 归属仍只在 ingestion 层，VNext 只读消费。

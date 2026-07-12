@@ -24,6 +24,13 @@ def test_ingestion_owns_provider_call_and_vnext_only_reads_canonical_output(tmp_
     assert float(frame.iloc[0]["adj_factor"]) == 1.2
 
 
+def test_vnext_event_truth_rejects_tampered_canonical_file(tmp_path):
+    EventTruthIngestion(tmp_path, client=Client()).fetch(["510300.SH"], "20260710", "20260710")
+    output = tmp_path / "data/normalized/events/event_truth/510300.SH.csv"
+    output.write_text(output.read_text(encoding="utf-8-sig") + "\n", encoding="utf-8-sig")
+    assert load_event_truth(tmp_path, "510300.SH").empty
+
+
 def test_failed_refresh_preserves_existing_event_truth(tmp_path):
     output = tmp_path / "data/normalized/events/event_truth/510300.SH.csv"
     output.parent.mkdir(parents=True)

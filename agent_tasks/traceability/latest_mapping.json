@@ -1480,6 +1480,17 @@
       ],
       "expected_keywords": ["read-modify-write", "fsync", "os.replace", "production.json", "version"],
       "behavior": "并发周度晋级不会覆盖其他参数；生产版本递增、值合并和持久化在一个文件锁临界区完成，历史记录仍追加保留。"
+    },
+    {
+      "id": "P2-EVENT-TRUTH-MANIFEST-01",
+      "title": "VNext Event Truth 读取验证 DataHub manifest 和哈希",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_ingestion/event_truth.py", "function": "fetch", "line": 55},
+        {"file": "commands/factor_lab/vnext/event_truth_sources.py", "function": "load_event_truth", "line": 13},
+        {"file": "commands/tests/test_event_truth_ingestion.py", "function": "test_vnext_event_truth_rejects_tampered_canonical_file", "line": 28}
+      ],
+      "expected_keywords": ["sha256", "run_status", "COMPLETE", "manifest.json", "tampered"],
+      "behavior": "VNext 只接受完整 manifest、OK 结果和匹配 SHA-256 的事件真值文件；篡改、旧格式或未完成 ingestion 一律返回空证据并阻断下游执行。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
