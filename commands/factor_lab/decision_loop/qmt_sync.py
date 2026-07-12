@@ -34,6 +34,13 @@ class QMTReconciliationService:
         self.failure_limit = failure_limit
 
     def preview(self) -> PositionDiff:
+        try:
+            with self.store.exclusive("reconciliation/sync", timeout=0.5):
+                return self._preview_locked()
+        except TimeoutError as exc:
+            raise RuntimeError("position reconciliation already in progress") from exc
+
+    def _preview_locked(self) -> PositionDiff:
         account_response = self.client.get_account()
         positions_response = self.client.get_positions()
         if account_response.get("status") != "ok":
@@ -64,31 +71,41 @@ class QMTReconciliationService:
         return preview
 
     def confirm(self, preview_id: str, expected_hash: str):
-        snapshot = self.positions.confirm(preview_id, expected_hash)
-        latest = self.store.read_json("reconciliation/latest.json", default={})
-        if latest.get("preview_id") == preview_id:
-            latest.update({
-                "status": "confirmed",
-                "confirmed_at": datetime.now().astimezone().isoformat(),
-                "snapshot_id": snapshot.snapshot_id,
-            })
-            self.store.write_json("reconciliation/latest.json", latest)
-        return snapshot
+        try:
+            with self.store.exclusive("reconciliation/sync", timeout=0.5):
+                snapshot = self.positions.confirm(preview_id, expected_hash)
+                latest = self.store.read_json("reconciliation/latest.json", default={})
+                if latest.get("preview_id") == preview_id:
+                    latest.update({
+                        "status": "confirmed",
+                        "confirmed_at": datetime.now().astimezone().isoformat(),
+                        "snapshot_id": snapshot.snapshot_id,
+                    })
+                    self.store.write_json("reconciliation/latest.json", latest)
+                return snapshot
+        except TimeoutError as exc:
+            raise RuntimeError("position reconciliation already in progress") from exc
 
     def latest(self) -> dict:
         return self.store.read_json("reconciliation/latest.json", default={})
 
     def _record_failure(self, reason: str) -> None:
-        state = self.store.read_json("reconciliation/failures.json", default={})
-        consecutive = int(state.get("consecutive", 0)) + 1
-        record = {
-            "consecutive": consecutive,
-            "last_error": reason,
-            "failed_at": datetime.now().astimezone().isoformat(),
-        }
-        self.store.write_json("reconciliation/failures.json", record)
+        holder: dict[str, dict] = {}
+
+        def bump(state: dict) -> dict:
+            consecutive = int(state.get("consecutive", 0)) + 1
+            record = {
+                "consecutive": consecutive,
+                "last_error": reason,
+                "failed_at": datetime.now().astimezone().isoformat(),
+            }
+            holder["record"] = record
+            return record
+
+        self.store.update_json("reconciliation/failures.json", {}, bump)
+        record = holder["record"]
         self.store.append_jsonl("reconciliation/failure_history.jsonl", record)
-        if consecutive >= self.failure_limit:
+        if record["consecutive"] >= self.failure_limit:
             today = datetime.now().astimezone().date().isoformat()
             auth = self.authorizations.current(today)
             if auth and auth.status in {"pending", "active"}:

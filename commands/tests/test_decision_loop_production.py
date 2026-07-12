@@ -4,6 +4,7 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from threading import Event, Thread
 
 import pytest
 
@@ -54,6 +55,30 @@ def test_qmt_sync_requires_preview_confirmation_and_keeps_quantities(tmp_path):
     snapshot = sync.confirm(preview.preview_id, preview.proposed_snapshot.content_hash)
     assert snapshot.confirmed is True
     assert sync.latest()["status"] == "confirmed"
+
+
+def test_qmt_reconciliation_preview_is_single_flight(tmp_path):
+    started = Event()
+    release = Event()
+
+    class SlowQMT(FakeQMT):
+        def get_account(self):
+            started.set()
+            assert release.wait(timeout=2)
+            return super().get_account()
+
+    store = DecisionLoopStore(tmp_path)
+    sync = QMTReconciliationService(store, SlowQMT())
+    outcomes = []
+    first = Thread(target=lambda: outcomes.append(sync.preview()), daemon=True)
+    first.start()
+    assert started.wait(timeout=2)
+    with pytest.raises(RuntimeError, match="already in progress"):
+        sync.preview()
+    release.set()
+    first.join(timeout=2)
+    assert not first.is_alive()
+    assert len(outcomes) == 1
 
 
 def test_qmt_consecutive_failures_revoke_daily_authorization(tmp_path, monkeypatch):

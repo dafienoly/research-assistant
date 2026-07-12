@@ -1571,8 +1571,20 @@
       ],
       "expected_keywords": ["execution/order-", "execution_order_overlap", "duplicate_order_id", "duplicate_event_id", "QMT_LIVE_TRADING_ENABLED"],
       "behavior": "同一订单使用哈希锁在 broker 调用前单飞；锁竞争、重复订单和已提交事件均 fail-closed，且不同订单不共享全局网络锁。"
+    },
+    {
+      "id": "P0-QMT-RECONCILIATION-SINGLE-FLIGHT-01",
+      "title": "QMT 账户/持仓预览确认与失败计数原子化",
+      "code_locations": [
+        {"file": "commands/factor_lab/decision_loop/qmt_sync.py", "function": "preview", "line": 35},
+        {"file": "commands/factor_lab/decision_loop/qmt_sync.py", "function": "confirm", "line": 86},
+        {"file": "commands/factor_lab/decision_loop/qmt_sync.py", "function": "_record_failure", "line": 128},
+        {"file": "commands/tests/test_decision_loop_production.py", "function": "test_qmt_reconciliation_preview_is_single_flight", "line": 53}
+      ],
+      "expected_keywords": ["reconciliation/sync", "already in progress", "update_json", "failure_history.jsonl", "qmt_consecutive_read_failures"],
+      "behavior": "账户/持仓读取和确认按同步锁串行化；失败次数在原子 read-modify-write 中递增，连续失败达到阈值撤销授权，禁止静默空持仓。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-12T13:06:35+08:00"
+  "generated_at": "2026-07-12T13:09:46+08:00"
 }
