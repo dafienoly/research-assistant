@@ -222,3 +222,11 @@ Core 已有 `--require-hashes`，但隔离 vectorbt 环境仍从 plain exact-pin
 ## Legacy Backtest Lab 随机执行器退役
 
 `POST /api/backtests/run` 原来等待固定秒数后随机生成 Sharpe、CAGR、最大回撤、净值、交易、基准、费用和风险归因，每次刷新都会得到不同的虚假“回测”。现随机执行器已物理删除；在 canonical universe/date/cost/OOS runner 尚未接入该 legacy 请求契约前，提交明确返回 `503 BACKTEST_ENGINE_NOT_INTEGRATED`，不创建 job、不写结果。列表响应暴露 `execution_available=false` 和 VNext 已验证产物入口 `/api/vnext/backtests`。这不是用较小实现替代回测，而是阻止未完成能力伪装为已完成。
+
+## Live / Portfolio / Theme 辅助 API 真实性
+
+Live Readiness 原来固定返回 QMT 正常、余额 850 万和“可以切换实盘”，run 接口等待两秒后伪造五项通过。现 run 调用真实 13 门禁并将报告原子持久化；API 额外叠加 QMT trader、confirmed positions、当日授权和三阶段 certification 四项 P0 blocker，避免旧门禁遗漏执行条件。当前真实烟测四项均失败，`overall=NOT_READY`、`live_activation_allowed=false`。
+
+Portfolio latest 原来固定展示虚假股票、收益和 Sharpe，run 等待三秒后返回静态 15 持仓。现 latest 读取真实 VNext `portfolio_optimization.json` 的 cost-aware 权重、snapshot/hash、约束与 artifact SHA；真实烟测 4 个资产/现金权重合计 100%，不生成订单、不调用券商。legacy run 在 governed optimizer 未接请求契约前返回 503。
+
+Theme API 原来固定 ETF 价格、主题强弱、事件、重仓、基本面和细分表现，并用正弦函数合成历史曲线。现 history 逐一验证 `semiconductor_ew/ew_a_share/semiconductor_core_ew` DataHub manifest SHA，用真实日收益生成 60 日 NAV；静态 status 返回 503，subsector 在没有 canonical 投影时返回 `MISSING + []`，不再用零值或样例冒充。

@@ -1226,6 +1226,18 @@
       ],
       "expected_keywords": ["BACKTEST_ENGINE_NOT_INTEGRATED", "fake_result_generated", "execution_available", "/api/vnext/backtests", "random.uniform"],
       "behavior": "未接 canonical runner 的 legacy 提交返回 503 且不创建假 job；随机指标、NAV、交易和风险归因代码已删除，已验证产物继续由 VNext 提供。"
+    },
+    {
+      "id": "INFRA-AUXILIARY-API-TRUTH-01",
+      "title": "Live、Portfolio 与 Theme API 只暴露真实证据",
+      "code_locations": [
+        {"file": "commands/factor_lab/api_server/routes_live.py", "function": "_enforce_execution_readiness", "line": 22},
+        {"file": "commands/factor_lab/api_server/routes_portfolio.py", "function": "_latest_optimization", "line": 24},
+        {"file": "commands/factor_lab/api_server/routes_theme.py", "function": "_history_series", "line": 45},
+        {"file": "commands/factor_lab/datahub_access.py", "function": "read_benchmark_projection", "line": 360}
+      ],
+      "expected_keywords": ["QMTAccountGate", "live_activation_allowed", "portfolio_optimization.json", "artifact_sha256", "read_benchmark_projection", "synthetic", "THEME_STATUS_SCHEMA_NOT_INTEGRATED"],
+      "behavior": "实盘就绪来自真实门禁并叠加四项执行 blocker；组合只读 VNext 优化产物；主题历史验证三份 DataHub SHA 后计算 NAV，未接能力 fail-visible。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

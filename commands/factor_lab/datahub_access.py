@@ -24,6 +24,7 @@ SHARED_DATAHUB_ROOT = Path(
 LIVE_SNAPSHOT_PATH = SHARED_DATAHUB_ROOT / "market" / "live_snapshot.csv"
 MARKET_TURNOVER_PATH = DATAHUB_ROOT / "derived" / "market_turnover" / "daily.csv"
 CORPORATE_EVENTS_ROOT = DATAHUB_ROOT / "events" / "corporate_events"
+BENCHMARK_PROJECTION_ROOT = DATAHUB_ROOT / "derived" / "benchmarks"
 
 
 def _optional_number(value: object) -> float | None:
@@ -353,6 +354,43 @@ def read_corporate_event_records(root: Path | None = None) -> list[dict]:
                 }
             )
     return records
+
+
+def read_benchmark_projection(name: str, root: Path | None = None) -> pd.DataFrame:
+    """Read one SHA-verified DataHub benchmark return projection."""
+    source_root = root or BENCHMARK_PROJECTION_ROOT
+    manifest_path = source_root / "manifest.json"
+    if not manifest_path.is_file():
+        raise FileNotFoundError("canonical benchmark projection manifest missing")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("status") != "OK" or not manifest.get("generated_at"):
+        raise ValueError("canonical benchmark projection manifest is not OK")
+    dataset = (manifest.get("datasets") or {}).get(name)
+    if not isinstance(dataset, dict) or dataset.get("status") != "OK":
+        raise ValueError(f"canonical benchmark projection unavailable: {name}")
+    path = (source_root / str(dataset.get("path") or "")).resolve()
+    if source_root.resolve() not in path.parents or not path.is_file():
+        raise ValueError(f"canonical benchmark projection path invalid: {name}")
+    expected_hash = str(dataset.get("sha256") or "")
+    actual_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+    if not expected_hash or actual_hash != expected_hash:
+        raise ValueError(f"canonical benchmark projection hash mismatch: {name}")
+    frame = pd.read_csv(path, encoding="utf-8-sig")
+    if not {"date", "return"}.issubset(frame.columns):
+        raise ValueError(f"canonical benchmark projection schema mismatch: {name}")
+    frame = frame.copy()
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    frame["return"] = pd.to_numeric(frame["return"], errors="coerce")
+    frame = frame.dropna(subset=["date", "return"]).sort_values("date").drop_duplicates("date", keep="last")
+    frame.attrs.update(
+        {
+            "dataset": name,
+            "generated_at": manifest["generated_at"],
+            "sha256": actual_hash,
+            "source": manifest.get("source"),
+        }
+    )
+    return frame
 
 
 def daily_kline_root() -> Path:

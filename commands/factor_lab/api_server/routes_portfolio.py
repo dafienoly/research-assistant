@@ -1,74 +1,102 @@
-"""投资组合 (Portfolio) API — 组合推荐生成与查询。"""
+"""Portfolio API backed by persisted VNext optimization evidence."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
 
 from fastapi import APIRouter, Request
-from factor_lab.api_server.response import api_success, api_error
-from factor_lab.api_server.services.job_service import job_service
+
+from factor_lab.api_server.response import api_error, api_success
 from factor_lab.api_server.services.audit_service import audit_service
+from factor_lab.datahub_access import PROJECT_ROOT
+from factor_lab.vnext.snapshot import ASSET_PROXIES
+
 
 router = APIRouter()
+OPTIMIZATION_PATH = PROJECT_ROOT / "artifacts" / "vnext" / "portfolio_optimization.json"
+
+
+def _latest_optimization(path: Path = OPTIMIZATION_PATH) -> dict:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("status") != "OK" or not payload.get("data_snapshot_id") or not payload.get("target_weights_hash"):
+        raise ValueError("VNext portfolio optimization artifact is not verified")
+    method = payload.get("methods", {}).get("cost_aware")
+    if not isinstance(method, dict) or method.get("status") != "OK" or not isinstance(method.get("weights"), dict):
+        raise ValueError("VNext cost-aware portfolio output missing")
+    role_assets = {role: {"ticker": symbol, "name": name} for role, (symbol, name) in ASSET_PROXIES.items()}
+    holdings = []
+    for role, weight in method["weights"].items():
+        numeric_weight = float(weight)
+        if numeric_weight <= 0:
+            continue
+        asset = role_assets.get(role, {"ticker": role, "name": role})
+        holdings.append(
+            {
+                **asset,
+                "role": role,
+                "weight": round(numeric_weight * 100, 6),
+                "reason": "VNext cost-aware optimization persisted output",
+            }
+        )
+    if float(method.get("cash_weight") or 0) > 0:
+        holdings.append(
+            {
+                "ticker": "CASH",
+                "name": "现金",
+                "role": "cash",
+                "weight": round(float(method["cash_weight"]) * 100, 6),
+                "reason": "VNext hard cash-minimum constraint",
+            }
+        )
+    return {
+        "generated_at": payload.get("generated_at"),
+        "as_of": payload.get("as_of"),
+        "strategy": "vnext:cost_aware",
+        "holdings": holdings,
+        "expected_annual_return": method.get("annualized_return_estimate"),
+        "expected_volatility": method.get("annualized_volatility"),
+        "expected_sharpe": method.get("sharpe_estimate"),
+        "risk_level": "research_only",
+        "status": "research_only",
+        "data_snapshot_id": payload["data_snapshot_id"],
+        "target_weights_hash": payload["target_weights_hash"],
+        "artifact_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "hard_constraints": method.get("hard_constraints", {}),
+        "real_broker_called": payload.get("real_broker_called") is True,
+        "order_output": payload.get("order_output") is True,
+    }
 
 
 @router.get("/portfolio/recommendation/latest")
 async def get_latest_recommendation(request: Request):
-    """获取最新的投资组合推荐。"""
-    # 模拟最近一次的推荐结果
-    return api_success(
-        data={
-            "generated_at": "2026-07-08T15:30:00+08:00",
-            "strategy": "多因子均衡策略 v3",
-            "holdings": [
-                {"ticker": "688001", "name": "华大九天", "weight": 5.2, "reason": "EDA 龙头，国产替代加速"},
-                {"ticker": "688002", "name": "中微公司", "weight": 4.8, "reason": "刻蚀设备龙头，先进制程受益"},
-                {"ticker": "688003", "name": "天岳先进", "weight": 4.5, "reason": "碳化硅衬底，新能源车驱动"},
-                {"ticker": "600519", "name": "贵州茅台", "weight": 3.0, "reason": "核心资产，防御配置"},
-                {"ticker": "300750", "name": "宁德时代", "weight": 3.5, "reason": "动力电池龙头，全球份额持续提升"},
-            ],
-            "expected_annual_return": 18.5,
-            "expected_volatility": 22.3,
-            "expected_sharpe": 0.83,
-            "risk_level": "moderate",
-            "status": "active",
-        },
-        request=request,
-    )
+    """Return the latest real VNext optimization artifact."""
+    try:
+        recommendation = _latest_optimization()
+    except (FileNotFoundError, OSError, ValueError, json.JSONDecodeError) as exc:
+        return api_error(
+            "PORTFOLIO_OPTIMIZATION_UNAVAILABLE",
+            f"VNext portfolio artifact unavailable: {type(exc).__name__}",
+            status_code=503,
+            request=request,
+        )
+    return api_success(data=recommendation, request=request)
 
 
 @router.post("/portfolio/recommendation/run")
 async def run_recommendation(request: Request, body: dict):
-    """触发投资组合推荐生成任务。"""
-    strategy = body.get("strategy", "multi_factor")
-    universe = body.get("universe", "hs300")
-    risk_tolerance = body.get("risk_tolerance", "moderate")
-
-    job = job_service.create(
-        name=f"portfolio_recommendation_{strategy[:20]}",
-        job_type="portfolio",
-        params={"strategy": strategy, "universe": universe, "risk_tolerance": risk_tolerance},
-    )
-    job_service.update_status(job.run_id, "running", "组合推荐计算中...")
-
-    import asyncio
-
-    async def _simulate():
-        await asyncio.sleep(3)
-        job_service.set_result(job.run_id, {
-            "status": "completed",
-            "holdings_count": 15,
-            "expected_sharpe": 0.85,
-            "generated_at": __import__("datetime").datetime.now(
-                __import__("datetime").timezone(__import__("datetime").timedelta(hours=8))
-            ).isoformat(),
-        })
-        job_service.update_status(job.run_id, "completed", "组合推荐生成完成")
-
-    asyncio.create_task(_simulate())
-
+    """Fail visibly until the governed optimizer is wired to this legacy request."""
+    strategy = str(body.get("strategy") or "multi_factor")
     audit_service.record(
         event_type="portfolio",
         resource="/api/portfolio/recommendation/run",
-        action="execute",
-        detail={"run_id": job.run_id, "strategy": strategy, "universe": universe},
-        run_id=job.run_id,
+        action="blocked",
+        detail={"strategy": strategy, "reason": "governed_optimizer_not_integrated", "fake_result_generated": False},
     )
-
-    return api_success(data={"job": job.to_dict()}, status_code=202, request=request)
+    return api_error(
+        "PORTFOLIO_RUNNER_NOT_INTEGRATED",
+        "交互式 legacy 推荐器已退役；latest 仅展示 VNext 已持久化优化结果。",
+        status_code=503,
+        request=request,
+    )
