@@ -204,3 +204,5 @@ Promotion Queue 原来由各进程分别读取整个 JSON 后覆盖写回，`add
 盘前 PassList 与监管真值原来分别由 08:55/08:57 cron 直接启动，只有时间假设、没有依赖边，PassList 延迟时监管任务会读取旧 watchlist。现新增声明式 `premarket` DAG：`vnext_passlist → regulatory_events`，分别声明 watchlist 与 regulatory dataset 的唯一 writer、超时、重试、checkpoint 和数据集锁；休市日由 canonical DataHub 日历整体跳过，日历缺失则 fail-closed 并进入现有运维告警链。
 
 分钟实时快照仍需每分钟执行，不能使用日级 checkpoint DAG；其唯一 ingestion 入口现于获取全市场行情前读取同一 canonical 交易日历。休市日返回 `SKIPPED/non_trading_day`，日历缺失返回 FAILED，不访问上游、不覆盖上一个有效快照。Decision Cycle 自身的第二道交易日门禁保持不变。
+
+通知 worker 原来仅在工作日 09:00–15:59 消费 outbox，15:45 启动的 postmarket DAG 常在 worker 停止后才产生告警，周日 weekly DAG 也没有消费者。现 worker 每天 08:00–20:59 运行；盘后和周末运维失败可以在同一运行窗口投递，Telegram 与企业微信仍共享事件关闭状态并保留独立回执。

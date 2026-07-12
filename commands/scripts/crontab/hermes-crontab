@@ -17,7 +17,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 0-30 11 * * 1-5 cd /home/ly/.hermes/research-assistant && .venv_quant/bin/python3 commands/scripts/decision_guard_once.py >> ~/.hermes/logs/decision_guard.log 2>&1
 * 13-14 * * 1-5 cd /home/ly/.hermes/research-assistant && .venv_quant/bin/python3 commands/scripts/decision_guard_once.py >> ~/.hermes/logs/decision_guard.log 2>&1
 0 15 * * 1-5 cd /home/ly/.hermes/research-assistant && .venv_quant/bin/python3 commands/scripts/decision_guard_once.py >> ~/.hermes/logs/decision_guard.log 2>&1
-* 9-15 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 commands/scripts/decision_notification_worker.py >> ~/.hermes/logs/decision_notifications.log 2>&1
+* 8-20 * * * cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 commands/scripts/decision_notification_worker.py >> ~/.hermes/logs/decision_notifications.log 2>&1
 55 8 * * 1-5 cd /home/ly/.hermes/research-assistant && PYTHONPATH=commands .venv_quant/bin/python3 commands/scripts/run_scheduled_dag.py premarket >> ~/.hermes/logs/premarket_dag.log 2>&1
 # Post-market write DAG uses dependencies and checkpoints instead of assuming a
 # prior job completed because its wall-clock slot elapsed. Independent status

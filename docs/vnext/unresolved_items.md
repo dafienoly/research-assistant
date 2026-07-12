@@ -33,3 +33,4 @@
 - Alpha Registry、人工确认、pending、Shadow 与 Promotion Queue/History 的主要状态已统一到 `flock + atomic replace/O_APPEND + fsync`；60 路队列并发和历史幂等追加专项已通过。仍需在真实进程强杀与磁盘故障下注入验证。测试隔离复核新增的两个 disabled Alpha 已登记保留，未自动删除。
 - VNext 健康页面已改为只读取 canonical coverage/freshness/integrity 与 data audit，不再扫描目录或按 provider 名称猜健康；实时快照强制 manifest/hash 校验。真实连续运行仍需观察审计生成任务与页面状态更新时间是否一致。
 - PassList 与监管真值已进入带交易日门禁的 `premarket` DAG，分钟实时快照也在联网前检查 canonical 日历；仍需观察下一真实交易日的 checkpoint、重试和运维告警。
+- 双通道 outbox worker 已覆盖每天 08:00–20:59，避免盘后/周日 DAG 告警滞留；仍需在下一次真实故障中核对两通道回执与统一确认。

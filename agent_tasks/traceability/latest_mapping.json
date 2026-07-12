@@ -1172,6 +1172,16 @@
       ],
       "expected_keywords": ["premarket", "vnext_passlist", "regulatory_events", "canonical_datahub", "non_trading_day", "trade_calendar_unavailable"],
       "behavior": "PassList 成功后才运行监管 ingestion；两个 writer 由声明式 DAG 管理并在休市日跳过。分钟快照联网前读取 canonical 日历，缺失 fail-closed。"
+    },
+    {
+      "id": "INFRA-OUTBOX-SCHEDULE-01",
+      "title": "盘后与周末告警具备通知消费者",
+      "code_locations": [
+        {"file": "commands/scripts/crontab/hermes-crontab", "function": "decision_notification_worker", "line": 20},
+        {"file": "commands/tests/test_scheduling.py", "function": "test_production_data_dependencies_and_runtime_are_explicit", "line": 135}
+      ],
+      "expected_keywords": ["* 8-20 * * *", "decision_notification_worker.py", "telegram", "enterprise_wechat"],
+      "behavior": "durable outbox 每天 08:00–20:59 有消费者，覆盖 postmarket 与周日 weekly DAG 失败时段；通道回执继续独立。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
