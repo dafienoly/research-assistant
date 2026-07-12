@@ -218,3 +218,7 @@ Core 已有 `--require-hashes`，但隔离 vectorbt 环境仍从 plain exact-pin
 ## Events API 真实性与 DataHub lineage
 
 `GET /api/events` 原来在每次请求中构造固定的虚假指数涨幅、波动率、卖单、资金流和 provider 超时，并盖上当前时间；返回 schema 也与 Events 前端所需的公司事件字段不一致。现列表与新增详情接口只读 canonical `normalized/events/corporate_events`：要求 manifest `COMPLETE`，逐分区验证 SHA-256 和 schema，再从真实 payload 生成稳定 event ID、类型、方向、标题、观测时间和 `partition#sha256` 来源引用。真实烟测验证 166 个分区并返回 3,910 条事件；forecast 上游缺失时不生成业绩预告。没有已验证事件时返回空列表，事件后收益在尚无权威计算结果时保持空数组。
+
+## Legacy Backtest Lab 随机执行器退役
+
+`POST /api/backtests/run` 原来等待固定秒数后随机生成 Sharpe、CAGR、最大回撤、净值、交易、基准、费用和风险归因，每次刷新都会得到不同的虚假“回测”。现随机执行器已物理删除；在 canonical universe/date/cost/OOS runner 尚未接入该 legacy 请求契约前，提交明确返回 `503 BACKTEST_ENGINE_NOT_INTEGRATED`，不创建 job、不写结果。列表响应暴露 `execution_available=false` 和 VNext 已验证产物入口 `/api/vnext/backtests`。这不是用较小实现替代回测，而是阻止未完成能力伪装为已完成。

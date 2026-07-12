@@ -97,6 +97,7 @@ jobs:
           commands/tests/test_test_data_isolation.py
           commands/tests/test_routes_vnext.py
           commands/tests/test_routes_events.py
+          commands/tests/test_routes_backtest_truth.py
           commands/tests/test_decision_loop.py
           commands/tests/test_decision_loop_api.py
           commands/tests/test_decision_loop_production.py

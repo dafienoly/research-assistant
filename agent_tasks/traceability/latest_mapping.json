@@ -1215,6 +1215,17 @@
       ],
       "expected_keywords": ["partition_sha256", "run_status", "hash mismatch", "factor_performance", "canonical corporate events unavailable"],
       "behavior": "API 验证 manifest 完成状态、分区 SHA 与 schema 后返回真实 payload 派生事件；无数据返回空列表，未计算的事件收益保持空，固定伪事件已删除。"
+    },
+    {
+      "id": "INFRA-BACKTEST-TRUTH-01",
+      "title": "Legacy Backtest 随机结果生成器退役",
+      "code_locations": [
+        {"file": "commands/factor_lab/api_server/routes_backtest.py", "function": "run_backtest", "line": 18},
+        {"file": "commands/factor_lab/api_server/routes_backtest.py", "function": "list_backtests", "line": 48},
+        {"file": "commands/tests/test_routes_backtest_truth.py", "function": "test_legacy_backtest_source_contains_no_random_result_generator", "line": 30}
+      ],
+      "expected_keywords": ["BACKTEST_ENGINE_NOT_INTEGRATED", "fake_result_generated", "execution_available", "/api/vnext/backtests", "random.uniform"],
+      "behavior": "未接 canonical runner 的 legacy 提交返回 503 且不创建假 job；随机指标、NAV、交易和风险归因代码已删除，已验证产物继续由 VNext 提供。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
