@@ -132,6 +132,7 @@ class DualChannelNotifier:
                     result = sender(claim.get("payload") or {})
                 except Exception as exc:  # sender isolation is intentional
                     result = {"ok": False, "error": type(exc).__name__}
+            result = self._normalize_sender_result(result)
             receipt = {
                 "event_id": claim.get("event_id"),
                 "channel": channel,
@@ -309,6 +310,7 @@ class DualChannelNotifier:
                 result = sender(payload)
             except Exception as exc:
                 result = {"ok": False, "error": type(exc).__name__}
+            result = self._normalize_sender_result(result)
             receipt = {
                 "event_id": digest_id,
                 "channel": channel,
@@ -343,6 +345,12 @@ class DualChannelNotifier:
             return max(0, int(raw or 0))
         except (TypeError, ValueError):
             return 0
+
+    @staticmethod
+    def _normalize_sender_result(result: object) -> dict:
+        if isinstance(result, dict):
+            return result
+        return {"ok": False, "error": "invalid_sender_result"}
 
     def _reserve_l2_digest(
         self, channel: str, total: int, now: datetime
