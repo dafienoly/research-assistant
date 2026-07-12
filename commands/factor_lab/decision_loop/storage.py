@@ -109,6 +109,11 @@ class DecisionLoopStore:
                 if target.exists():
                     target.with_suffix(target.suffix + ".bak").write_bytes(target.read_bytes())
                 os.replace(temporary, target)
+                directory_fd = os.open(target.parent, os.O_RDONLY)
+                try:
+                    os.fsync(directory_fd)
+                finally:
+                    os.close(directory_fd)
                 self._bump_version(name)
             finally:
                 if os.path.exists(temporary):
