@@ -1469,6 +1469,17 @@
       ],
       "expected_keywords": ["VNextService", "build_data_health", "coverage", "freshness", "integrity", "status=MISSING"],
       "behavior": "机会引擎不依赖陈旧 health latest 缓存；每次生成从当前 DataHub 审计证据构建门禁，异常 fail-closed 为 MISSING。"
+    },
+    {
+      "id": "P2-PARAMETER-ATOMIC-01",
+      "title": "生产参数晋级在同一锁内原子合并版本",
+      "code_locations": [
+        {"file": "commands/factor_lab/decision_loop/storage.py", "function": "update_json", "line": 88},
+        {"file": "commands/factor_lab/decision_loop/review.py", "function": "weekly_decide", "line": 197},
+        {"file": "commands/tests/test_decision_loop_production.py", "function": "test_store_update_json_serializes_concurrent_read_modify_write", "line": 102}
+      ],
+      "expected_keywords": ["read-modify-write", "fsync", "os.replace", "production.json", "version"],
+      "behavior": "并发周度晋级不会覆盖其他参数；生产版本递增、值合并和持久化在一个文件锁临界区完成，历史记录仍追加保留。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

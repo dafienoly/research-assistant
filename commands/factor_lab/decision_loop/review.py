@@ -206,23 +206,31 @@ class ParameterPromotionService:
         )
         self._save(updated, "weekly_decision")
         if approved:
-            current = self.store.read_json(
-                "parameters/production.json", default={"version": 0, "values": {}}
-            )
-            values = {
-                **current.get("values", {}),
-                updated.parameter: updated.proposed_value,
-            }
             production = {
-                "version": int(current.get("version", 0)) + 1,
-                "values": values,
-                "promoted_at": now.isoformat(),
-                "candidate_id": candidate_id,
-                "decision_id": updated.decision_id,
-                "event_id": updated.event_id,
-                "order_id": updated.order_id,
+                "version": 0,
+                "values": {},
             }
-            self.store.write_json("parameters/production.json", production)
+            def promote(current: dict[str, Any]) -> dict[str, Any]:
+                values = {
+                    **(current.get("values", {}) if isinstance(current, dict) else {}),
+                    updated.parameter: updated.proposed_value,
+                }
+                production.update({
+                    "version": int(current.get("version", 0) if isinstance(current, dict) else 0) + 1,
+                    "values": values,
+                    "promoted_at": now.isoformat(),
+                    "candidate_id": candidate_id,
+                    "decision_id": updated.decision_id,
+                    "event_id": updated.event_id,
+                    "order_id": updated.order_id,
+                })
+                return production
+
+            self.store.update_json(
+                "parameters/production.json",
+                {"version": 0, "values": {}},
+                promote,
+            )
             self.store.append_jsonl("parameters/production_history.jsonl", production)
         return updated
 

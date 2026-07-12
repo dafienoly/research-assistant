@@ -8,6 +8,7 @@ import json
 import os
 import tempfile
 import time
+from copy import deepcopy
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -74,6 +75,45 @@ class DecisionLoopStore:
                 if os.path.exists(tmp_name):
                     os.unlink(tmp_name)
         return target
+
+    def update_json(
+        self,
+        name: str,
+        default: Any,
+        mutator: Callable[[Any], Any],
+    ) -> Any:
+        """Atomically apply a read-modify-write mutation under one file lock."""
+        target = self.path(name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with self._lock(target):
+            if not target.exists():
+                current = deepcopy(default)
+            else:
+                try:
+                    current = json.loads(target.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    backup = target.with_suffix(target.suffix + ".bak")
+                    if not backup.exists():
+                        raise
+                    current = json.loads(backup.read_text(encoding="utf-8"))
+            updated = mutator(deepcopy(current))
+            payload = current if updated is None else updated
+            encoded = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, default=str)
+            fd, temporary = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                    stream.write(encoded)
+                    stream.write("\n")
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                if target.exists():
+                    target.with_suffix(target.suffix + ".bak").write_bytes(target.read_bytes())
+                os.replace(temporary, target)
+                self._bump_version(name)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
+            return payload
 
     def append_jsonl(self, name: str, payload: Any) -> Path:
         target = self.path(name)

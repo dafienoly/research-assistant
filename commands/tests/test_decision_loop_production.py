@@ -99,6 +99,21 @@ def test_store_cross_process_style_idempotency_and_corruption_recovery(tmp_path)
     assert store.read_json("state/current.json") == {"value": 1}
 
 
+def test_store_update_json_serializes_concurrent_read_modify_write(tmp_path):
+    store = DecisionLoopStore(tmp_path)
+
+    def increment(_index):
+        store.update_json(
+            "parameters/production.json",
+            {"version": 0, "values": {}},
+            lambda current: {**current, "version": int(current.get("version", 0)) + 1},
+        )
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(increment, range(80)))
+    assert store.read_json("parameters/production.json")["version"] == 80
+
+
 def test_store_does_not_steal_old_but_live_lock(tmp_path):
     store = DecisionLoopStore(tmp_path)
     lock_path = store.path("notifications/outbox-worker").with_suffix(".lock")
