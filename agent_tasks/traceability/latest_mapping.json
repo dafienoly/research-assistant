@@ -1560,8 +1560,19 @@
       ],
       "expected_keywords": ["candidate-", "status in", "production_history.jsonl", "promotion:", "update_json"],
       "behavior": "并发周度决定在 candidate 锁内完成状态迁移和生产版本写入；已晋级/拒绝请求幂等返回，production history 使用 candidate id 去重。"
+    },
+    {
+      "id": "P0-EXECUTION-ORDER-CLAIM-01",
+      "title": "受控执行按订单单飞并阻断重复事件",
+      "code_locations": [
+        {"file": "commands/factor_lab/decision_loop/execution.py", "function": "submit", "line": 53},
+        {"file": "commands/factor_lab/decision_loop/execution.py", "function": "_block_reason", "line": 147},
+        {"file": "commands/tests/test_decision_loop.py", "function": "test_execution_order_claim_blocks_concurrent_duplicate_event", "line": 634}
+      ],
+      "expected_keywords": ["execution/order-", "execution_order_overlap", "duplicate_order_id", "duplicate_event_id", "QMT_LIVE_TRADING_ENABLED"],
+      "behavior": "同一订单使用哈希锁在 broker 调用前单飞；锁竞争、重复订单和已提交事件均 fail-closed，且不同订单不共享全局网络锁。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-12T12:58:40+08:00"
+  "generated_at": "2026-07-12T13:06:35+08:00"
 }

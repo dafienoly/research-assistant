@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 from datetime import datetime
 from typing import Protocol
@@ -57,6 +58,27 @@ class GovernedExecutionGateway:
     def submit(
         self, request: ExecutionRequest, trading_date: str, now: datetime | None = None
     ) -> dict:
+        lock_id = hashlib.sha256(request.order.order_id.encode("utf-8")).hexdigest()[:24]
+        try:
+            with self.store.exclusive(f"execution/order-{lock_id}", timeout=0.5):
+                return self._submit_locked(request, trading_date, now)
+        except TimeoutError:
+            result = {
+                "status": "blocked",
+                "reason": "execution_order_overlap",
+                "payload": {
+                    "order_id": request.order.order_id,
+                    "symbol": request.order.symbol,
+                    "side": request.order.side,
+                    "event_id": request.event_id,
+                },
+            }
+            self._audit(result)
+            return result
+
+    def _submit_locked(
+        self, request: ExecutionRequest, trading_date: str, now: datetime | None
+    ) -> dict:
         auth = self.authorizations.current(trading_date, now)
         if auth and auth.status == "active":
             auth = self.authorizations.validate_runtime(
@@ -110,6 +132,8 @@ class GovernedExecutionGateway:
                 }
             else:
                 response = self.executor.place_order(payload)
+                if not isinstance(response, dict):
+                    response = {"status": "error", "error": "invalid_executor_response"}
                 result = {
                     "status": "submitted"
                     if response.get("status") == "ok"
@@ -173,6 +197,11 @@ class GovernedExecutionGateway:
             for row in submitted
         ):
             return "duplicate_order_id"
+        if request.event_id and any(
+            row.get("payload", {}).get("event_id") == request.event_id
+            for row in submitted
+        ):
+            return "duplicate_event_id"
         executed_amount = sum(
             float(row["payload"].get("quantity", 0))
             * float(row["payload"].get("limit_price", 0))

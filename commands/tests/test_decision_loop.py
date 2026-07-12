@@ -632,6 +632,44 @@ def test_execution_is_fail_closed_without_live_configuration(tmp_path, monkeypat
     assert gateway.submit(request, date, now)["reason"] == "miniqmt_live_not_configured"
 
 
+def test_execution_order_claim_blocks_concurrent_duplicate_event(tmp_path, monkeypatch):
+    gateway, date, now, plan_hash = _active_gateway(tmp_path, monkeypatch)
+    started = Event()
+    release = Event()
+    calls = []
+
+    class SlowExecutor:
+        def place_order(self, payload):
+            calls.append(payload["order_id"])
+            started.set()
+            assert release.wait(timeout=2)
+            return {"status": "ok", "broker_order_id": "slow-1"}
+
+    gateway.executor = SlowExecutor()
+    request = ExecutionRequest(
+        order=planned_order(),
+        event_id="event-dupe",
+        data_mode="executable",
+        audit_passed=True,
+        parameter_version="v1",
+        plan_hash=plan_hash,
+    )
+    outcomes = []
+    first = Thread(target=lambda: outcomes.append(gateway.submit(request, date, now)), daemon=True)
+    first.start()
+    assert started.wait(timeout=2)
+    second = Thread(target=lambda: outcomes.append(gateway.submit(request, date, now)), daemon=True)
+    second.start()
+    second.join(timeout=2)
+    release.set()
+    first.join(timeout=2)
+    assert not first.is_alive() and not second.is_alive()
+    assert len(calls) == 1
+    assert {item["status"] for item in outcomes} == {"submitted", "blocked"}
+    assert any(item.get("reason") == "execution_order_overlap" for item in outcomes)
+    assert gateway.submit(request, date, now)["reason"] == "duplicate_order_id"
+
+
 def test_execution_detects_plan_tampering_and_risk_mode_keeps_only_protective_sell(
     tmp_path, monkeypatch
 ):
