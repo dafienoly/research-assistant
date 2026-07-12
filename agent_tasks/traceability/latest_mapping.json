@@ -1439,6 +1439,16 @@
       ],
       "expected_keywords": ["daily_kline_path", "canonical DataHub", "benchmark_prices", "missing horizons remain null"],
       "behavior": "1/5/20 日收益和基准超额优先使用 DataHub canonical 日线；路径缺失或冲突时保留 null，不使用 provider fallback、目录发现或合成数据。"
+    },
+    {
+      "id": "P0-INTRADAY-SNAPSHOT-FAIL-CLOSED-01",
+      "title": "盘中成交额监测在实时快照缺失时 fail-closed",
+      "code_locations": [
+        {"file": "commands/intraday_monitor.py", "function": "check_volume_anomaly", "line": 1209},
+        {"file": "commands/tests/test_intraday_monitor.py", "function": "test_invalid_snapshot_amount_is_fail_closed", "line": 341}
+      ],
+      "expected_keywords": ["canonical_live_snapshot_unavailable", "canonical_live_snapshot_amount_invalid", "invalid_amount_rows", "read_market_turnover"],
+      "behavior": "实时快照缺失或金额字段全不可解析时返回 MISSING，不把零成交额当作正常市场状态；有效快照再结合 DataHub turnover projection 计算异常。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

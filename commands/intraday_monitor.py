@@ -347,7 +347,6 @@ class Deduplicator:
         """注册事件到冷却表"""
         now = now_str()
         key = self._cooldown_key(event)
-        sector_key = self._sector_key(event)
 
         # 更新或添加冷却记录
         found = False
@@ -505,7 +504,6 @@ class EscalationGate:
         change_pct = abs(event.get("change_pct", 0))
         is_position = event.get("is_position", False)
         is_candidate = event.get("is_candidate", False)
-        is_watchlist = event.get("is_watchlist", False)
         sector_drop_count = event.get("sector_drop_count", 0)
 
         return any([
@@ -612,7 +610,6 @@ class IntradayMonitor:
 
     def classify_event(self, event: dict) -> str:
         """对事件进行 L0-L4 分级"""
-        rule_id = event.get("trigger_rule", "")
         change_pct = abs(event.get("change_pct", 0))
         is_position = event.get("is_position", False)
         is_candidate = event.get("is_candidate", False)
@@ -810,7 +807,7 @@ class IntradayMonitor:
                     level, event.get("alert_type", ""),
                     [symbol], event.get("sector", ""),
                     f"{name} 风险升级",
-                    lines[:3] + [f"** 需要 Codex 复核 **"] + lines[3:],
+                    lines[:3] + ["** 需要 Codex 复核 **"] + lines[3:],
                     codex_escalated=True,
                 )
                 self.gate.consume_budget(event, level)
@@ -941,8 +938,8 @@ def cmd_check_once():
     events = monitor.check_once()
     levels = {}
     for e in events:
-        l = e.get("level", "?")
-        levels[l] = levels.get(l, 0) + 1
+        level_name = e.get("level", "?")
+        levels[level_name] = levels.get(level_name, 0) + 1
     print(f"事件统计: {levels}")
     print(f"总事件: {len(events)}")
 
@@ -1224,11 +1221,26 @@ class LowFreqMonitor:
         }
 
         snapshot = self._load_datahub_snapshot()
-        today_vol = sum(
-            float(row["amount"])
-            for row in snapshot.values()
-            if row.get("amount") is not None
-        )
+        if not snapshot:
+            result["reason"] = "canonical_live_snapshot_unavailable"
+            self.volume_anomaly = result
+            return result
+
+        today_vol = 0.0
+        invalid_amounts = 0
+        for row in snapshot.values():
+            raw_amount = row.get("amount")
+            if raw_amount in (None, ""):
+                continue
+            try:
+                today_vol += float(raw_amount)
+            except (TypeError, ValueError):
+                invalid_amounts += 1
+        if invalid_amounts and today_vol <= 0:
+            result["reason"] = "canonical_live_snapshot_amount_invalid"
+            result["invalid_amount_rows"] = invalid_amounts
+            self.volume_anomaly = result
+            return result
         try:
             history = read_market_turnover()
             avg_20d = float(history.tail(20)["market_amount"].mean())
@@ -1239,6 +1251,7 @@ class LowFreqMonitor:
                     "volume_label": self._fmt_vol(today_vol),
                     "avg_label": self._fmt_vol(0),
                     "reason": str(error),
+                    "invalid_amount_rows": invalid_amounts,
                 }
             )
             self.volume_anomaly = result
@@ -1265,6 +1278,7 @@ class LowFreqMonitor:
             "data_status": "OK",
             "source": "datahub:derived/market_turnover",
             "reason": None,
+            "invalid_amount_rows": invalid_amounts,
         }
         self.volume_anomaly = result
         return result
@@ -1397,8 +1411,8 @@ class LowFreqMonitor:
         for alert in self.etf_alerts:
             if alert["alert_level"] == "严重":
                 msg_lines = [
-                    f"🔴 ETF跳水预警",
-                    f"━━━━━━━━━━━━━━━",
+                    "🔴 ETF跳水预警",
+                    "━━━━━━━━━━━━━━━",
                     f"ETF: {alert['code']} {alert.get('name', '')}",
                     f"跌幅: {alert['change_pct']:.1f}%",
                     f"级别: {alert['alert_level']}",
@@ -1494,7 +1508,7 @@ class LowFreqReport:
         lines.append("=" * 62)
 
         # ETF
-        lines.append(f"\n📉 半导体ETF跳水预警:")
+        lines.append("\n📉 半导体ETF跳水预警:")
         if m.etf_alerts:
             for a in m.etf_alerts:
                 lines.append(f"  {a['code']} {a.get('name','')}: {a['change_pct']:.1f}% [{a['alert_level']}]")
@@ -1503,24 +1517,24 @@ class LowFreqReport:
 
         # U3
         u3 = m.u3_diffusion
-        lines.append(f"\n🏭 U3半导体核心池扩散度:")
+        lines.append("\n🏭 U3半导体核心池扩散度:")
         lines.append(f"  上涨 {u3.get('rising',0)}/{u3.get('total',0)} = {u3.get('ratio_pct',0)}%")
 
         # 情绪
         s = m.sentiment
-        lines.append(f"\n📈 全A情绪:")
+        lines.append("\n📈 全A情绪:")
         lines.append(f"  上涨 {s.get('advance',0)} 下跌 {s.get('decline',0)} "
                      f"比 {s.get('ratio',0):.2f} [{s.get('status','')}]")
 
         # 指数
-        lines.append(f"\n🏛️ 指数风险:")
+        lines.append("\n🏛️ 指数风险:")
         for idx in m.index_risk:
             cp = idx.get('change_pct', 0)
             lines.append(f"  {idx.get('name','')}: {cp:+.1f}% [{idx.get('risk_level','')}]")
 
         # 成交额
         v = m.volume_anomaly
-        lines.append(f"\n💰 成交额:")
+        lines.append("\n💰 成交额:")
         if v.get('today_volume', 0) > 0:
             lines.append(f"  今日 {v.get('volume_label','--')} | "
                          f"20日均 {v.get('avg_label','--')} | "

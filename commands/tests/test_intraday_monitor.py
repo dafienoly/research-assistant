@@ -15,11 +15,10 @@ V4.11 盘中低频监测引擎 — 单元测试
 
 from __future__ import annotations
 
-import json
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import patch
 
 import pytest
 import pandas as pd
@@ -32,17 +31,11 @@ if str(BASE) not in sys.path:
 CST = timezone(timedelta(hours=8))
 
 # ─── 被测试模块 ──────────────────────────────────────────────────────────
-from intraday_monitor import (
+from intraday_monitor import (  # noqa: E402
     LowFreqMonitor,
     LowFreqReport,
     ETF_DIVE_WATCH_CODES,
     INDEX_WATCH_CODES,
-    U3_SEMICONDUCTOR_FALLBACK_CODES,
-    VOLUME_ANOMALY_THRESHOLD_PCT,
-    IntradayMonitor,
-    PriceDropRule,
-    PriceSurgeRule,
-    DataStaleRule,
     Deduplicator,
 )
 
@@ -335,6 +328,14 @@ class TestCheckVolumeAnomaly:
         assert result["today_volume"] == 0.0
         assert result["alert"] is False
         assert result["data_status"] == "MISSING"
+        assert result["reason"] == "canonical_live_snapshot_unavailable"
+
+    def test_invalid_snapshot_amount_is_fail_closed(self, monitor):
+        monitor.market_snapshot = {"600001": _fake_quote("600001", amount="not-a-number")}
+        result = monitor.check_volume_anomaly()
+        assert result["data_status"] == "MISSING"
+        assert result["reason"] == "canonical_live_snapshot_amount_invalid"
+        assert result["invalid_amount_rows"] == 1
 
     def test_with_quotes_amount(self, monitor):
         monitor.market_snapshot = {
