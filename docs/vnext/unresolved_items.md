@@ -15,6 +15,7 @@
 - `factor:mine`/注册、策略报告、行业轮动与行业排名的无输入随机演示路径已在真实 CLI 分发顺序上阻断；策略报告支持显式真实收益 CSV。`factor_commands` 与 `hermes_cli` 仍存在重复 command registry 和不可达旧代码，需物理合并后才能消除维护漂移。
 - 自动 Research Skill 的 strategy-report/factor-mining/sector-rotation 也已 fail-closed，demo 参数不能再生成“completed”结果。真实 handler 尚需接入 DataHub snapshot、manifest SHA、universe version、forward return 与行业映射；旧随机实现目前不可达但仍应在重建时物理删除。
 - 已退役的 research:loop/AutoResearchLoop 公共启动函数现统一 BLOCKED，不再评估、入队或注册自动候选。`research_loop.py` 与同名 package 的双实现仍需物理合并；历史类不可作为恢复自动 Agent 开发系统的依据。
+- Live Readiness 的 Paper 状态缺失函数和 Benchmark 错误导入已修复：真实 Paper 权益为 21 日，六个 canonical benchmark 均可用，基础 13 门禁现为 12 pass/1 blocker/0 warning。当前运行进程未注入 Telegram token/chat ID，因此双通道通知仍阻断；不得从 `.bashrc` 隐式加载。
 - 行级完整性审计当前为 OK（活跃 5,530 文件、0 问题行）；曾污染的 3 个文件已从最早干净 D 盘快照恢复，污染原件保留在 `quarantine_polluted_market_20260712_0134`。该事件说明备份恢复已生效，但恢复后的连续每日门禁仍需观察。
 - 监管公告 ingestion 与覆盖感知门禁已实现并安装 08:57 cron。真实 smoke 曾发现 CNINFO 缺 orgId 时返回全市场公告，原“30 条”证据已撤销；现按上游 `secCode` 验证并二阶段使用 `688012,orgId` 拉取，得到 1 条证券专属公告、覆盖 `OK`。该证据仅证明 688012，不代表全市场覆盖。
 - Antifragile Review 缺 realized Regime/Semi/Style 标签、滚动模型衰减历史及连续 Paper/Shadow 权益曲线，因此相关六项指标为 null。

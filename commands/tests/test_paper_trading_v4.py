@@ -28,11 +28,34 @@ _commands_dir = os.path.dirname(_test_dir)  # commands/
 if _commands_dir not in sys.path:
     sys.path.insert(0, _commands_dir)
 
-from factor_lab.paper.standing_paper_trading import PaperTradingV4
+from factor_lab.paper.standing_paper_trading import (
+    PaperTradingV4,
+    get_paper_trading_status,
+)
 from factor_lab.paper.shadow_trading import ShadowTradingEngine
 
 CST = timezone(timedelta(hours=8))
 BASE = Path(_commands_dir)
+
+
+def test_paper_trading_status_reads_real_equity_history(tmp_path: Path) -> None:
+    pd.DataFrame({
+        "date": pd.date_range("2026-06-01", periods=20, freq="B"),
+        "total_value": [100_000 + i * 100 for i in range(20)],
+    }).to_csv(tmp_path / "equity.csv", index=False)
+
+    status = get_paper_trading_status(tmp_path)
+
+    assert status["status"] == "OK"
+    assert status["trading_days"] == 20
+    assert status["total_return_pct"] == pytest.approx(1.9)
+
+
+def test_paper_trading_status_missing_is_fail_visible(tmp_path: Path) -> None:
+    status = get_paper_trading_status(tmp_path)
+
+    assert status["status"] == "MISSING"
+    assert status["trading_days"] == 0
 
 
 # ── 辅助: 生成 20 个模拟交易日 ──────────────────────────────────────────

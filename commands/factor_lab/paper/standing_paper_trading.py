@@ -273,6 +273,69 @@ class StandingPaperTrading:
         }
 
 
+def get_paper_trading_status(state_dir: Optional[Path] = None) -> dict[str, Any]:
+    """只读汇总持续 Paper 权益，不创建状态或用样例数据兜底。"""
+    root = state_dir or Path(
+        os.environ.get("HERMES_PAPER_TRADING_DIR", str(StandingPaperTrading.STATE_DIR))
+    )
+    equity_path = root / "equity.csv"
+    empty = {
+        "trading_days": 0,
+        "total_return_pct": 0.0,
+        "sharpe": 0.0,
+        "max_drawdown_pct": 0.0,
+        "source": str(equity_path),
+    }
+    if not equity_path.is_file():
+        return {**empty, "status": "MISSING", "reason": "paper equity history missing"}
+
+    try:
+        frame = pd.read_csv(equity_path)
+    except Exception as exc:
+        return {
+            **empty,
+            "status": "INVALID",
+            "reason": f"paper equity unreadable: {exc}",
+        }
+
+    if not {"date", "total_value"}.issubset(frame.columns):
+        return {
+            **empty,
+            "status": "INVALID",
+            "reason": "paper equity schema missing date/total_value",
+        }
+
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    frame["total_value"] = pd.to_numeric(frame["total_value"], errors="coerce")
+    frame = frame.dropna(subset=["date", "total_value"]).sort_values("date")
+    frame = frame.drop_duplicates(subset=["date"], keep="last")
+    if frame.empty or (frame["total_value"] <= 0).any():
+        return {
+            **empty,
+            "status": "INVALID",
+            "reason": "paper equity contains no valid positive observations",
+        }
+
+    values = frame["total_value"].astype(float)
+    returns = values.pct_change().dropna()
+    total_return = float(values.iloc[-1] / values.iloc[0] - 1.0)
+    volatility = float(returns.std(ddof=1)) if len(returns) >= 2 else 0.0
+    sharpe = (
+        float(returns.mean() / volatility * np.sqrt(252))
+        if volatility > 0 else 0.0
+    )
+    drawdown = values / values.cummax() - 1.0
+    return {
+        "status": "OK",
+        "trading_days": int(frame["date"].nunique()),
+        "total_return_pct": round(total_return * 100, 6),
+        "sharpe": round(sharpe, 6),
+        "max_drawdown_pct": round(float(drawdown.min()) * 100, 6),
+        "source": str(equity_path),
+        "as_of": frame["date"].iloc[-1].isoformat(),
+    }
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # V4.8 PaperTradingV4 — Enhanced Paper / Shadow Trading Engine
 # ═══════════════════════════════════════════════════════════════════════════════

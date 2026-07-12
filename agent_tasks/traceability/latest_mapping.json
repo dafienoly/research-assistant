@@ -1292,8 +1292,19 @@
       ],
       "expected_keywords": ["自动 Agent 开发系统已退役", "不会评估、入队或注册候选", "BLOCKED"],
       "behavior": "所有公开自动研究启动函数只返回阻断状态，不实例化旧循环，也不向候选队列或 Alpha Registry 写入。"
+    },
+    {
+      "id": "P0-LIVE-READINESS-CONTRACT-01",
+      "title": "Paper 与 Benchmark Readiness 使用真实可读状态",
+      "code_locations": [
+        {"file": "commands/factor_lab/paper/standing_paper_trading.py", "function": "get_paper_trading_status", "line": 276},
+        {"file": "commands/live_readiness.py", "function": "check_benchmark", "line": 285},
+        {"file": "commands/live_readiness.py", "function": "check_paper_trading", "line": 530}
+      ],
+      "expected_keywords": ["paper equity history missing", "available_days", "基准体系缺少可验证收益序列", "get_paper_trading_status"],
+      "behavior": "Paper gate 只读并验证真实权益历史；Benchmark gate 检查六个 canonical projection 的实际可用天数，缺失或损坏 fail-closed。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-12T10:00:00+08:00"
+  "generated_at": "2026-07-12T10:20:00+08:00"
 }

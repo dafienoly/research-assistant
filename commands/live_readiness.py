@@ -282,21 +282,29 @@ class LiveReadinessChecker:
 
         try:
             sys.path.insert(0, str(BASE))
-            from benchmarks_v4 import list_benchmarks, get_benchmark
+            from benchmarks_v4 import list_benchmarks
 
             benchmarks = list_benchmarks()
             evidence_parts.append(f"基准体系: {len(benchmarks)} 个基准")
+            unavailable = []
+            for benchmark in benchmarks:
+                name = benchmark.get("name", "unknown")
+                days = int(benchmark.get("available_days", 0) or 0)
+                evidence_parts.append(
+                    f"  {name}: {days} 行, {benchmark.get('date_range', 'N/A')}"
+                )
+                if days <= 0:
+                    unavailable.append(name)
 
-            for bm in benchmarks:
-                try:
-                    data = get_benchmark(bm)
-                    evidence_parts.append(f"  {bm}: {len(data)} 行")
-                except Exception:
-                    evidence_parts.append(f"  {bm}: 不可用")
-
-            gate.passed = True
-            gate.message = f"基准体系正常 ({len(benchmarks)} 个基准)"
-            gate.fix_suggestion = ""
+            gate.passed = len(benchmarks) >= 6 and not unavailable
+            if gate.passed:
+                gate.severity = "info"
+                gate.message = f"基准体系正常 ({len(benchmarks)} 个真实基准)"
+                gate.fix_suggestion = ""
+            else:
+                gate.severity = "blocker"
+                gate.message = "基准体系缺少可验证收益序列"
+                gate.fix_suggestion = "通过 DataHub 重新生成 benchmark projections"
 
         except ImportError as e:
             evidence_parts.append(f"benchmarks_v4 模块导入失败: {e}")
