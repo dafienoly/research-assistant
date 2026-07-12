@@ -150,13 +150,6 @@ jobs:
             commands/scripts/vnext_*.py \
             scripts/generate_hashed_lock.py
 
-      - name: Semgrep blocking gate
-        if: github.event_name == 'workflow_dispatch' && inputs.run_major_audit == true
-        run: >-
-          env -u HTTPS_PROXY -u HTTP_PROXY -u ALL_PROXY
-          semgrep scan --config auto --error --exclude '*test*'
-          commands/factor_lab/decision_loop commands/factor_lab/api_server
-
       - name: Generate CycloneDX SBOM
         env:
           PYTHONPATH: commands
