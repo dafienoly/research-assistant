@@ -807,9 +807,22 @@ def test_benchmark_match_returns_null_without_evidence():
         {"600000.SH": {"benchmark": "512480.SH", "source": "exchange"}}, {}
     )
     assert complete.match_instrument("600000.SH", "stock").primary == "512480.SH"
-    assert BenchmarkMatcher.match_portfolio(
-        {"512480.SH": 0.7, "000300.SH": 0.3}, {"512480.SH"}
-    ) == {"components": {"512480.SH": 1.0}, "method": "tradable_exposure_matched"}
+    mapped = BenchmarkMatcher.match_portfolio(
+        {"600000.SH": 0.7, "000300.SH": 0.3},
+        {"600000.SH", "000300.SH"},
+        tradable_benchmarks={"512480.SH"},
+        instrument_types={"600000.SH": "stock", "000300.SH": "stock"},
+        matcher=complete,
+    )
+    assert mapped["components"] == {"512480.SH": 1.0}
+    assert mapped["unmapped"]["000300.SH"]
+    missing = BenchmarkMatcher.match_portfolio(
+        {"512480.SH": 0.7, "000300.SH": 0.3},
+        {"512480.SH", "000300.SH"},
+        matcher=BenchmarkMatcher({}, {}),
+    )
+    assert missing["components"] is None
+    assert "512480.SH" in missing["unmapped"]
 
 
 def test_review_metrics_and_missing_benchmark_are_honest():

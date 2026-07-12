@@ -149,6 +149,8 @@ class BenchmarkBody(Body):
 class PortfolioBenchmarkBody(Body):
     exposure_weights: dict[str, float]
     tradable: list[str]
+    tradable_benchmarks: list[str] = Field(default_factory=list)
+    instrument_types: dict[str, Literal["stock", "etf"]] = Field(default_factory=dict)
 
 
 def _service() -> DecisionLoopService:
@@ -406,7 +408,14 @@ async def match_benchmark(body: BenchmarkBody, request: Request):
 
 @router.post("/benchmarks/portfolio")
 async def match_portfolio_benchmark(body: PortfolioBenchmarkBody, request: Request):
-    result = BenchmarkMatcher.match_portfolio(body.exposure_weights, set(body.tradable))
+    matcher = BenchmarkMatcher.from_durable_registry()
+    result = BenchmarkMatcher.match_portfolio(
+        body.exposure_weights,
+        set(body.tradable),
+        tradable_benchmarks=set(body.tradable_benchmarks) if body.tradable_benchmarks else None,
+        instrument_types=body.instrument_types,
+        matcher=matcher,
+    )
     return api_success(
         data=result or {"components": None, "reason": "no reliable tradable exposure mapping"},
         request=request,

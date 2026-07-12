@@ -96,19 +96,71 @@ class BenchmarkMatcher:
             row["source"],
         )
 
-    @staticmethod
+    @classmethod
     def match_portfolio(
-        exposure_weights: dict[str, float], tradable: set[str]
+        cls,
+        exposure_weights: dict[str, float],
+        tradable: set[str],
+        *,
+        tradable_benchmarks: set[str] | None = None,
+        instrument_types: dict[str, str] | None = None,
+        matcher: "BenchmarkMatcher" | None = None,
     ) -> dict | None:
-        usable = {
-            symbol: weight
-            for symbol, weight in exposure_weights.items()
-            if symbol in tradable and weight > 0
-        }
-        total = sum(usable.values())
-        if total <= 0:
+        """Map actual exposure to a verifiable, tradable mixed benchmark.
+
+        ``tradable`` describes which exposure symbols are eligible for the
+        portfolio.  ``tradable_benchmarks`` optionally narrows the benchmark
+        instruments that can be traded; for backwards compatibility it falls
+        back to ``tradable`` when omitted.  An unmapped exposure is retained
+        in ``unmapped`` with its reason and never silently becomes its own
+        benchmark.
+        """
+        if not exposure_weights:
             return None
-        return {
-            "components": {symbol: weight / total for symbol, weight in usable.items()},
-            "method": "tradable_exposure_matched",
+        active_matcher = matcher or cls.from_durable_registry()
+        benchmark_universe = set(tradable_benchmarks or tradable)
+        instrument_types = instrument_types or {}
+        components: dict[str, float] = {}
+        evidence: dict[str, str] = {}
+        unmapped: dict[str, str] = {}
+
+        for raw_symbol, raw_weight in exposure_weights.items():
+            symbol = str(raw_symbol).strip().upper()
+            try:
+                weight = float(raw_weight)
+            except (TypeError, ValueError):
+                continue
+            if symbol not in tradable or weight <= 0:
+                continue
+            instrument_type = instrument_types.get(symbol) or cls._infer_instrument_type(symbol)
+            match = active_matcher.match_instrument(symbol, instrument_type)
+            candidates = [item for item in [match.primary, *match.secondary] if item]
+            selected = next((item for item in candidates if item in benchmark_universe), None)
+            if not selected:
+                unmapped[symbol] = match.reason or "没有可交易的可靠基准映射"
+                continue
+            components[selected] = components.get(selected, 0.0) + weight
+            if match.evidence_source:
+                evidence[selected] = match.evidence_source
+
+        total = sum(components.values())
+        if total <= 0:
+            return {
+                "components": None,
+                "method": "dynamic_exposure_mapped",
+                "reason": "没有可交易的可靠基准映射",
+                "unmapped": unmapped,
+            }
+        result = {
+            "components": {symbol: round(weight / total, 8) for symbol, weight in components.items()},
+            "method": "dynamic_exposure_mapped",
+            "mapping_evidence": evidence,
         }
+        if unmapped:
+            result["unmapped"] = unmapped
+        return result
+
+    @staticmethod
+    def _infer_instrument_type(symbol: str) -> str:
+        code = symbol.split(".", 1)[0]
+        return "etf" if code.startswith(("15", "16", "50", "51", "52", "56", "58")) else "stock"

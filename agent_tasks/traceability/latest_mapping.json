@@ -1538,6 +1538,17 @@
       ],
       "expected_keywords": ["coverage.json", "factor_input_projection.json", "EXPLICIT_MANIFESTS", "datahub:audit/health", "cmd_data_coverage", "daily_kline_index"],
       "behavior": "状态 API 和生产 cron 不再扫描 CSV 或调用第二套 data_audit；只读取 DataHub 已生成的覆盖率、新鲜度、缺口、完整性和投影 manifest。"
+    },
+    {
+      "id": "P1-DYNAMIC-PORTFOLIO-BENCHMARK-01",
+      "title": "组合按实际暴露生成可交易混合基准并解释缺失映射",
+      "code_locations": [
+        {"file": "commands/factor_lab/decision_loop/benchmark.py", "function": "match_portfolio", "line": 101},
+        {"file": "commands/factor_lab/api_server/routes_decision_loop.py", "function": "match_portfolio_benchmark", "line": 411},
+        {"file": "commands/tests/test_decision_loop.py", "function": "test_benchmark_match_returns_null_without_evidence", "line": 803}
+      ],
+      "expected_keywords": ["tradable_benchmarks", "dynamic_exposure_mapped", "unmapped", "mapping_evidence", "no reliable tradable"],
+      "behavior": "组合不再直接复制持仓代码作为基准；只接受可靠且可交易的映射，按暴露归一化混合权重，无法映射时保留 null 和逐标的原因。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
