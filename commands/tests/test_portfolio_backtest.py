@@ -471,6 +471,10 @@ class TestMetrics:
 # ═══════════════════════════════════════════════════════════════
 
 class TestPortfolioBacktestEngine:
+    def test_real_benchmark_is_default(self, portfolio_spec):
+        engine = PortfolioBacktestEngine(portfolio_spec)
+        assert engine.run.__func__.__defaults__ == (None, False)
+
     def test_create(self, portfolio_spec):
         engine = PortfolioBacktestEngine(portfolio_spec)
         assert engine.spec.name == "测试组合"

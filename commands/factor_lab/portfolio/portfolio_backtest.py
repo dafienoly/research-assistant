@@ -88,7 +88,7 @@ class PortfolioBacktestEngine:
     def run(
         self,
         benchmark_spec: Optional[BenchmarkSpec] = None,
-        synthetic_benchmark: bool = True,
+        synthetic_benchmark: bool = False,
     ) -> PortfolioResult:
         """执行组合回测
 
@@ -102,7 +102,7 @@ class PortfolioBacktestEngine:
 
         Args:
             benchmark_spec: 基准规格 (None = 不对比基准)
-            synthetic_benchmark: 是否使用 synthetic 基准 (无真实数据时)
+            synthetic_benchmark: 是否显式使用 synthetic 测试基准；默认读取真实数据
 
         Returns:
             PortfolioResult 包含完整回测结果

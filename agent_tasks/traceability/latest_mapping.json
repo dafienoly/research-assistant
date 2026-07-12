@@ -1249,8 +1249,17 @@
       ],
       "expected_keywords": ["DataHub", "缺少 --signal-file", "factor_signals 必须显式提供", "禁止使用随机或内置兜底信号"],
       "behavior": "未接 canonical runner 时不写固定信号；组合构建必须输入真实信号文件；Paper/Shadow 缺少显式信号即 fail-closed，历史产物保留但不进入执行链。"
+    },
+    {
+      "id": "INFRA-BENCHMARK-TRUTH-01",
+      "title": "组合回测默认使用真实基准",
+      "code_locations": [
+        {"file": "commands/factor_lab/portfolio/portfolio_backtest.py", "function": "run", "line": 87}
+      ],
+      "expected_keywords": ["synthetic_benchmark: bool = False", "method=\"synthetic\" if synthetic_benchmark else \"api\"", "基准加载失败"],
+      "behavior": "组合回测默认读取真实基准；合成基准只允许调用方在隔离测试中显式开启，真实数据失败时 warning 且不制造基准收益。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-12T08:15:00+08:00"
+  "generated_at": "2026-07-12T09:10:00+08:00"
 }

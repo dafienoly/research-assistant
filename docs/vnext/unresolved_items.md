@@ -11,6 +11,7 @@
 - Legacy Backtest Lab 的随机指标/NAV/交易生成器已退役，提交现在 fail-visible 并指向 VNext 已验证回测产物；若恢复交互式提交，必须接入 canonical universe、用户日期、真实成本、Event Truth 和 OOS runner，不能复用旧硬编码 CLI。
 - Live Readiness API 已接真实 13 门禁并补 QMT/确认持仓/当日授权/三阶段认证四项硬阻断；Portfolio latest 已接 VNext cost-aware artifact，Theme history 已接 DataHub SHA 等权投影。Portfolio run 与 Theme status/subsector 的完整交互能力在 governed runner/canonical projection 接入前继续 fail-visible。
 - Strategy Lab 固定个股信号及 Portfolio Builder 随机/内置兜底信号已物理删除；Paper/Shadow 也禁止缺省信号。正式 strategy signal runner 尚未接入 DataHub snapshot/manifest/universe/version，因此对应 latest 命令保持明确阻断。历史 `data/portfolio` 产物保留但视为未验证，不进入执行链。
+- 组合回测的 synthetic benchmark 已从默认路径移除，仅允许测试显式开启；真实基准不可用时结果保持无基准并携带 warning。`benchmark.py` 内部合成生成器仍为测试兼容代码，后续可迁移到 tests fixture 后彻底删除。
 - 行级完整性审计当前为 OK（活跃 5,530 文件、0 问题行）；曾污染的 3 个文件已从最早干净 D 盘快照恢复，污染原件保留在 `quarantine_polluted_market_20260712_0134`。该事件说明备份恢复已生效，但恢复后的连续每日门禁仍需观察。
 - 监管公告 ingestion 与覆盖感知门禁已实现并安装 08:57 cron。真实 smoke 曾发现 CNINFO 缺 orgId 时返回全市场公告，原“30 条”证据已撤销；现按上游 `secCode` 验证并二阶段使用 `688012,orgId` 拉取，得到 1 条证券专属公告、覆盖 `OK`。该证据仅证明 688012，不代表全市场覆盖。
 - Antifragile Review 缺 realized Regime/Semi/Style 标签、滚动模型衰减历史及连续 Paper/Shadow 权益曲线，因此相关六项指标为 null。
