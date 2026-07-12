@@ -214,3 +214,7 @@ Core 已有 `--require-hashes`，但隔离 vectorbt 环境仍从 plain exact-pin
 ## 因子失败归因 DataHub 边界
 
 `alpha/failure_db.py` 正常使用 canonical benchmark，但在 benchmark 模块导入失败时会改走 `mx_data.get_index_daily` 直接联网，形成异常路径的第二套数据实现。该 fallback 已物理删除：canonical benchmark 不可用时 regime 诚实返回 `unknown`。Provider boundary 架构测试现把 `mx_data` 与 Tushare/AkShare/Baostock/JQData 同等视为下游禁止导入的 provider wrapper。
+
+## Events API 真实性与 DataHub lineage
+
+`GET /api/events` 原来在每次请求中构造固定的虚假指数涨幅、波动率、卖单、资金流和 provider 超时，并盖上当前时间；返回 schema 也与 Events 前端所需的公司事件字段不一致。现列表与新增详情接口只读 canonical `normalized/events/corporate_events`：要求 manifest `COMPLETE`，逐分区验证 SHA-256 和 schema，再从真实 payload 生成稳定 event ID、类型、方向、标题、观测时间和 `partition#sha256` 来源引用。真实烟测验证 166 个分区并返回 3,910 条事件；forecast 上游缺失时不生成业绩预告。没有已验证事件时返回空列表，事件后收益在尚无权威计算结果时保持空数组。

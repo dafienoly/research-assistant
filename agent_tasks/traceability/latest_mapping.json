@@ -1204,6 +1204,17 @@
       ],
       "expected_keywords": ["get_benchmark_returns", "make_benchmark_spec", "mx_data", "provider SDK outside DataHub boundary"],
       "behavior": "失败归因只读 canonical benchmark；模块不可用返回 unknown，不通过 mx_data 自行联网。架构测试阻止 provider wrapper 再进入下游。"
+    },
+    {
+      "id": "INFRA-EVENTS-API-TRUTH-01",
+      "title": "Events API 只返回可验证公司事件",
+      "code_locations": [
+        {"file": "commands/factor_lab/datahub_access.py", "function": "read_corporate_event_records", "line": 310},
+        {"file": "commands/factor_lab/api_server/routes_events.py", "function": "list_events", "line": 110},
+        {"file": "commands/factor_lab/api_server/routes_events.py", "function": "event_detail", "line": 150}
+      ],
+      "expected_keywords": ["partition_sha256", "run_status", "hash mismatch", "factor_performance", "canonical corporate events unavailable"],
+      "behavior": "API 验证 manifest 完成状态、分区 SHA 与 schema 后返回真实 payload 派生事件；无数据返回空列表，未计算的事件收益保持空，固定伪事件已删除。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

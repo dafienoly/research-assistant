@@ -7,6 +7,7 @@
 - 数据审计仍为 `PARTIAL`：按 U0 代码集合核对，资金流匹配 5,401/5,530、缺 129，财务匹配 5,528/5,530、缺 2；精确补拉对这些代码得到上游空结果。概念 409/380、行业 511/80 已为 OK；三份产业链/主题标签已从受版本控制语义和 canonical `stock_basic` 原子生成，不再缺失。当前唯一 data-gap 报告为已验证空的 preopen policy event，影响级别 minor。
 - Canonical DataHub 核心新鲜度已为 OK：活跃股票 5,530/5,530，5,526 只最新至 2026-07-10，另 4 只由官方 `suspend_d` 解释；正式 ML 和 Shadow 数据门禁为 OK。生产 BUY OrderDraft 仍因资金流/财务/标签辅助缺口保持 BLOCKED，保护性 SELL 数据门禁为 OK。
 - 市场 Event Truth 已真实拉取 13 个指数/ETF 代理，覆盖 `stk_limit`、`suspend_d`、现金分红和复权因子；公司事件已完成 166 个有效 U3 A 股标的，holdertrade 892、repurchase 493、share_float 1,412、dividend 5,363。forecast 网关持续返回非 JSON，累计三次后熔断，因此公司事件保持 `PARTIAL`，不得宣称完整。
+- Events API 已删除固定虚假行情/卖单/资金流事件，逐分区验证公司事件 manifest SHA 后返回真实列表和详情；事件因子 1/5/20 日表现尚无权威产物，继续返回空数组而非估算值。
 - 行级完整性审计当前为 OK（活跃 5,530 文件、0 问题行）；曾污染的 3 个文件已从最早干净 D 盘快照恢复，污染原件保留在 `quarantine_polluted_market_20260712_0134`。该事件说明备份恢复已生效，但恢复后的连续每日门禁仍需观察。
 - 监管公告 ingestion 与覆盖感知门禁已实现并安装 08:57 cron。真实 smoke 曾发现 CNINFO 缺 orgId 时返回全市场公告，原“30 条”证据已撤销；现按上游 `secCode` 验证并二阶段使用 `688012,orgId` 拉取，得到 1 条证券专属公告、覆盖 `OK`。该证据仅证明 688012，不代表全市场覆盖。
 - Antifragile Review 缺 realized Regime/Semi/Style 标签、滚动模型衰减历史及连续 Paper/Shadow 权益曲线，因此相关六项指标为 null。

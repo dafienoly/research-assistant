@@ -23,6 +23,7 @@ SHARED_DATAHUB_ROOT = Path(
 )
 LIVE_SNAPSHOT_PATH = SHARED_DATAHUB_ROOT / "market" / "live_snapshot.csv"
 MARKET_TURNOVER_PATH = DATAHUB_ROOT / "derived" / "market_turnover" / "daily.csv"
+CORPORATE_EVENTS_ROOT = DATAHUB_ROOT / "events" / "corporate_events"
 
 
 def _optional_number(value: object) -> float | None:
@@ -305,6 +306,53 @@ def read_live_snapshot(
             "manifest_sha256": expected_hash,
         }
     return result
+
+
+def read_corporate_event_records(root: Path | None = None) -> list[dict]:
+    """Read hash-verified canonical corporate-event partitions."""
+    source_root = root or CORPORATE_EVENTS_ROOT
+    manifest_path = source_root / "manifest.json"
+    if not source_root.is_dir() or not manifest_path.is_file():
+        raise FileNotFoundError("canonical corporate-events dataset or manifest missing")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("run_status") != "COMPLETE" or manifest.get("status") not in {"OK", "PARTIAL"}:
+        raise ValueError("canonical corporate-events manifest is not complete")
+    results = manifest.get("results")
+    if not isinstance(results, list):
+        raise ValueError("canonical corporate-events manifest has no partition results")
+
+    records: list[dict] = []
+    required = {"ts_code", "event_dataset", "event_date", "payload", "source_provider", "observed_at"}
+    for result in results:
+        if not isinstance(result, dict) or not result.get("path") or not result.get("sha256"):
+            continue
+        path = (source_root / str(result["path"])).resolve()
+        if source_root.resolve() not in path.parents or not path.is_file():
+            raise ValueError(f"canonical corporate-events partition missing: {result.get('path')}")
+        actual_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+        if actual_hash != str(result["sha256"]):
+            raise ValueError(f"canonical corporate-events hash mismatch: {path.name}")
+        frame = pd.read_csv(path, encoding="utf-8-sig", dtype="string", low_memory=False)
+        if not required.issubset(frame.columns):
+            raise ValueError(f"canonical corporate-events schema mismatch: {path.name}")
+        for row in frame.to_dict(orient="records"):
+            try:
+                payload = json.loads(str(row["payload"]))
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            if not isinstance(payload, dict):
+                continue
+            records.append(
+                {
+                    **row,
+                    "payload": payload,
+                    "partition": path.name,
+                    "partition_sha256": actual_hash,
+                    "manifest_status": manifest["status"],
+                    "manifest_generated_at": manifest.get("generated_at"),
+                }
+            )
+    return records
 
 
 def daily_kline_root() -> Path:

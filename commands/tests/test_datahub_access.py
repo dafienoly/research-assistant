@@ -20,6 +20,35 @@ from factor_lab.datahub_access import (
 )
 
 
+def test_corporate_events_reader_verifies_partition_hash(tmp_path):
+    from factor_lab.datahub_access import read_corporate_event_records
+
+    root = tmp_path / "corporate_events"
+    root.mkdir()
+    partition = root / "688012.SH.csv"
+    partition.write_text(
+        'ts_code,event_dataset,event_date,payload,source_provider,observed_at\n'
+        '688012.SH,repurchase,20260710,"{""ann_date"":""20260710""}",tushare,2026-07-10T18:00:00+08:00\n',
+        encoding="utf-8",
+    )
+    digest = hashlib.sha256(partition.read_bytes()).hexdigest()
+    (root / "manifest.json").write_text(
+        json.dumps({
+            "status": "PARTIAL", "run_status": "COMPLETE", "generated_at": "2026-07-10T18:00:00+08:00",
+            "results": [{"path": partition.name, "sha256": digest, "status": "PARTIAL"}],
+        }),
+        encoding="utf-8",
+    )
+
+    records = read_corporate_event_records(root)
+    assert records[0]["payload"]["ann_date"] == "20260710"
+    assert records[0]["partition_sha256"] == digest
+
+    partition.write_text(partition.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="hash mismatch"):
+        read_corporate_event_records(root)
+
+
 def write_calendar(tmp_path):
     path = tmp_path / "trade_calendar.csv"
     pd.DataFrame(
