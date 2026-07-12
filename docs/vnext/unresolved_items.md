@@ -31,3 +31,4 @@
 - 全市场成交额不再调用业务层 `mx.py` 或合成 20 日均；canonical `derived/market_turnover` 已生成 60 日、5,738 源分区、CNY 单位和 SHA manifest。该投影需要随每日 DataHub DAG 连续观察，缺失/过期时盘中成交额结论保持 MISSING。
 - Decision Loop JSONL 已使用不可抢占 `flock`、坏行 quarantine 和关联通知归档；仍需在真实积压、进程强杀和跨日恢复下持续观察。Alpha Registry 旧 D 盘 JSON 多写者尚未完全迁移到同一 CAS/单写入服务。
 - Alpha Registry、人工确认、pending 与 Shadow 的主要 JSON 读改写已统一到 `flock + atomic replace + fsync`；Promotion Engine 的独立 queue/history 仍需继续并发收口。测试隔离复核新增的两个 disabled Alpha 已登记保留，未自动删除。
+- VNext 健康页面已改为只读取 canonical coverage/freshness/integrity 与 data audit，不再扫描目录或按 provider 名称猜健康；实时快照强制 manifest/hash 校验。真实连续运行仍需观察审计生成任务与页面状态更新时间是否一致。

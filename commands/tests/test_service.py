@@ -1,5 +1,4 @@
-import os
-from datetime import datetime
+import json
 
 from factor_lab.vnext.service import VNextService
 
@@ -11,46 +10,65 @@ def test_service_missing_component_is_explicit(tmp_path):
     assert result["missing_evidence"]
 
 
-def test_data_health_does_not_count_valuation_files_as_daily(tmp_path):
-    market = tmp_path / "data" / "normalized" / "market"
-    market.mkdir(parents=True)
-    (market / "600000.SH.csv").write_text("trade_date,close\n20260710,10\n", encoding="utf-8")
-    (market / "valuation_600000.SH.csv").write_text("trade_date,pe\n20260710,10\n", encoding="utf-8")
+def _write_audit(tmp_path, relative_path, payload):
+    path = tmp_path / relative_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def test_data_health_reads_only_canonical_audit_artifacts(tmp_path):
+    generated_at = "2026-07-10T15:30:00+08:00"
+    _write_audit(
+        tmp_path,
+        "data/audit/health/coverage.json",
+        {"generated_at": generated_at, "universe_status": "OK", "stocks_with_data": 5530, "active_missing_files": 0},
+    )
+    _write_audit(
+        tmp_path,
+        "data/audit/health/freshness.json",
+        {"generated_at": generated_at, "status": "OK", "blocking_stock_count": 0},
+    )
+    _write_audit(
+        tmp_path,
+        "data/audit/health/integrity.json",
+        {"generated_at": generated_at, "status": "OK", "files_checked": 5530, "problematic_file_count": 0},
+    )
+    _write_audit(
+        tmp_path,
+        "artifacts/vnext/data_audit_report.json",
+        {"generated_at": generated_at, "status": "PARTIAL", "data_gap_status": "PARTIAL", "order_draft_status": "BLOCKED"},
+    )
     service = VNextService(project_root=tmp_path, artifact_root=tmp_path / "artifacts")
     result = service.build_data_health("2026-07-10")
-    daily = next(item for item in result["sources"] if item["source"] == "Tushare日线")
-    valuation = next(item for item in result["sources"] if item["source"] == "Tushare估值")
-    assert daily["records_or_files"] == 1
-    assert valuation["records_or_files"] == 1
-    assert valuation["coverage_ratio"] == 1.0
+    assert result["status"] == "PARTIAL"
+    assert [item["source"] for item in result["sources"]] == [
+        "datahub:coverage", "datahub:freshness", "datahub:integrity", "vnext:data-audit"
+    ]
+    coverage = result["sources"][0]
+    assert coverage["status"] == "OK"
+    assert coverage["evidence"]["stocks_with_data"] == 5530
+    assert result["sources"][-1]["evidence"]["order_draft_status"] == "BLOCKED"
 
 
-def test_data_health_marks_incomplete_directory_coverage_partial(tmp_path):
-    market = tmp_path / "data" / "normalized" / "market"
-    flow = tmp_path / "data" / "normalized" / "fund_flow"
-    market.mkdir(parents=True)
-    flow.mkdir(parents=True)
-    for index in range(10):
-        (market / f"{index:06d}.SH.csv").write_text("trade_date,close\n20260710,10\n", encoding="utf-8")
-    for index in range(5):
-        (flow / f"{index:06d}.SH.csv").write_text("trade_date,buy_sm_amount\n20260710,1\n", encoding="utf-8")
+def test_data_health_fails_visible_when_canonical_audits_are_missing(tmp_path):
     service = VNextService(project_root=tmp_path, artifact_root=tmp_path / "artifacts")
     result = service.build_data_health("2026-07-10")
-    fund_flow = next(item for item in result["sources"] if item["source"] == "Tushare资金流")
-    assert fund_flow["status"] == "PARTIAL"
-    assert fund_flow["expected_files"] == 10
-    assert fund_flow["coverage_ratio"] == 0.5
+    assert result["status"] == "MISSING"
+    assert result["confidence"] == 0.0
+    assert result["missing_evidence"] == [
+        "datahub:coverage", "datahub:freshness", "datahub:integrity", "vnext:data-audit"
+    ]
 
 
-def test_data_health_marks_old_directory_files_stale(tmp_path):
-    market = tmp_path / "data" / "normalized" / "market"
-    market.mkdir(parents=True)
-    path = market / "600000.SH.csv"
-    path.write_text("trade_date,close\n20260101,10\n", encoding="utf-8")
-    stale_epoch = datetime(2026, 1, 1).timestamp()
-    os.utime(path, (stale_epoch, stale_epoch))
+def test_data_health_marks_old_audit_artifact_stale(tmp_path):
+    _write_audit(
+        tmp_path,
+        "data/audit/health/coverage.json",
+        {"generated_at": "2026-01-01T15:30:00+08:00", "universe_status": "OK", "stocks_with_data": 5530},
+    )
     service = VNextService(project_root=tmp_path, artifact_root=tmp_path / "artifacts")
     result = service.build_data_health("2026-07-10")
-    daily = next(item for item in result["sources"] if item["source"] == "Tushare日线")
-    assert daily["status"] == "STALE"
-    assert daily["message"].startswith("age_days=")
+    coverage = next(item for item in result["sources"] if item["source"] == "datahub:coverage")
+    assert coverage["status"] == "STALE"
+    assert coverage["age_days"] > 2

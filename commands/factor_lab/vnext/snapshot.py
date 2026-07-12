@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
+
+from factor_lab.datahub_access import LIVE_SNAPSHOT_PATH, read_live_snapshot
 
 from .contracts import DataStatus, QualityStatus, Tradability, clamp, finite_number, now_iso, sha256_payload
 from .providers import (
@@ -70,9 +73,7 @@ class HubSnapshotBuilder:
         self.data_root = self.project_root / "data"
         self.daily_root = self.data_root / "normalized" / "market"
         self.market_series_root = self.data_root / "normalized" / "market_series"
-        self.live_snapshot = Path(live_snapshot) if live_snapshot else Path(
-            "/mnt/c/Users/ly/.codex/data/a-share-data-hub/market/live_snapshot.csv"
-        )
+        self.live_snapshot = Path(live_snapshot) if live_snapshot else LIVE_SNAPSHOT_PATH
         self.source_statuses: list[dict[str, Any]] = []
         self.provider_route_summaries: list[dict[str, Any]] = []
         if provider_router is None:
@@ -251,6 +252,12 @@ class HubSnapshotBuilder:
 
     def _load_live_snapshot(self, as_of: str) -> pd.DataFrame:
         source = f"local:{self.live_snapshot}"
+        validation_now = pd.Timestamp(as_of, tz="Asia/Shanghai").replace(hour=15, minute=0, second=0)
+        try:
+            read_live_snapshot(path=self.live_snapshot, max_age_seconds=36 * 60 * 60, now=validation_now.to_pydatetime())
+        except (FileNotFoundError, OSError, ValueError, json.JSONDecodeError) as exc:
+            self._record(source, DataStatus.MISSING, 0, f"canonical DataHub manifest validation failed: {exc}")
+            return pd.DataFrame()
         route = self.provider_router.route(
             ProviderQuery(
                 dataset="live_snapshot",

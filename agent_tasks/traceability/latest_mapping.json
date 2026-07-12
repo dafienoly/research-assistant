@@ -1139,6 +1139,17 @@
       ],
       "expected_keywords": ["fcntl.flock", "os.replace", "fsync", "update_json", "human_approved_shadow"],
       "behavior": "注册、人工确认、Shadow 与 pending 队列共享 flock+atomic replace 的完整读改写事务；并发注册不会丢 index 条目，现有 D 盘格式不迁移不删除。"
+    },
+    {
+      "id": "INFRA-VNEXT-DATAHEALTH-01",
+      "title": "VNext 健康状态与实时快照统一 DataHub 证据",
+      "code_locations": [
+        {"file": "commands/factor_lab/vnext/service.py", "function": "build_data_health", "line": 145},
+        {"file": "commands/factor_lab/vnext/service.py", "function": "_health_audit_item", "line": 180},
+        {"file": "commands/factor_lab/vnext/snapshot.py", "function": "_load_live_snapshot", "line": 252}
+      ],
+      "expected_keywords": ["coverage.json", "freshness.json", "integrity.json", "LIVE_SNAPSHOT_PATH", "read_live_snapshot", "canonical DataHub manifest validation failed"],
+      "behavior": "VNext 不按目录数量、mtime 或 provider 名称猜测健康；只读取 canonical 审计证据，缺失/损坏/过期 fail-visible。实时 CSV 必须先通过 DataHub manifest、SHA、观测时间和 schema 校验。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

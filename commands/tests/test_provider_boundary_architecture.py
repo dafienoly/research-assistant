@@ -41,3 +41,16 @@ def test_provider_sdks_exist_only_at_datahub_ingestion_boundaries() -> None:
 
 def test_global_dns_monkeypatch_module_is_retired() -> None:
     assert not (ROOT / "commands/dns_patch.py").exists()
+
+
+def test_vnext_health_and_snapshot_use_canonical_datahub_contracts() -> None:
+    service_source = (ROOT / "commands/factor_lab/vnext/service.py").read_text(encoding="utf-8")
+    snapshot_source = (ROOT / "commands/factor_lab/vnext/snapshot.py").read_text(encoding="utf-8")
+    assert "/mnt/c/Users/" not in service_source
+    assert "/mnt/c/Users/" not in snapshot_source
+    assert "data/audit/health" not in service_source
+    assert '"coverage.json"' in service_source
+    assert '"freshness.json"' in service_source
+    assert '"integrity.json"' in service_source
+    assert "LIVE_SNAPSHOT_PATH" in snapshot_source
+    assert "read_live_snapshot" in snapshot_source

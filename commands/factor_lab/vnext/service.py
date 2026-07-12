@@ -11,7 +11,6 @@ from typing import Any, Mapping
 import pandas as pd
 
 from .contracts import DataStatus, TradingMode, now_iso
-from .data_quality import DataQualityGate
 from .execution import TelegramApprovalGate
 from .market import compute_index_box, compute_policy_support_proxy, compute_style_rotation_matrix
 from .ml import CrossSectionalRanker
@@ -142,63 +141,14 @@ class VNextService:
         return self.store.read(component, as_of)
 
     def build_data_health(self, as_of: str, *, snapshot: Mapping[str, Any] | None = None) -> dict[str, Any]:
-        external = Path("/mnt/c/Users/ly/.codex/data/a-share-data-hub")
-        paths = {
-            "Tushare日线": self.project_root / "data" / "normalized" / "market",
-            "Tushare估值": self.project_root / "data" / "normalized" / "market",
-            "Tushare资金流": self.project_root / "data" / "normalized" / "fund_flow",
-            "Tushare财务": self.project_root / "data" / "normalized" / "fundamentals",
-            "AkShare实时快照": external / "market" / "live_snapshot.csv",
-            "腾讯行情": self.project_root / "data" / "market" / "live_snapshot.csv",
-            "东方财富盘中": external / "intraday" / "live_snapshot_priority.csv",
-            "ETF数据": self.store.root / "snapshot" / f"{as_of}.json",
-            "港股数据": self.project_root / "data" / "normalized" / "hong_kong",
-            "海外代理数据": self.project_root / "data" / "normalized" / "overseas_proxy",
-            "事件新闻": external / "events" / "preopen_events.csv",
-        }
-        items: list[dict[str, Any]] = []
-        for name, path in paths.items():
-            if path.is_dir():
-                files = [item for item in path.iterdir() if item.is_file()]
-                if name == "Tushare日线":
-                    files = [item for item in files if item.suffix.lower() == ".csv" and not item.name.startswith("valuation_")]
-                elif name == "Tushare估值":
-                    files = [item for item in files if item.suffix.lower() == ".csv" and item.name.startswith("valuation_")]
-                status = DataStatus.OK if files else DataStatus.MISSING
-                updated = max((item.stat().st_mtime for item in files), default=None)
-                age_days = (
-                    (pd.Timestamp(as_of).date() - pd.Timestamp(updated, unit="s").date()).days
-                    if updated is not None
-                    else None
-                )
-                if age_days is not None and age_days > 2:
-                    status = DataStatus.STALE
-                items.append(
-                    {
-                        "source": name,
-                        "status": status.value,
-                        "records_or_files": len(files),
-                        "path": str(path),
-                        "updated_at_epoch": updated,
-                        "missing_fields": [],
-                        "message": f"age_days={age_days}" if age_days is not None else "directory empty",
-                    }
-                )
-            else:
-                observation = DataQualityGate(max_age_days=2).inspect_file(name, path, as_of=pd.Timestamp(as_of).date())
-                items.append(observation.to_dict())
-        daily_item = next((item for item in items if item.get("source") == "Tushare日线"), None)
-        expected_files = int((daily_item or {}).get("records_or_files") or 0)
-        if expected_files:
-            for item in items:
-                if item.get("source") not in {"Tushare估值", "Tushare资金流", "Tushare财务"}:
-                    continue
-                observed = int(item.get("records_or_files") or 0)
-                coverage = observed / expected_files
-                item["expected_files"] = expected_files
-                item["coverage_ratio"] = round(coverage, 4)
-                if observed > 0 and coverage < 0.95 and item.get("status") == DataStatus.OK.value:
-                    item["status"] = DataStatus.PARTIAL.value
+        audit_root = self.project_root / "data" / "audit" / "health"
+        audit_specs = (
+            ("datahub:coverage", audit_root / "coverage.json", "universe_status"),
+            ("datahub:freshness", audit_root / "freshness.json", "status"),
+            ("datahub:integrity", audit_root / "integrity.json", "status"),
+            ("vnext:data-audit", self.project_root / "artifacts" / "vnext" / "data_audit_report.json", "status"),
+        )
+        items = [self._health_audit_item(name, path, status_field, as_of) for name, path, status_field in audit_specs]
         if snapshot:
             items.extend(list(snapshot.get("source_statuses", [])))
         bad = [item for item in items if item.get("status") != DataStatus.OK.value]
@@ -217,6 +167,67 @@ class VNextService:
             "missing_evidence": [item.get("source", "unknown") for item in bad],
             "truthfulness": "no mock/demo/fallback substitution",
             "updated_at": now_iso(),
+        }
+
+    @staticmethod
+    def _health_audit_item(source: str, path: Path, status_field: str, as_of: str) -> dict[str, Any]:
+        base = {
+            "source": source,
+            "path": str(path),
+            "status": DataStatus.MISSING.value,
+            "records_or_files": 0,
+            "generated_at": None,
+            "message": "canonical audit artifact missing",
+        }
+        if not path.is_file():
+            return base
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            return {**base, "status": DataStatus.PARTIAL.value, "message": f"canonical audit unreadable: {exc}"}
+        if not isinstance(payload, dict):
+            return {**base, "status": DataStatus.PARTIAL.value, "message": "canonical audit is not a JSON object"}
+
+        raw_status = str(payload.get(status_field, "MISSING")).upper()
+        status = raw_status if raw_status in {item.value for item in DataStatus} else DataStatus.PARTIAL.value
+        generated_at = payload.get("generated_at") or payload.get("observed_at")
+        generated = pd.to_datetime(generated_at, errors="coerce", utc=True)
+        target = pd.Timestamp(as_of, tz="Asia/Shanghai")
+        age_days = max(0, (target.date() - generated.date()).days) if pd.notna(generated) else None
+        if generated_at is None or pd.isna(generated):
+            status = DataStatus.PARTIAL.value
+        elif age_days is not None and age_days > 2:
+            status = DataStatus.STALE.value
+
+        evidence = {
+            key: payload.get(key)
+            for key in (
+                "universe_status",
+                "total_stocks",
+                "stocks_with_data",
+                "active_missing_files",
+                "blocking_stock_count",
+                "files_checked",
+                "problematic_file_count",
+                "data_freshness_status",
+                "data_gap_status",
+                "formal_ml_status",
+                "shadow_status",
+                "order_draft_status",
+                "blocking_reasons",
+                "warnings",
+                "recovery",
+            )
+            if key in payload
+        }
+        return {
+            **base,
+            "status": status,
+            "records_or_files": int(payload.get("files_checked") or payload.get("stocks_with_data") or 1),
+            "generated_at": generated_at,
+            "age_days": age_days,
+            "evidence": evidence,
+            "message": "canonical DataHub audit evidence",
         }
 
     def execution_status(self, as_of: str) -> dict[str, Any]:

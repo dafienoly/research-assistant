@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -75,8 +77,12 @@ def test_router_never_promotes_alternative_when_primary_is_missing(tmp_path):
 
 
 def test_router_records_conflict_without_overwriting_primary(tmp_path):
-    primary_reader = lambda _: pd.DataFrame([{"trade_date": "20260710", "close": 10.5}])
-    alternative_reader = lambda _: pd.DataFrame([{"trade_date": "20260710", "close": 10.8}])
+    def primary_reader(_):
+        return pd.DataFrame([{"trade_date": "20260710", "close": 10.5}])
+
+    def alternative_reader(_):
+        return pd.DataFrame([{"trade_date": "20260710", "close": 10.8}])
+
     registry = ProviderRegistry()
     registry.register(CallableFrameFetcher("primary", primary_reader))
     registry.register(CallableFrameFetcher("secondary", alternative_reader))
@@ -178,7 +184,19 @@ def test_hub_snapshot_uses_provider_router_and_emits_manifest_bound_snapshot_id(
     daily_root = data_root / "normalized" / "market"
     daily_root.mkdir(parents=True)
     live = data_root / "live_snapshot.csv"
-    live.write_text("symbol,change_pct,update_time\n600183.SH,1.2,2026-07-10T15:00:00+08:00\n", encoding="utf-8")
+    live.write_text(
+        "code,last_price,change_pct,update_time,source\n600183,10.0,1.2,2026-07-10T15:00:00+08:00,test\n",
+        encoding="utf-8",
+    )
+    (live.with_suffix(".manifest.json")).write_text(
+        json.dumps({
+            "status": "OK",
+            "observed_at": "2026-07-10T15:00:00+08:00",
+            "sha256": hashlib.sha256(live.read_bytes()).hexdigest(),
+            "conflicts": [],
+        }),
+        encoding="utf-8",
+    )
 
     dates = pd.date_range("2026-01-01", "2026-07-10", freq="B")
 

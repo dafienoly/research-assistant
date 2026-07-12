@@ -188,3 +188,9 @@ Vite/Rolldown 生产构建原有 1.14 MB 与 550 KB 大块。现按 charts、Ant
 代码审计协调器原来按 change-set 同时缓存 PASS 和 FAIL，环境性失败（例如临时盘满）在环境恢复后仍会永久阻断且不重跑。现只复用已通过结果；失败和异常每次重新执行完整门禁。测试临时目录统一可由 `TMPDIR/TEMP/TMP` 指向 WSL `/tmp`，不通过删除 Windows 临时数据解决容量问题。
 
 内置 Research Skill 的“数据质量”原来只统计 `fetch_log.jsonl` 行数，无法证明数据可用；Registry/Runtime 又把运行状态写入源码树 `agent_tasks`。现 Skill 强制读取有时效限制的 canonical coverage/freshness/integrity 并输出 OK/BLOCKED；运行状态默认迁至 `~/.hermes/state/research-assistant/research-skills`，支持环境覆盖，旧源码树内容保留不删。
+
+## VNext 健康状态与实时快照收口
+
+`VNextService.build_data_health` 原来硬编码开发机共享目录，并用目录文件数量和 CSV mtime 猜测“Tushare/AkShare/腾讯/东方财富”等 provider 健康。这既无法证明数据属于哪个 snapshot，也会把目录存在误报为数据可用。现仅消费 DataHub 生成的 `coverage.json`、`freshness.json`、`integrity.json` 与 VNext data audit；保留生成时间、覆盖/阻断证据和恢复信息。证据缺失、损坏或超过两天均 fail-visible，辅助缺口继续使整体为 `PARTIAL`。
+
+`HubSnapshotBuilder` 的默认实时行情路径现由 `datahub_access.LIVE_SNAPSHOT_PATH` 统一解析。读取 CSV 前强制通过 canonical manifest 状态、SHA-256、观测时间和 schema 校验；验证失败返回 `MISSING`，不再绕过 DataHub 或从其他 provider 回退。架构测试同时禁止 VNext 重新引入用户目录绝对路径和目录扫描式健康判断。
