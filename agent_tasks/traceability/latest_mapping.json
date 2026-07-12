@@ -1281,8 +1281,19 @@
       ],
       "expected_keywords": ["status\": \"BLOCKED", "禁止生成 demo/random", "禁止 demo/random 数据", "DataHub snapshot"],
       "behavior": "策略报告、因子挖掘和行业轮动 Skill 在真实版本化输入契约接入前统一 fail-closed，显式 demo 参数也不会产出报告、候选或绩效。"
+    },
+    {
+      "id": "INFRA-AUTO-RESEARCH-RETIREMENT-01",
+      "title": "自动 Agent 研究与开发入口保持退役",
+      "code_locations": [
+        {"file": "commands/factor_lab/research_loop/__init__.py", "function": "cmd_research_loop", "line": 1098},
+        {"file": "commands/factor_lab/research_loop/__init__.py", "function": "cmd_auto_research", "line": 1754},
+        {"file": "commands/factor_lab/research_loop.py", "function": "cmd_research_loop", "line": 718}
+      ],
+      "expected_keywords": ["自动 Agent 开发系统已退役", "不会评估、入队或注册候选", "BLOCKED"],
+      "behavior": "所有公开自动研究启动函数只返回阻断状态，不实例化旧循环，也不向候选队列或 Alpha Registry 写入。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-12T09:45:00+08:00"
+  "generated_at": "2026-07-12T10:00:00+08:00"
 }

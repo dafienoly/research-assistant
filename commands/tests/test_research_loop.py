@@ -10,6 +10,13 @@ from factor_lab.research_loop import (
 )
 
 
+def test_automatic_research_entrypoints_are_retired() -> None:
+    from factor_lab.research_loop import cmd_auto_research, cmd_research_loop
+
+    assert "BLOCKED" in cmd_research_loop()
+    assert "已退役" in cmd_auto_research()
+
+
 class TestResearchNotebook:
     @pytest.fixture
     def nb(self):

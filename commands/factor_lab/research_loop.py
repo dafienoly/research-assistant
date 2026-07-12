@@ -723,21 +723,11 @@ IC IR: {facts['ic_ir']:.2f}
 
 def cmd_research_loop(notebook: str = "", rounds: int = 5,
                        convergence: int = 5, concurrent: int = 10) -> str:
-    """启动研究循环"""
-    config = ResearchConfig(
-        max_rounds=rounds,
-        convergence_window=convergence,
-        max_concurrent=concurrent,
+    """退役自动 Agent 研究入口，禁止生成或注册候选。"""
+    return (
+        "❌ BLOCKED: research:loop 自动 Agent 开发系统已退役；"
+        "候选只能由版本化 DataHub 研究任务生成并经人工 Promotion 审批"
     )
-    loop = ResearchLoop(notebook_path=notebook, config=config)
-    report = loop.run()
-    lines = [f"✅ 研究循环完成: {report.rounds_completed} 轮, 停止: {report.stop_reason}"]
-    if report.best_factor:
-        lines.append(f"最佳因子: {report.best_factor['expression'][:60]}")
-        lines.append(f"最佳评分: {report.best_factor['score']:.1f}")
-    if report.new_knowledge:
-        lines.append(f"新增知识条目: {len(report.new_knowledge)}")
-    return "\n".join(lines)
 
 
 # ═══════════════════════════════════════════════════════
@@ -1417,15 +1407,7 @@ def cmd_auto_research(market_context: str = "", max_rounds: int = 5,
     Returns:
         str: 结果摘要
     """
-    config = {"max_rounds": max_rounds}
-    if output_dir:
-        config["output_dir"] = output_dir
-    loop = AutoResearchLoop(config=config)
-    result = loop.run(market_context=market_context)
-    lines = [
-        f"✅ AutoResearchLoop 完成: {result['rounds']} 轮",
-        f"停止原因: {result['stop_reason']}",
-        f"最佳评分: {result['best_score']:.2f}",
-        f"耗时: {result['duration']:.0f}s",
-    ]
-    return "\n".join(lines)
+    return (
+        "❌ BLOCKED: AutoResearchLoop 自动 Agent 开发系统已退役；"
+        "不会评估、入队或注册候选"
+    )
