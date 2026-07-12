@@ -55,7 +55,7 @@ class VectorbtFastLaneAdapter:
         self.project_root = Path(project_root).resolve()
         self.python = self.project_root / ".venv_vectorbt" / "bin" / "python"
         self.worker = self.project_root / "commands" / "vectorbt_worker.py"
-        self.lock_file = self.project_root / "requirements" / "vectorbt.lock"
+        self.lock_file = self.project_root / "requirements" / "vectorbt.hashed.lock"
 
     def run(
         self,

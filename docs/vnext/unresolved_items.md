@@ -22,7 +22,7 @@
 
 ## 供应链与产品化剩余风险
 
-- Core Python 使用 `requirements/core.hashed.lock` 和 `--require-hashes`；隔离研究/sidecar 锁仍需逐步补齐制品哈希，SBOM/许可证报告不能替代来源完整性证明。
+- Core 与实际启用的隔离 vectorbt Python 环境均使用完整 hashed lock 和 `--require-hashes`，审批清单固定 plain/hashed 文件 SHA，SBOM记录两类摘要。vn.py/OpenBB/FinRL 仍为 comment-only 未安装状态；若未来启用，必须先解析并生成各自 hashed lock，SBOM/许可证报告不能替代来源完整性证明。
 - 前端已完成路由懒加载和 Rolldown vendor 分组，最大生产块约 175 KB且无 chunk-size warning；应用内浏览器不可用导致真实 console/点击/截图仍待验收。
 - vectorbt 受 Apache-2.0 + Commons Clause 约束，仅批准隔离内部研究；商业托管或分发前需重新审查。
 - vn.py、OpenBB、FinRL/FinRL-X、Qbot 均未装入 Core；comment-only lock 表示“未安装”，不能宣称对应运行时已适配完成。

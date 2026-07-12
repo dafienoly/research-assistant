@@ -206,3 +206,7 @@ Promotion Queue 原来由各进程分别读取整个 JSON 后覆盖写回，`add
 分钟实时快照仍需每分钟执行，不能使用日级 checkpoint DAG；其唯一 ingestion 入口现于获取全市场行情前读取同一 canonical 交易日历。休市日返回 `SKIPPED/non_trading_day`，日历缺失返回 FAILED，不访问上游、不覆盖上一个有效快照。Decision Cycle 自身的第二道交易日门禁保持不变。
 
 通知 worker 原来仅在工作日 09:00–15:59 消费 outbox，15:45 启动的 postmarket DAG 常在 worker 停止后才产生告警，周日 weekly DAG 也没有消费者。现 worker 每天 08:00–20:59 运行；盘后和周末运维失败可以在同一运行窗口投递，Telegram 与企业微信仍共享事件关闭状态并保留独立回执。
+
+## Active Python 供应链哈希闭环
+
+Core 已有 `--require-hashes`，但隔离 vectorbt 环境仍从 plain exact-pin lock 安装，审批清单和运行结果也只引用 plain lock。现为 vectorbt 的 55 个实际安装依赖生成完整 PyPI release SHA-256 lock，CI 使用 `pip install --require-hashes`；依赖审批清单同时固定 plain/hashed 两个文件的 SHA，VNext CI Gate 验证每个 exact pin 至少有一个包哈希。SBOM 同时记录两个 active 环境的 plain/hashed lock 摘要，Vectorbt worker 运行证据引用 hashed lock。三个 comment-only 未安装 sidecar 不生成虚假空哈希锁。

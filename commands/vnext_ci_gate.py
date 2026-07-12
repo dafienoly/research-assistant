@@ -60,8 +60,36 @@ class VNextCIGate:
                     pin_errors = ["deferred environment contains active requirements"]
                 if pin_errors:
                     errors.append(f"UNPINNED_OR_UNAPPROVED_LOCK:{name}")
+            hashed_lock = environment.get("hashed_lock_file")
+            hashed_hash_ok = None
+            hash_coverage_errors: list[str] = []
+            if hashed_lock:
+                hashed_path = root / str(hashed_lock)
+                hashed_expected = str(environment.get("hashed_lock_sha256") or "")
+                hashed_hash_ok = hashed_path.is_file() and _sha256(hashed_path) == hashed_expected
+                if not hashed_hash_ok:
+                    errors.append(f"HASHED_LOCK_HASH_MISMATCH:{name}")
+                elif environment["status"] in {"active", "active_isolated"} and lock_path.suffix == ".lock":
+                    hashed_text = hashed_path.read_text(encoding="utf-8")
+                    exact_pins = [line for line in active_lines if PIN_RE.fullmatch(line)]
+                    hash_coverage_errors = [
+                        pin
+                        for pin in exact_pins
+                        if f"{pin} \\\n" not in hashed_text
+                        or "--hash=sha256:" not in hashed_text.split(f"{pin} \\\n", 1)[1].split("\n", 1)[0]
+                    ]
+                    if hash_coverage_errors:
+                        errors.append(f"HASHED_LOCK_INCOMPLETE:{name}")
             lock_results.append(
-                {"environment": name, "path": str(lock_path.relative_to(root)), "hash_ok": hash_ok, "pin_errors": pin_errors}
+                {
+                    "environment": name,
+                    "path": str(lock_path.relative_to(root)),
+                    "hash_ok": hash_ok,
+                    "pin_errors": pin_errors,
+                    "hashed_lock_path": str(hashed_lock) if hashed_lock else None,
+                    "hashed_hash_ok": hashed_hash_ok,
+                    "hash_coverage_errors": hash_coverage_errors,
+                }
             )
         checks["dependency_locks"] = lock_results
 

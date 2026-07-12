@@ -15,12 +15,16 @@ environments:
     status: active
     lock_file: requirements/core.lock
     sha256: 9577091a0b08718324bfbe8fca5fe380572ec0fa86fb5d1065a9d657ecf58b39
+    hashed_lock_file: requirements/core.hashed.lock
+    hashed_lock_sha256: f9e61385841102f47bb52bd88114667d28a02ac4130eb57b9f921a88575742c1
     allow_all_exactly_locked_packages: true
     prohibited_packages: [vectorbt, vnpy, openbb, finrl]
   hermes-research-vectorbt:
     status: active_isolated
     lock_file: requirements/vectorbt.lock
     sha256: 7644b92b35332d89522058e0377979531c9c7721f76a80641cb6a7f5cb540d22
+    hashed_lock_file: requirements/vectorbt.hashed.lock
+    hashed_lock_sha256: a02c66082e4db7528bcd6a7b64fd46a2e0fc67f8924de6603f97ea5c54b576d8
     approval: conditional_research_only
     prohibited_capabilities: [network_data_download, broker_import, order_transmission]
   hermes-execution-vnpy:

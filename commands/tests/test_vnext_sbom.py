@@ -27,15 +27,16 @@ def test_cyclonedx_sbom_covers_core_and_isolated_vectorbt(tmp_path: Path) -> Non
     assert not any(item["name"].lower() in {"vnpy", "openbb", "finrl"} for item in document["components"])
 
 
-def test_core_hashed_lock_covers_every_exact_pin() -> None:
-    plain = [
-        line.strip()
-        for line in (PROJECT_ROOT / "requirements" / "core.lock").read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.startswith("#")
-    ]
-    hashed = (PROJECT_ROOT / "requirements" / "core.hashed.lock").read_text(encoding="utf-8")
-    for pin in plain:
-        marker = f"{pin} \\\n"
-        assert marker in hashed
-        block = hashed.split(marker, 1)[1].split("\n", 1)[0]
-        assert "--hash=sha256:" in block
+def test_active_hashed_locks_cover_every_exact_pin() -> None:
+    for environment in ("core", "vectorbt"):
+        plain = [
+            line.strip()
+            for line in (PROJECT_ROOT / "requirements" / f"{environment}.lock").read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.startswith("#")
+        ]
+        hashed = (PROJECT_ROOT / "requirements" / f"{environment}.hashed.lock").read_text(encoding="utf-8")
+        for pin in plain:
+            marker = f"{pin} \\\n"
+            assert marker in hashed
+            block = hashed.split(marker, 1)[1].split("\n", 1)[0]
+            assert "--hash=sha256:" in block

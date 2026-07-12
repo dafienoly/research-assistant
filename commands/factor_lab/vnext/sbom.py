@@ -64,7 +64,9 @@ class CycloneDXGenerator:
                 )
         lock_files = [
             root / "requirements" / "core.lock",
+            root / "requirements" / "core.hashed.lock",
             root / "requirements" / "vectorbt.lock",
+            root / "requirements" / "vectorbt.hashed.lock",
             root / "requirements" / "execution-vnpy.lock",
             root / "requirements" / "openbb-sidecar.lock",
             root / "requirements" / "finrl-lab.lock",

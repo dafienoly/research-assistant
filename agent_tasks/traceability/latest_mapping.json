@@ -1182,6 +1182,18 @@
       ],
       "expected_keywords": ["* 8-20 * * *", "decision_notification_worker.py", "telegram", "enterprise_wechat"],
       "behavior": "durable outbox 每天 08:00–20:59 有消费者，覆盖 postmarket 与周日 weekly DAG 失败时段；通道回执继续独立。"
+    },
+    {
+      "id": "INFRA-ACTIVE-HASHED-LOCKS-01",
+      "title": "Active Python 环境全量制品哈希",
+      "code_locations": [
+        {"file": "commands/vnext_ci_gate.py", "function": "run", "line": 35},
+        {"file": "commands/factor_lab/vnext/sbom.py", "function": "generate", "line": 40},
+        {"file": "commands/factor_lab/vnext/vectorbt_adapter.py", "function": "__init__", "line": 54},
+        {"file": "scripts/generate_hashed_lock.py", "function": "generate", "line": 32}
+      ],
+      "expected_keywords": ["vectorbt.hashed.lock", "--require-hashes", "hashed_lock_sha256", "HASHED_LOCK_INCOMPLETE", "--hash=sha256:"],
+      "behavior": "Core 与 vectorbt active 环境的每个 exact pin 都绑定 PyPI SHA-256；CI 固定并验证 hashed lock 文件及覆盖率，SBOM和运行证据引用 hashed lock。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
