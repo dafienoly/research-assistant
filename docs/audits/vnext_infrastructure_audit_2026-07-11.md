@@ -210,3 +210,7 @@ Promotion Queue 原来由各进程分别读取整个 JSON 后覆盖写回，`add
 ## Active Python 供应链哈希闭环
 
 Core 已有 `--require-hashes`，但隔离 vectorbt 环境仍从 plain exact-pin lock 安装，审批清单和运行结果也只引用 plain lock。现为 vectorbt 的 55 个实际安装依赖生成完整 PyPI release SHA-256 lock，CI 使用 `pip install --require-hashes`；依赖审批清单同时固定 plain/hashed 两个文件的 SHA，VNext CI Gate 验证每个 exact pin 至少有一个包哈希。SBOM 同时记录两个 active 环境的 plain/hashed lock 摘要，Vectorbt worker 运行证据引用 hashed lock。三个 comment-only 未安装 sidecar 不生成虚假空哈希锁。
+
+## 因子失败归因 DataHub 边界
+
+`alpha/failure_db.py` 正常使用 canonical benchmark，但在 benchmark 模块导入失败时会改走 `mx_data.get_index_daily` 直接联网，形成异常路径的第二套数据实现。该 fallback 已物理删除：canonical benchmark 不可用时 regime 诚实返回 `unknown`。Provider boundary 架构测试现把 `mx_data` 与 Tushare/AkShare/Baostock/JQData 同等视为下游禁止导入的 provider wrapper。

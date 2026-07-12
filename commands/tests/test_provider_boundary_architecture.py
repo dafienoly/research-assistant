@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PROVIDER_MODULES = {"akshare", "baostock", "jqdatasdk", "tushare"}
+PROVIDER_MODULES = {"akshare", "baostock", "jqdatasdk", "mx_data", "tushare"}
 ALLOWED_PREFIXES = (
     "commands/data_providers/",
     "commands/factor_lab/data/",

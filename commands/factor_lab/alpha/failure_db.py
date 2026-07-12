@@ -13,7 +13,6 @@
 """
 
 import json
-import os
 import csv
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone, timedelta
@@ -206,7 +205,6 @@ class FailureDatabase:
         如果不可用，返回 unknown。
         """
         try:
-            import numpy as np
 
             # 尝试加载基准指数数据
             try:
@@ -216,33 +214,7 @@ class FailureDatabase:
                 )
                 bench = get_benchmark_returns(make_benchmark_spec("CSI300"))
             except ImportError:
-                # 降级：尝试通过 mx-data 获取
                 bench = None
-                try:
-                    from mx_data import mx_data
-                    df = mx_data.get_index_daily(
-                        index_code="000300.SH",
-                        count=60,
-                        fields=["trade_date", "pct_chg"],
-                    )
-                    if df is not None and not df.empty:
-                        returns = df["pct_chg"].values / 100.0
-                        # 构造一个类似 Series
-                        class _Series:
-                            def __init__(self, data):
-                                self._data = data
-                            def tail(self, n):
-                                return _Series(self._data[-n:])
-                            def __len__(self):
-                                return len(self._data)
-                            def prod(self):
-                                p = 1.0
-                                for v in self._data:
-                                    p *= 1 + v
-                                return p - 1
-                        bench = _Series(returns)
-                except Exception:
-                    bench = None
 
             if bench is None or (hasattr(bench, "__len__") and len(bench) < 20):
                 return "unknown"

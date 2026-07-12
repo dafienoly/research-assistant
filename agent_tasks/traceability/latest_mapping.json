@@ -1194,6 +1194,16 @@
       ],
       "expected_keywords": ["vectorbt.hashed.lock", "--require-hashes", "hashed_lock_sha256", "HASHED_LOCK_INCOMPLETE", "--hash=sha256:"],
       "behavior": "Core 与 vectorbt active 环境的每个 exact pin 都绑定 PyPI SHA-256；CI 固定并验证 hashed lock 文件及覆盖率，SBOM和运行证据引用 hashed lock。"
+    },
+    {
+      "id": "INFRA-FAILURE-DB-DATAHUB-01",
+      "title": "因子失败归因不绕过 DataHub",
+      "code_locations": [
+        {"file": "commands/factor_lab/alpha/failure_db.py", "function": "_detect_market_regime", "line": 201},
+        {"file": "commands/tests/test_provider_boundary_architecture.py", "function": "test_provider_sdks_exist_only_at_datahub_ingestion_boundaries", "line": 22}
+      ],
+      "expected_keywords": ["get_benchmark_returns", "make_benchmark_spec", "mx_data", "provider SDK outside DataHub boundary"],
+      "behavior": "失败归因只读 canonical benchmark；模块不可用返回 unknown，不通过 mx_data 自行联网。架构测试阻止 provider wrapper 再进入下游。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
