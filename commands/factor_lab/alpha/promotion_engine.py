@@ -21,10 +21,14 @@
     - promote 后 alpha 默认 enabled=False
 """
 
-import sys, os, json, csv, shutil
+import os
+import json
+import csv
+import shutil
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+
+from factor_lab.alpha.storage import append_jsonl_unique, read_json, update_json, write_json
 
 CST = timezone(timedelta(hours=8))
 BASE = Path("/mnt/d/HermesReports")
@@ -55,14 +59,13 @@ class PromotionQueue:
         self.queue: list = []
 
     def _load_queue(self) -> list:
-        if PROMOTION_QUEUE_FILE.exists():
-            return json.loads(PROMOTION_QUEUE_FILE.read_text())
-        return []
+        queue = read_json(PROMOTION_QUEUE_FILE, [])
+        if not isinstance(queue, list):
+            raise ValueError("promotion queue must be a JSON list")
+        return queue
 
     def _save_queue(self, queue: list):
-        PROMOTION_QUEUE_FILE.write_text(
-            json.dumps(queue, indent=2, ensure_ascii=False)
-        )
+        write_json(PROMOTION_QUEUE_FILE, queue)
 
     def add(self, candidate_id: str, priority: float = 0.5,
             notes: str = "") -> dict:
@@ -76,12 +79,6 @@ class PromotionQueue:
         返回:
             队列条目 dict
         """
-        queue = self._load_queue()
-
-        # 查重
-        if any(item["candidate_id"] == candidate_id for item in queue):
-            return {"error": f"候选 {candidate_id} 已在队列中", "candidate_id": candidate_id}
-
         # 检查 governance review
         from factor_lab.alpha.governance import GovernanceReview
         review = GovernanceReview().get_review(candidate_id)
@@ -110,18 +107,35 @@ class PromotionQueue:
             "added_at": datetime.now(CST).isoformat(),
             "status": "pending",  # pending / processing / promoted / failed
         }
-        queue.append(entry)
-        self._save_queue(queue)
-        return {"entry": entry, "status": "queued"}
+        outcome: dict = {}
+
+        def mutate(queue: list) -> list:
+            if not isinstance(queue, list):
+                raise ValueError("promotion queue must be a JSON list")
+            if any(item.get("candidate_id") == candidate_id for item in queue):
+                outcome.update({"error": f"候选 {candidate_id} 已在队列中", "candidate_id": candidate_id})
+                return queue
+            queue.append(entry)
+            outcome.update({"entry": entry, "status": "queued"})
+            return queue
+
+        update_json(PROMOTION_QUEUE_FILE, [], mutate)
+        return outcome
 
     def remove(self, candidate_id: str) -> dict:
         """从队列移除候选"""
-        queue = self._load_queue()
-        new_queue = [item for item in queue if item["candidate_id"] != candidate_id]
-        if len(new_queue) == len(queue):
-            return {"error": f"候选 {candidate_id} 不在队列中"}
-        self._save_queue(new_queue)
-        return {"status": "removed", "candidate_id": candidate_id}
+        outcome: dict = {}
+
+        def mutate(queue: list) -> list:
+            new_queue = [item for item in queue if item.get("candidate_id") != candidate_id]
+            if len(new_queue) == len(queue):
+                outcome.update({"error": f"候选 {candidate_id} 不在队列中"})
+            else:
+                outcome.update({"status": "removed", "candidate_id": candidate_id})
+            return new_queue
+
+        update_json(PROMOTION_QUEUE_FILE, [], mutate)
+        return outcome
 
     def list_queue(self, status: str = "") -> list:
         """列出队列
@@ -140,23 +154,32 @@ class PromotionQueue:
 
     def update_status(self, candidate_id: str, new_status: str) -> dict:
         """更新队列条目状态"""
-        queue = self._load_queue()
-        for item in queue:
-            if item["candidate_id"] == candidate_id:
-                item["status"] = new_status
-                item["updated_at"] = datetime.now(CST).isoformat()
-                self._save_queue(queue)
-                return {"status": "updated", "candidate_id": candidate_id,
-                        "new_status": new_status}
-        return {"error": f"候选 {candidate_id} 不在队列中"}
+        outcome: dict = {}
+
+        def mutate(queue: list) -> list:
+            for item in queue:
+                if item.get("candidate_id") == candidate_id:
+                    item["status"] = new_status
+                    item["updated_at"] = datetime.now(CST).isoformat()
+                    outcome.update({"status": "updated", "candidate_id": candidate_id, "new_status": new_status})
+                    return queue
+            outcome.update({"error": f"候选 {candidate_id} 不在队列中"})
+            return queue
+
+        update_json(PROMOTION_QUEUE_FILE, [], mutate)
+        return outcome
 
     def clear_completed(self) -> dict:
         """清理已完成或失败的项目"""
-        queue = self._load_queue()
-        active = [item for item in queue if item["status"] in ("pending", "processing")]
-        removed = len(queue) - len(active)
-        self._save_queue(active)
-        return {"removed": removed, "remaining": len(active)}
+        outcome: dict = {}
+
+        def mutate(queue: list) -> list:
+            active = [item for item in queue if item.get("status") in ("pending", "processing")]
+            outcome.update({"removed": len(queue) - len(active), "remaining": len(active)})
+            return active
+
+        update_json(PROMOTION_QUEUE_FILE, [], mutate)
+        return outcome
 
     def queue_stats(self) -> dict:
         """队列统计"""
@@ -385,10 +408,13 @@ class PromotionEngine:
                 "governance_score": record.get("governance_score", 0),
                 "governance_verdict": record.get("governance_verdict", ""),
             }
-            with open(PROMOTION_HISTORY_FILE, "a") as f:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except Exception:
-            pass
+            append_jsonl_unique(
+                PROMOTION_HISTORY_FILE,
+                entry,
+                unique_fields=("candidate_id", "alpha_id"),
+            )
+        except (OSError, TypeError, ValueError) as exc:
+            record.setdefault("persistence_warnings", []).append(f"promotion history append failed: {exc}")
 
     def get_promotion(self, alpha_id: str) -> dict:
         """获取晋级记录"""
@@ -482,13 +508,13 @@ def generate_promotion_report(output_dir: str = "") -> dict:
 
     # Audit
     with open(os.path.join(output_dir, "audit.log"), "w") as f:
-        f.write(f"=== ALPHA PROMOTION AUDIT V3.9 ===\n")
+        f.write("=== ALPHA PROMOTION AUDIT V3.9 ===\n")
         f.write(f"Report at: {report['generated_at']}\n")
         f.write(f"Total promotions: {total}\n")
         f.write(f"Avg governance score: {avg_score:.4f}\n")
-        f.write(f"Auto apply: False\n")
-        f.write(f"No live trade: True\n")
-        f.write(f"=== END ===\n")
+        f.write("Auto apply: False\n")
+        f.write("No live trade: True\n")
+        f.write("=== END ===\n")
 
     return {
         "output_dir": output_dir,
@@ -621,7 +647,7 @@ def cmd_promotion_queue_stats() -> None:
     """CLI 入口: alpha:promotion-queue-stats"""
     pq = PromotionQueue()
     stats = pq.queue_stats()
-    print(f"\n  📊 Promotion Queue Stats")
+    print("\n  📊 Promotion Queue Stats")
     print(f"  {'='*40}")
     print(f"  Total: {stats['total']}")
     for status, count in stats.get("by_status", {}).items():
@@ -637,14 +663,14 @@ def cmd_promote(candidate_id: str, override: bool = False) -> dict:
         print(f"❌ {result['error']}")
         return result
     print(f"\n{'='*60}")
-    print(f"  🚀 Alpha Promotion V3.9")
+    print("  🚀 Alpha Promotion V3.9")
     print(f"  Candidate: {result.get('candidate_name', '?')} ({candidate_id})")
     print(f"  Alpha ID: {result['alpha_id']}")
     print(f"{'='*60}")
     print(f"  Governance Score: {result.get('governance_score', 0):.4f}")
     print(f"  Promoted At: {result.get('promoted_at', '?')}")
-    print(f"  Enabled: False")
-    print(f"  Paper/Live: Disabled")
+    print("  Enabled: False")
+    print("  Paper/Live: Disabled")
     print(f"{'='*60}\n")
     return result
 
@@ -653,7 +679,7 @@ def cmd_batch_promote(max_count: int = 0) -> None:
     """CLI 入口: alpha:batch-promote"""
     result = run_batch_promotion(max_count=max_count)
     print(f"\n{'='*60}")
-    print(f"  🚀 Batch Promotion V3.9")
+    print("  🚀 Batch Promotion V3.9")
     print(f"  Total: {result['total']} | "
           f"✅ Succeeded: {result['succeeded']} | "
           f"❌ Failed: {result['failed']}")
@@ -670,7 +696,7 @@ def cmd_promotion_report() -> None:
     """CLI 入口: alpha:promotion-report"""
     result = generate_promotion_report()
     print(f"\n{'='*60}")
-    print(f"  📊 Promotion Report V3.9")
+    print("  📊 Promotion Report V3.9")
     print(f"  Output: {result['output_dir']}")
     print(f"  Total Promotions: {result['stats']['total_promotions']}")
     print(f"  Avg Score: {result['stats']['average_governance_score']:.4f}")

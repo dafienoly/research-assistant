@@ -194,3 +194,7 @@ Vite/Rolldown 生产构建原有 1.14 MB 与 550 KB 大块。现按 charts、Ant
 `VNextService.build_data_health` 原来硬编码开发机共享目录，并用目录文件数量和 CSV mtime 猜测“Tushare/AkShare/腾讯/东方财富”等 provider 健康。这既无法证明数据属于哪个 snapshot，也会把目录存在误报为数据可用。现仅消费 DataHub 生成的 `coverage.json`、`freshness.json`、`integrity.json` 与 VNext data audit；保留生成时间、覆盖/阻断证据和恢复信息。证据缺失、损坏或超过两天均 fail-visible，辅助缺口继续使整体为 `PARTIAL`。
 
 `HubSnapshotBuilder` 的默认实时行情路径现由 `datahub_access.LIVE_SNAPSHOT_PATH` 统一解析。读取 CSV 前强制通过 canonical manifest 状态、SHA-256、观测时间和 schema 校验；验证失败返回 `MISSING`，不再绕过 DataHub 或从其他 provider 回退。架构测试同时禁止 VNext 重新引入用户目录绝对路径和目录扫描式健康判断。
+
+## Promotion Engine 并发持久化收口
+
+Promotion Queue 原来由各进程分别读取整个 JSON 后覆盖写回，`add/remove/update/clear` 并发时会互相覆盖；Promotion history 也直接无锁 append，异常被静默吞掉。现队列操作复用 Alpha storage 的跨进程 `flock`，在同一临界区完成完整读改写，并通过临时文件、`fsync`、`os.replace` 发布。历史使用加锁 `O_APPEND`、文件与目录 `fsync`，以 `candidate_id + alpha_id` 为幂等键；已存在的坏行保持原字节，不因重写或归档被删除。60 路并发队列写与 120 次含重复历史追加测试均证明无丢项、无重复。

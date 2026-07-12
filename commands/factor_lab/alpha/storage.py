@@ -34,6 +34,38 @@ def write_json(path: Path, payload: Any) -> None:
     update_json(path, payload, lambda _current: payload)
 
 
+def append_jsonl_unique(path: Path, payload: dict[str, Any], *, unique_fields: tuple[str, ...]) -> bool:
+    """Append one durable JSONL row once while preserving all existing bytes."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    with lock_path.open("a+", encoding="utf-8") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if path.exists():
+            with path.open("r", encoding="utf-8") as source:
+                for raw in source:
+                    try:
+                        existing = json.loads(raw)
+                    except (TypeError, json.JSONDecodeError):
+                        continue
+                    if isinstance(existing, dict) and all(
+                        existing.get(field) == payload.get(field) for field in unique_fields
+                    ):
+                        return False
+        encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n"
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        try:
+            os.write(descriptor, encoded.encode("utf-8"))
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        directory = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+        return True
+
+
 def _atomic_write(path: Path, payload: Any) -> None:
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{path.name}.", suffix=".tmp", dir=path.parent

@@ -1150,6 +1150,17 @@
       ],
       "expected_keywords": ["coverage.json", "freshness.json", "integrity.json", "LIVE_SNAPSHOT_PATH", "read_live_snapshot", "canonical DataHub manifest validation failed"],
       "behavior": "VNext 不按目录数量、mtime 或 provider 名称猜测健康；只读取 canonical 审计证据，缺失/损坏/过期 fail-visible。实时 CSV 必须先通过 DataHub manifest、SHA、观测时间和 schema 校验。"
+    },
+    {
+      "id": "INFRA-PROMOTION-STORAGE-01",
+      "title": "Promotion Queue 与 History 跨进程原子持久化",
+      "code_locations": [
+        {"file": "commands/factor_lab/alpha/storage.py", "function": "append_jsonl_unique", "line": 38},
+        {"file": "commands/factor_lab/alpha/promotion_engine.py", "function": "add", "line": 65},
+        {"file": "commands/factor_lab/alpha/promotion_engine.py", "function": "_append_history", "line": 400}
+      ],
+      "expected_keywords": ["fcntl.flock", "os.replace", "os.O_APPEND", "os.fsync", "update_json", "unique_fields"],
+      "behavior": "队列完整读改写位于同一 flock 临界区并原子替换；历史按 candidate_id+alpha_id 幂等加锁追加并同步文件和目录，不删除既有或损坏行。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",

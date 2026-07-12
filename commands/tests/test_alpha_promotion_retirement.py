@@ -9,6 +9,7 @@
   6. 安全不变性
 """
 import sys, os, json, shutil
+from concurrent.futures import ThreadPoolExecutor
 import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -246,6 +247,41 @@ def test_promotion_queue_status_update():
         update_result = pq.update_status(cid, "processing")
         assert update_result.get("status") == "updated"
         assert update_result.get("new_status") == "processing"
+
+
+def test_promotion_queue_concurrent_adds_do_not_lose_entries(monkeypatch):
+    monkeypatch.setattr(
+        GovernanceReview,
+        "get_review",
+        lambda _self, candidate_id: {
+            "candidate_name": candidate_id,
+            "governance": {"verdict": "approve", "overall_score": 0.8},
+        },
+    )
+    candidate_ids = [f"concurrent_{index:03d}" for index in range(60)]
+    with ThreadPoolExecutor(max_workers=16) as executor:
+        results = list(executor.map(PromotionQueue().add, candidate_ids))
+    assert all(result.get("status") == "queued" for result in results)
+    queue = PromotionQueue().list_queue()
+    assert {item["candidate_id"] for item in queue} == set(candidate_ids)
+
+
+def test_promotion_history_concurrent_append_is_durable_and_idempotent():
+    engine = PromotionEngine()
+    records = [
+        {
+            "candidate_id": f"candidate_{index:03d}",
+            "alpha_id": f"alpha_{index:03d}",
+            "candidate_name": f"alpha_{index:03d}",
+            "promoted_at": datetime.now(CST).isoformat(),
+        }
+        for index in range(60)
+    ]
+    with ThreadPoolExecutor(max_workers=16) as executor:
+        list(executor.map(engine._append_history, records + records))
+    lines = PROMOTION_HISTORY_FILE.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 60
+    assert len({(row["candidate_id"], row["alpha_id"]) for row in map(json.loads, lines)}) == 60
 
 
 # ═══════════════════════════════════════════════════════════════════
