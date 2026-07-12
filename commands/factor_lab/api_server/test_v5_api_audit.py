@@ -1,7 +1,18 @@
 #!/usr/bin/env python3
 """V5 API Audit — parallel curl-subprocess approach for robust testing."""
-import json, os, sys, time, subprocess, socket
-from datetime import datetime, timezone, timedelta
+
+# This is an operator-run endpoint smoke script, not a pytest suite.  The
+# filename is retained for compatibility with existing release tooling, but
+# automatic pytest collection would execute network calls and, historically,
+# even treated the helper below as a fixture-based test.  Release-only audit
+# entrypoints invoke ``main()`` explicitly.
+__test__ = False
+
+import json
+import os
+import socket
+import time
+from datetime import datetime, timedelta, timezone
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
@@ -73,7 +84,7 @@ DEFAULT_TIMEOUT = 10
 UNIVERSE_TIMEOUT = 210  # /api/universe can block for ~180s building universes
 
 
-def test_endpoint(method: str, path: str, body=None, timeout_s=DEFAULT_TIMEOUT):
+def audit_endpoint(method: str, path: str, body=None, timeout_s=DEFAULT_TIMEOUT):
     """Test a single endpoint. Returns audit dict."""
     url = f"{BASE}{path}"
     result = {
@@ -176,7 +187,7 @@ def main():
     # Test GET endpoints
     for i, path in enumerate(GET_ENDPOINTS, 1):
         timeout_s = UNIVERSE_TIMEOUT if path == "/api/universe" else DEFAULT_TIMEOUT
-        r = test_endpoint("GET", path, timeout_s=timeout_s)
+        r = audit_endpoint("GET", path, timeout_s=timeout_s)
         results.append(r)
 
         if r["passed"]:
@@ -191,7 +202,7 @@ def main():
     # Test POST endpoints
     offset = len(GET_ENDPOINTS)
     for i, (path, body) in enumerate(POST_ENDPOINTS, offset + 1):
-        r = test_endpoint("POST", path, body=body, timeout_s=DEFAULT_TIMEOUT)
+        r = audit_endpoint("POST", path, body=body, timeout_s=DEFAULT_TIMEOUT)
         results.append(r)
 
         if r["passed"]:

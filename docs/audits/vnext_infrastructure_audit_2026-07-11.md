@@ -327,3 +327,15 @@ PassList 的健康来源也已收口：每次生成调用只读 `VNextService.bu
 参数晋级账本补充跨进程原子更新：`production.json` 的版本递增和参数合并现在在同一锁内完成 read-modify-write，临时文件 `fsync` 后替换；并发 80 次更新回归最终版本为 80，未发现丢更新。历史 JSONL 仍单独追加，保留每次晋级的 decision/event/order lineage。
 
 Event Truth 读取增加 DataHub manifest 约束：每个标的必须存在 `run_status=COMPLETE` 的 event-truth manifest、状态为 `OK` 的结果行和匹配的 SHA-256；旧 manifest 没有哈希时按缺失处理，等待下一次受控 ingestion，不通过兼容回退放行旧 CSV。限价、停牌、复权和分红的 provider 归属仍只在 ingestion 层，VNext 只读消费。
+
+## 2026-07-12 第八轮复核：移除遗留数据测试与自动 API 审计收集
+
+全量 pytest 最终为 `3042 passed / 13 skipped / 2 failed / 1 error`。失败来自仓库根目录遗留的 K 线测试：它仍递归检查已退役的 `data/market/daily_kline` 和不存在的根 `data/manifest.json`；错误来自 `test_v5_api_audit.py` 把人工运行的网络 smoke helper `test_endpoint` 当成 pytest 测试函数并要求不存在的 fixture。
+
+现已完成收口：
+
+- 根目录遗留 K 线测试整体标记为 retired/skip，不再读取或遍历数据目录；受控的 canonical 检查只保留 `commands/tests/data/test_kline_freshness_schema.py`，完整覆盖率和新鲜度仍由 DataHub manifest 负责。
+- V5 API 审计脚本保留手工/发布前调用兼容性，但设置 `__test__ = False`，并将 helper 改为 `audit_endpoint`；pytest 不再启动网络请求或把它误收集为 fixture 测试。
+- 本轮定向验证为 `1 skipped`、Ruff 全部通过、`git diff --check` 通过；不创建、不删除、不修补任何数据文件。
+
+这保证“代码审计只在大版本发布前执行”的边界不会被旧测试文件绕过：日常 pytest 不扫描数据和临时目录，发布前仍使用显式 `--major-version` 的 source-only 审计入口。

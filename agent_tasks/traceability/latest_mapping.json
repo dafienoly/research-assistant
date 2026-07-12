@@ -1491,8 +1491,18 @@
       ],
       "expected_keywords": ["sha256", "run_status", "COMPLETE", "manifest.json", "tampered"],
       "behavior": "VNext 只接受完整 manifest、OK 结果和匹配 SHA-256 的事件真值文件；篡改、旧格式或未完成 ingestion 一律返回空证据并阻断下游执行。"
+    },
+    {
+      "id": "P0-LEGACY-AUDIT-COLLECTION-01",
+      "title": "停用遗留数据目录测试和自动 API 审计收集",
+      "code_locations": [
+        {"file": "tests/data/test_kline_freshness_schema.py", "function": "test_legacy_kline_checks_retired", "line": 22},
+        {"file": "commands/factor_lab/api_server/test_v5_api_audit.py", "function": "audit_endpoint", "line": 84}
+      ],
+      "expected_keywords": ["legacy data/market/daily_kline checks retired", "pytestmark", "__test__ = False", "audit_endpoint"],
+      "behavior": "日常 pytest 不扫描遗留数据目录，也不启动网络 API 审计；V5 endpoint smoke 仅在显式人工/发布流程调用 main() 时运行。"
     }
   ],
   "source": "Hermes P0/P1/P2 production-closure implementation",
-  "generated_at": "2026-07-12T10:45:00+08:00"
+  "generated_at": "2026-07-12T12:31:18+08:00"
 }
